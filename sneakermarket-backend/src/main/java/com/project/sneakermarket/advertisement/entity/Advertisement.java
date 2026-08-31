@@ -20,7 +20,7 @@ public class Advertisement {
     private Long adId;
 
     @Column(name = "created_by", nullable = false)
-    private Integer createdBy;
+    private Long createdBy;
 
     @Column(name = "ad_name", nullable = false)
     private String adName;

@@ -19,7 +19,7 @@ public class CreateAdvertisementRequest {
 
     @NotNull(message = "建立者會員編號不可為空")
     @Positive(message = "建立者會員編號必須大於 0")
-    private Integer createdBy;
+    private Long createdBy;
 
     @NotBlank(message = "廣告名稱不可為空")
     @Size(max = 120, message = "廣告名稱不可超過 120 個字元")
