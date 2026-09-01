@@ -52,6 +52,12 @@ const routes = [
     name: 'not-found',
     component: () => import('@/views/NotFoundView.vue'),
   },
+    {
+    path: '/calendar/eventManage',
+    name: 'eventManage',
+    component: () => import('@/views/calendar/EventManage.vue'),
+  }
+  
 ]
 
 const router = createRouter({
