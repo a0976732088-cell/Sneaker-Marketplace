@@ -1,6 +1,9 @@
 <script setup>
 import { computed, ref, reactive } from "vue";
 import { createAdvertisement } from "@/service/advertisementService";
+import { VueDatePicker } from "@vuepic/vue-datepicker";
+import "@vuepic/vue-datepicker/dist/main.css";
+import { zhTW } from "date-fns/locale";
 
 const tabs = ["全部廣告", "進行中", "已排程", "草稿", "已結束"];
 const activeTab = ref("全部廣告");
@@ -104,6 +107,23 @@ const form = reactive({
   sortOrder: 0,
 });
 
+function resetForm() {
+  Object.assign(form, {
+    createdBy: 1,
+    adName: "",
+    imageUrl: "",
+    adDescription: "",
+    adType: "NEW_PRODUCT",
+    adPlacement: "BANNER",
+    startAt: "",
+    endAt: "",
+    targetType: "URL",
+    targetId: null,
+    targetUrl: "",
+    sortOrder: 0,
+  });
+}
+
 function notify(message) {
   let timer = null;
   toast.value = message;
@@ -138,11 +158,12 @@ async function createDraft() {
   try {
     const result = await createAdvertisement(payload);
 
+    resetForm();
     showCreate.value = false;
     notify(result.message);
-    console.log("新增廣告，編號:", result.data);
+    console.log("新增成功");
   } catch (error) {
-    console.error("新增失敗", error.response?.data || error);
+    console.error("新增失敗");
 
     notify(error.response?.data?.message || "請確認後端與資料庫");
   }
@@ -398,13 +419,31 @@ async function createDraft() {
             ></textarea>
           </label>
           <div class="form-grid">
-            <label
-              >開始時間<input
+            <label>
+              開始時間
+              <VueDatePicker
                 v-model="form.startAt"
-                type="datetime-local" /></label
-            ><label
-              >結束時間<input v-model="form.endAt" type="datetime-local"
-            /></label>
+                model-type="yyyy-MM-dd'T'HH:mm"
+                :locale="zhTW"
+                :teleport="true"
+                :formats="{ input: 'yyyy/MM/dd HH:mm' }"
+                :time-config="{ is24: true, timePickerInline: true }"
+                placeholder="選擇日期與時間"
+              />
+            </label>
+
+            <label>
+              結束時間
+              <VueDatePicker
+                v-model="form.endAt"
+                model-type="yyyy-MM-dd'T'HH:mm"
+                :locale="zhTW"
+                :teleport="true"
+                :formats="{ input: 'yyyy/MM/dd HH:mm' }"
+                :time-config="{ is24: true, timePickerInline: true }"
+                placeholder="選擇日期與時間"
+              />
+            </label>
           </div>
         </div>
         <footer>
