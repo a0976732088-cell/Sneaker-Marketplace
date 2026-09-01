@@ -1,11 +1,14 @@
 package com.project.sneakermarket.advertisement.service;
 
+import com.project.sneakermarket.advertisement.dto.AdvertisementResponse;
 import com.project.sneakermarket.advertisement.dto.CreateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import com.project.sneakermarket.advertisement.repository.AdvertisementRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -36,5 +39,34 @@ public class AdvertisementService {
 
 
         return adRepo.save(advertisement);
+    }
+
+    public List<AdvertisementResponse> getAllAdvertisements(){
+        return adRepo.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private AdvertisementResponse toResponse(Advertisement advertisement) {
+        AdvertisementResponse response = new AdvertisementResponse();
+
+        response.setAdId(advertisement.getAdId());
+        response.setAdName(advertisement.getAdName());
+        response.setImageUrl(advertisement.getImageUrl());
+        response.setAdDescription(advertisement.getAdDescription());
+        response.setAdType(advertisement.getAdType());
+        response.setAdPlacement(advertisement.getAdPlacement());
+        response.setStartAt(advertisement.getStartAt());
+        response.setEndAt(advertisement.getEndAt());
+        response.setTargetType(advertisement.getTargetType());
+        response.setTargetId(advertisement.getTargetId());
+        response.setTargetUrl(advertisement.getTargetUrl());
+        response.setSortOrder(advertisement.getSortOrder());
+        response.setAdStatus(advertisement.getAdStatus());
+        response.setCreatedAt(advertisement.getCreatedAt());
+        response.setUpdatedAt(advertisement.getUpdatedAt());
+
+        return response;
     }
 }
