@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, reactive } from "vue";
+import { createAdvertisement } from "@/service/advertisementService";
 
 const tabs = ["全部廣告", "進行中", "已排程", "草稿", "已結束"];
 const activeTab = ref("全部廣告");
@@ -87,9 +88,29 @@ const filteredAds = computed(() =>
   }),
 );
 
+const form = reactive({
+  // 未來登入功能完成後應由登入者資料取得
+  createdBy: 1,
+  adName: "",
+  imageUrl: "",
+  adDescription: "",
+  adType: "NEW_PRODUCT",
+  adPlacement: "BANNER",
+  startAt: "",
+  endAt: "",
+  targetType: "URL",
+  targetId: null,
+  targetUrl: "",
+  sortOrder: 0,
+});
+
 function notify(message) {
+  let timer = null;
   toast.value = message;
-  window.setTimeout(() => {
+
+  if (timer) clearTimeout(timer);
+
+  timer = window.setTimeout(() => {
     toast.value = "";
   }, 2400);
 }
@@ -99,9 +120,32 @@ function toggle(ad) {
   notify(`「${ad.name}」已${ad.status === "進行中" ? "開始投放" : "暫停投放"}`);
 }
 
-function createDraft() {
-  showCreate.value = false;
-  notify("廣告草稿已建立，稍後可繼續編輯");
+async function createDraft() {
+  const payload = {
+    createdBy: form.createdBy,
+    adName: form.adName,
+    imageUrl: form.imageUrl,
+    adDescription: form.adDescription || null,
+    adType: form.adType,
+    adPlacement: form.adPlacement,
+    startAt: form.startAt || null,
+    endAt: form.endAt || null,
+    targetType: form.targetType,
+    targetId: form.targetType === "URL" ? null : form.targetId || null,
+    targetUrl: form.targetType === "URL" ? form.targetUrl || null : null,
+    sortOrder: form.sortOrder,
+  };
+  try {
+    const result = await createAdvertisement(payload);
+
+    showCreate.value = false;
+    notify(result.message);
+    console.log("新增廣告，編號:", result.data);
+  } catch (error) {
+    console.error("新增失敗", error.response?.data || error);
+
+    notify(error.response?.data?.message || "請確認後端與資料庫");
+  }
 }
 </script>
 
@@ -282,39 +326,85 @@ function createDraft() {
         </header>
         <div class="drawer-body">
           <label
-            >廣告名稱<input required placeholder="例如：九月新品上市"
+            >廣告名稱
+            <input
+              v-model.trim="form.adName"
+              required
+              placeholder="例如：九月新品上市"
           /></label>
           <div class="form-grid">
             <label
-              >廣告類型<select>
-                <option>新品推薦</option>
-                <option>熱門商品</option>
-                <option>競標活動</option>
-                <option>折扣優惠</option>
+              >廣告類型<select v-model="form.adType" required>
+                <option value="NEW_PRODUCT">新品推薦</option>
+                <option value="HOT_PRODUCT">熱門商品</option>
+                <option value="AUCTION">競標活動</option>
+                <option value="DISCOUNT">折扣優惠</option>
               </select></label
-            ><label
-              >顯示版位<select>
-                <option>首頁橫幅</option>
-                <option>首頁彈窗</option>
-                <option>商品頁側欄</option>
+            >
+            <label
+              >顯示版位<select v-model="form.adPlacement">
+                <option value="BANNER">首頁橫幅</option>
+                <option value="POPUP">首頁彈窗</option>
+                <option value="SMALL_BLOCK">商品頁側欄</option>
               </select></label
             >
           </div>
           <label
             >圖片網址<input
+              v-model="form.imageUrl"
               required
               type="url"
               placeholder="https://example.com/banner.jpg"
           /></label>
+          <div class="form-grid">
+            <label>
+              導向類型
+              <select v-model="form.targetType" required>
+                <option value="PRODUCT">一般商品</option>
+                <option value="AUCTION">競標商品</option>
+                <option value="COUPON">優惠券</option>
+                <option value="URL">外部網址</option>
+              </select>
+            </label>
+
+            <label v-if="form.targetType === 'URL'">
+              導向網址
+              <input
+                v-model.trim="form.targetUrl"
+                type="url"
+                maxlength="500"
+                required
+                placeholder="https://example.com/activity"
+              />
+            </label>
+
+            <!-- 這段不是必須的，測試功能所使用正式會需要依賴其他組員API -->
+            <label v-else>
+              導向目標編號
+              <input
+                v-model.number="form.targetId"
+                type="number"
+                min="1"
+                required
+                placeholder="請輸入目標 ID"
+              />
+            </label>
+          </div>
           <label
             >廣告說明<textarea
+              v-model="form.adDescription"
               rows="3"
               placeholder="輸入活動簡介..."
             ></textarea>
           </label>
           <div class="form-grid">
-            <label>開始時間<input type="datetime-local" /></label
-            ><label>結束時間<input type="datetime-local" /></label>
+            <label
+              >開始時間<input
+                v-model="form.startAt"
+                type="datetime-local" /></label
+            ><label
+              >結束時間<input v-model="form.endAt" type="datetime-local"
+            /></label>
           </div>
         </div>
         <footer>
