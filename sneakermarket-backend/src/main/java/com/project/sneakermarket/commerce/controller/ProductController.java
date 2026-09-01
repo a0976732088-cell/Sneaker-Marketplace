@@ -2,14 +2,12 @@ package com.project.sneakermarket.commerce.controller;
 
 import com.project.sneakermarket.commerce.dto.ProductListItemResponse;
 import com.project.sneakermarket.commerce.service.ProductService;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:5173")
 public class ProductController {
 
     private final ProductService productService;
