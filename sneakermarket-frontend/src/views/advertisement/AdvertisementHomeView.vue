@@ -3,9 +3,12 @@ import { computed, ref, reactive, onMounted } from "vue";
 import { VueDatePicker } from "@vuepic/vue-datepicker";
 import "@vuepic/vue-datepicker/dist/main.css";
 import { zhTW } from "date-fns/locale";
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import { faTrash, faPencil } from "@fortawesome/free-solid-svg-icons";
 import {
   createAdvertisement,
   getAllAdvertisements,
+  deleteAdvertisement,
 } from "@/service/advertisementService";
 
 const tabs = ["全部廣告", "進行中", "草稿", "已停用", "已結束"];
@@ -18,6 +21,7 @@ const toast = ref("");
 const ads = ref([]);
 const loadingAds = ref(false);
 const loadError = ref("");
+// const deletingAdId = ref(null);
 
 const typeLabels = {
   HOT_PRODUCT: "熱門商品",
@@ -186,6 +190,28 @@ async function loadAdvertisements() {
     loadError.value = "廣告列表載入失敗";
   } finally {
     loadingAds.value = false;
+  }
+}
+
+async function handleDeleteAdvertisement(ad) {
+  // 防止不小心按到刪除
+  const confirmed = window.confirm(`確定要刪除廣告「${ad.name}」嗎？`);
+
+  if (!confirmed) return;
+
+  try {
+    // 將廣告編號傳給刪除 API
+    const result = await deleteAdvertisement(ad.id);
+
+    // 刪除成功後重新查詢資料庫
+    await loadAdvertisements();
+
+    // 顯示後端回傳的訊息
+    notify(result.message || "廣告刪除成功");
+  } catch (error) {
+    console.error("刪除廣告失敗", error);
+
+    notify("廣告刪除失敗，請確認後端與資料庫");
   }
 }
 
@@ -370,15 +396,15 @@ onMounted(() => {
                         title="編輯"
                         @click="notify(`正在開啟「${ad.name}」`)"
                       >
-                        ✎</button
+                        <FontAwesomeIcon :icon="faPencil" /></button
                       ><button
                         v-if="['進行中', '草稿'].includes(ad.status)"
                         :title="ad.status === '進行中' ? '暫停' : '上架'"
                         @click="toggle(ad)"
                       >
                         {{ ad.status === "進行中" ? "Ⅱ" : "▶" }}</button
-                      ><button title="更多" @click="notify('已開啟更多操作')">
-                        •••
+                      ><button title="刪除" @click="handleDeleteAdvertisement(ad)">
+                        <FontAwesomeIcon :icon="faTrash" />
                       </button>
                     </div>
                   </td>
