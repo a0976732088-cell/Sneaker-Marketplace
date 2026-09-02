@@ -1,84 +1,41 @@
 <script setup>
-import { computed, ref, reactive } from "vue";
-import { createAdvertisement } from "@/service/advertisementService";
+import { computed, ref, reactive, onMounted } from "vue";
 import { VueDatePicker } from "@vuepic/vue-datepicker";
 import "@vuepic/vue-datepicker/dist/main.css";
 import { zhTW } from "date-fns/locale";
+import {
+  createAdvertisement,
+  getAllAdvertisements,
+} from "@/service/advertisementService";
 
-const tabs = ["全部廣告", "進行中", "已排程", "草稿", "已結束"];
+const tabs = ["全部廣告", "進行中", "草稿", "已停用", "已結束"];
 const activeTab = ref("全部廣告");
 const keyword = ref("");
 const placement = ref("全部版位");
 const showCreate = ref(false);
 const toast = ref("");
 
-const ads = ref([
-  {
-    id: "AD-2026-0821",
-    name: "秋季潮鞋新品上市",
-    desc: "New Balance 1906R 新色首發",
-    place: "首頁橫幅",
-    type: "新品推薦",
-    period: "08/28 00:00 — 09/12 23:59",
-    status: "進行中",
-    views: "128.4K",
-    clicks: "5,842",
-    ctr: "4.55%",
-    color: "mint",
-  },
-  {
-    id: "AD-2026-0822",
-    name: "Jordan 限時競標",
-    desc: "Air Jordan 1 Retro High OG",
-    place: "首頁彈窗",
-    type: "競標活動",
-    period: "09/03 12:00 — 09/06 22:00",
-    status: "已排程",
-    views: "—",
-    clicks: "—",
-    ctr: "—",
-    color: "orange",
-  },
-  {
-    id: "AD-2026-0815",
-    name: "會員限定折扣週",
-    desc: "指定鞋款最高現折 NT$1,000",
-    place: "商品頁側欄",
-    type: "折扣優惠",
-    period: "08/20 00:00 — 08/31 23:59",
-    status: "進行中",
-    views: "86.7K",
-    clicks: "3,126",
-    ctr: "3.61%",
-    color: "violet",
-  },
-  {
-    id: "AD-2026-0824",
-    name: "經典鞋款回歸",
-    desc: "本週熱銷排行榜精選",
-    place: "首頁橫幅",
-    type: "熱門商品",
-    period: "尚未設定",
-    status: "草稿",
-    views: "—",
-    clicks: "—",
-    ctr: "—",
-    color: "blue",
-  },
-  {
-    id: "AD-2026-0808",
-    name: "夏日清倉 Sale",
-    desc: "精選鞋款最低 5 折",
-    place: "首頁橫幅",
-    type: "折扣優惠",
-    period: "08/08 00:00 — 08/18 23:59",
-    status: "已結束",
-    views: "203.1K",
-    clicks: "9,774",
-    ctr: "4.81%",
-    color: "pink",
-  },
-]);
+const ads = ref([]);
+const loadingAds = ref(false);
+const loadError = ref("");
+
+const typeLabels = {
+  HOT_PRODUCT: "熱門商品",
+  NEW_PRODUCT: "新品推薦",
+  AUCTION: "競標活動",
+  DISCOUNT: "折扣優惠",
+};
+const placementLabels = {
+  BANNER: "首頁橫幅",
+  POPUP: "首頁彈窗",
+  SMALL_BLOCK: "商品頁側欄",
+};
+const statusLabels = {
+  DRAFT: "草稿",
+  ACTIVE: "進行中",
+  INACTIVE: "已停用",
+  EXPIRED: "已結束",
+};
 
 const filteredAds = computed(() =>
   ads.value.filter((ad) => {
@@ -160,7 +117,11 @@ async function createDraft() {
 
     resetForm();
     showCreate.value = false;
+
     notify(result.message);
+
+    await loadAdvertisements();
+
     console.log("新增成功");
   } catch (error) {
     console.error("新增失敗");
@@ -168,6 +129,67 @@ async function createDraft() {
     notify(error.response?.data?.message || "請確認後端與資料庫");
   }
 }
+
+function formatDateTime(value) {
+  if (!value) return "尚未設定";
+
+  return new Intl.DateTimeFormat("zh-TW", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
+function toAdvertisementViewModel(ad) {
+  return {
+    id: ad.adId,
+    name: ad.adName,
+    desc: ad.adDescription || "",
+    imageUrl: ad.imageUrl,
+
+    type: typeLabels[ad.adType] || ad.adType,
+    place: placementLabels[ad.adPlacement] || ad.adPlacement,
+    status: statusLabels[ad.adStatus] || ad.adStatus,
+
+    period:
+      ad.startAt || ad.endAt
+        ? `${formatDateTime(ad.startAt)} — ${formatDateTime(ad.endAt)}`
+        : "尚未設定",
+
+    targetType: ad.targetType,
+    targetId: ad.targetId,
+    targetUrl: ad.targetUrl,
+
+    // 後端目前沒有成效統計欄位
+    views: "—",
+    clicks: "—",
+    ctr: "—",
+    color: "blue",
+  };
+}
+
+async function loadAdvertisements() {
+  loadingAds.value = true;
+  loadError.value = "";
+
+  try {
+    const result = await getAllAdvertisements();
+
+    ads.value = (result.data || []).map(toAdvertisementViewModel);
+  } catch (error) {
+    console.error("查詢廣告失敗");
+
+    loadError.value = "廣告列表載入失敗";
+  } finally {
+    loadingAds.value = false;
+  }
+}
+
+onMounted(() => {
+  loadAdvertisements();
+});
 </script>
 
 <template>
@@ -240,92 +262,131 @@ async function createDraft() {
             <option>首頁彈窗</option>
             <option>商品頁側欄</option>
           </select>
+
+          <!-- 未來有機會可以匯出到excel檔案 -->
           <button class="outline-button" @click="notify('報表已匯出')">
             ⇩ 匯出報表
           </button>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>廣告內容</th>
-                <th>版位／類型</th>
-                <th>投放期間</th>
-                <th>狀態</th>
-                <th class="number">曝光</th>
-                <th class="number">點擊</th>
-                <th class="number">CTR</th>
-                <th><span class="visually-hidden">操作</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="ad in filteredAds" :key="ad.id">
-                <td>
-                  <div class="ad-identity">
-                    <div class="ad-thumbnail" :class="ad.color">
-                      <span>⌁</span><small>{{ ad.type }}</small>
-                    </div>
-                    <div>
-                      <strong>{{ ad.name }}</strong
-                      ><small>{{ ad.desc }}</small
-                      ><em>{{ ad.id }}</em>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <strong class="cell-main">{{ ad.place }}</strong
-                  ><small class="cell-sub">{{ ad.type }}</small>
-                </td>
-                <td>
-                  <span class="period">{{ ad.period }}</span>
-                </td>
-                <td>
-                  <span class="status-badge" :class="ad.status"
-                    >● {{ ad.status }}</span
-                  >
-                </td>
-                <td class="number">{{ ad.views }}</td>
-                <td class="number">{{ ad.clicks }}</td>
-                <td class="number">
-                  <strong>{{ ad.ctr }}</strong>
-                </td>
-                <td>
-                  <div class="row-actions">
-                    <button
-                      title="編輯"
-                      @click="notify(`正在開啟「${ad.name}」`)"
-                    >
-                      ✎</button
-                    ><button
-                      v-if="['進行中', '草稿'].includes(ad.status)"
-                      :title="ad.status === '進行中' ? '暫停' : '上架'"
-                      @click="toggle(ad)"
-                    >
-                      {{ ad.status === "進行中" ? "Ⅱ" : "▶" }}</button
-                    ><button title="更多" @click="notify('已開啟更多操作')">
-                      •••
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="!filteredAds.length">
-                <td colspan="8" class="empty-state">
-                  找不到符合條件的廣告，請調整搜尋或篩選條件。
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <footer class="panel-footer">
+
+        <!-- 查詢 API 尚未完成時顯示載入狀態 -->
+        <div v-if="loadingAds" class="py-5 text-center text-secondary">
           <span
-            >顯示 1–{{ filteredAds.length }}，共
-            {{ filteredAds.length }} 筆</span
-          >
-          <div>
-            <button disabled>‹</button><button class="current">1</button
-            ><button disabled>›</button>
+            class="spinner-border spinner-border-sm me-2"
+            aria-hidden="true"
+          ></span>
+          廣告資料載入中...
+        </div>
+
+        <!-- 查詢 API 發生錯誤時顯示錯誤訊息 -->
+        <div v-else-if="loadError" class="alert alert-danger m-3" role="alert">
+          <div class="d-flex justify-content-between align-items-center">
+            <span>{{ loadError }}</span>
+
+            <!-- 讓管理員可以手動重新查詢 -->
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-danger"
+              @click="loadAdvertisements"
+            >
+              重新載入
+            </button>
           </div>
-        </footer>
+        </div>
+
+        <template v-else>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>廣告內容</th>
+                  <th>版位／類型</th>
+                  <th>投放期間</th>
+                  <th>狀態</th>
+                  <th class="number">曝光</th>
+                  <th class="number">點擊</th>
+                  <th class="number">CTR</th>
+                  <th><span class="visually-hidden">操作</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="ad in filteredAds" :key="ad.id">
+                  <td>
+                    <div class="ad-identity">
+                      
+                      <div class="ad-thumbnail" :class="ad.color">
+                        <img
+      v-if="ad.imageUrl"
+      class="ad-thumbnail-image"
+      :src="ad.imageUrl"
+      :alt="ad.name"
+      loading="lazy"
+    >
+                        
+                        <div>尚無圖片</div>
+                      </div>
+                      <div>
+                        <strong>{{ ad.name }}</strong
+                        ><small>{{ ad.desc }}</small
+                        >
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <strong class="cell-main">{{ ad.place }}</strong
+                    ><small class="cell-sub">{{ ad.type }}</small>
+                  </td>
+                  <td>
+                    <span class="period">{{ ad.period }}</span>
+                  </td>
+                  <td>
+                    <span class="status-badge" :class="ad.status"
+                      >● {{ ad.status }}</span
+                    >
+                  </td>
+                  <td class="number">{{ ad.views }}</td>
+                  <td class="number">{{ ad.clicks }}</td>
+                  <td class="number">
+                    <strong>{{ ad.ctr }}</strong>
+                  </td>
+                  <td>
+                    <div class="row-actions">
+                      <button
+                        title="編輯"
+                        @click="notify(`正在開啟「${ad.name}」`)"
+                      >
+                        ✎</button
+                      ><button
+                        v-if="['進行中', '草稿'].includes(ad.status)"
+                        :title="ad.status === '進行中' ? '暫停' : '上架'"
+                        @click="toggle(ad)"
+                      >
+                        {{ ad.status === "進行中" ? "Ⅱ" : "▶" }}</button
+                      ><button title="更多" @click="notify('已開啟更多操作')">
+                        •••
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="!filteredAds.length">
+                  <td colspan="8" class="empty-state">
+                    找不到符合條件的廣告，請調整搜尋或篩選條件。
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <footer class="panel-footer">
+            <span
+              >顯示 1–{{ filteredAds.length }}，共
+              {{ filteredAds.length }} 筆</span
+            >
+            <div>
+              <button disabled>‹</button><button class="current">1</button
+              ><button disabled>›</button>
+            </div>
+          </footer>
+        </template>
       </div>
     </main>
 

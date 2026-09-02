@@ -4,3 +4,8 @@ export async function createAdvertisement(payload) {
   const response = await httpClient.post("/admin/ads/add", payload);
   return response.data;
 }
+
+export async function getAllAdvertisements() {
+  const response = await httpClient.get("/admin/ads/findAll");
+  return response.data;
+}
