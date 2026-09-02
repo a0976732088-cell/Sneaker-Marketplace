@@ -148,6 +148,8 @@ function toAdvertisementViewModel(ad) {
     name: ad.adName,
     desc: ad.adDescription || "",
     imageUrl: ad.imageUrl,
+    // 圖片載入失敗時切換為「尚無圖片」提示
+    imageLoadFailed: false,
 
     type: typeLabels[ad.adType] || ad.adType,
     place: placementLabels[ad.adPlacement] || ad.adPlacement,
@@ -297,6 +299,17 @@ onMounted(() => {
         <template v-else>
           <div class="table-wrap">
             <table>
+              <!-- 固定各欄位比例，狀態或資料筆數改變時表格不會左右跳動。 -->
+              <colgroup>
+                <col class="column-ad" />
+                <col class="column-placement" />
+                <col class="column-period" />
+                <col class="column-status" />
+                <col class="column-number" />
+                <col class="column-number" />
+                <col class="column-ctr" />
+                <col class="column-actions" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>廣告內容</th>
@@ -313,22 +326,24 @@ onMounted(() => {
                 <tr v-for="ad in filteredAds" :key="ad.id">
                   <td>
                     <div class="ad-identity">
-                      
-                      <div class="ad-thumbnail" :class="ad.color">
+                      <!-- 左側廣告預覽依照原始圖片比例顯示，避免裁切內容 -->
+                      <div class="ad-thumbnail">
+                        <!-- 有網址且圖片載入正常時顯示 -->
                         <img
-      v-if="ad.imageUrl"
-      class="ad-thumbnail-image"
-      :src="ad.imageUrl"
-      :alt="ad.name"
-      loading="lazy"
-    >
-                        
-                        <div>尚無圖片</div>
+                          v-if="ad.imageUrl && !ad.imageLoadFailed"
+                          class="ad-thumbnail-image"
+                          :src="ad.imageUrl"
+                          :alt="ad.name"
+                          loading="lazy"
+                          @error="ad.imageLoadFailed = true"
+                        />
+
+                        <!-- 沒網址或圖片載入失敗時顯示 -->
+                        <div v-else class="ad-thumbnail-empty">尚無圖片</div>
                       </div>
                       <div>
                         <strong>{{ ad.name }}</strong
-                        ><small>{{ ad.desc }}</small
-                        >
+                        ><small>{{ ad.desc }}</small>
                       </div>
                     </div>
                   </td>
@@ -530,7 +545,9 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 224px minmax(0, 1fr);
   min-height: calc(100vh - 128px);
+  /* 抵銷外層 container 的上下間距，讓廣告版面銜接導覽列與頁尾。 */
   margin: -1.5rem calc((100vw - 100%) / -2);
+  margin-bottom: -1.5rem;
   background: #f6f7f9;
   color: var(--ink);
   font-family: Inter, "Noto Sans TC", system-ui, sans-serif;
@@ -656,6 +673,8 @@ onMounted(() => {
   background: none;
 }
 .ad-workspace {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   padding: 32px clamp(24px, 3vw, 48px) 46px;
 }
@@ -790,6 +809,10 @@ onMounted(() => {
   font-weight: 700;
 }
 .ad-panel {
+  /* 廣告列表填滿工作區剩餘高度，資料較少時版面也不會縮在上方。 */
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -876,12 +899,36 @@ onMounted(() => {
   min-height: 36px;
 }
 .table-wrap {
+  flex: 1;
   overflow-x: auto;
 }
 table {
   width: 100%;
-  min-width: 970px;
+  min-width: 1100px;
+  /* 搭配 colgroup 固定欄寬，避免內容長度改變時重新排版。 */
+  table-layout: fixed;
   border-collapse: collapse;
+}
+.column-ad {
+  width: 31%;
+}
+.column-placement {
+  width: 13%;
+}
+.column-period {
+  width: 18%;
+}
+.column-status {
+  width: 10%;
+}
+.column-number {
+  width: 7%;
+}
+.column-ctr {
+  width: 6%;
+}
+.column-actions {
+  width: 8%;
 }
 th {
   padding: 11px 16px;
@@ -910,16 +957,17 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 11px;
-  min-width: 230px;
+  min-width: 310px;
 }
 .ad-thumbnail {
   position: relative;
   display: grid;
-  width: 72px;
-  height: 44px;
-  flex: 0 0 72px;
+  /* 只固定寬度，高度交給圖片依原始比例自動撐開。 */
+  width: 160px;
+  height: auto;
+  flex: 0 0 160px;
   place-items: center;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 6px;
   color: #fff;
 }
@@ -997,9 +1045,13 @@ tbody tr:hover {
 }
 .status-badge {
   display: inline-block;
+  /* 每種狀態使用相同寬度，從草稿切換到進行中也不會推動欄位。 */
+  min-width: 76px;
   padding: 5px 7px;
+  box-sizing: border-box;
   border-radius: 12px;
   white-space: nowrap;
+  text-align: center;
   font-size: 8px;
   font-weight: 700;
 }
@@ -1021,6 +1073,7 @@ tbody tr:hover {
 }
 .row-actions {
   display: flex;
+  width: 85px;
   gap: 2px;
   justify-content: flex-end;
 }
@@ -1270,6 +1323,33 @@ tbody tr:hover {
     gap: 0;
   }
 }
+/* 保留網址圖片的完整比例，不以固定高度裁切上下或左右內容。 */
+.ad-thumbnail-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 6px;
+}
+
+/* 沒有圖片或圖片網址失效時的預設狀態 */
+.ad-thumbnail-empty {
+  display: grid;
+  width: 100%;
+  min-height: 90px;
+  place-items: center;
+  border-radius: 6px;
+  color: #7b8492;
+  background: #eef0f3;
+  font-size: 8px;
+}
+
+/* 移除舊假縮圖使用的圓形裝飾，避免蓋住真實圖片 */
+.ad-thumbnail::after {
+  display: none;
+}
+
 /* 側欄已隱藏，廣告管理主內容改為單欄滿寬 */
 .ad-admin-shell {
   grid-template-columns: minmax(0, 1fr);
@@ -1277,5 +1357,60 @@ tbody tr:hover {
 
 .ad-workspace {
   width: 100%;
+}
+
+/*
+ * 廣告管理頁字體尺寸統一放大。
+ * 集中放在樣式最後方，方便日後直接從這一區調整整頁文字大小。
+ */
+.eyebrow,
+.metric-grid em,
+.panel-tabs button span,
+th,
+.ad-identity small,
+.ad-identity em,
+.cell-sub,
+.period,
+.status-badge,
+.create-drawer header span,
+.ad-thumbnail-empty {
+  font-size: 12px;
+}
+
+.workspace-header p,
+.create-button,
+.metric-grid article div > span,
+.metric-grid strong small,
+.panel-tabs button,
+.search-box input,
+.filter-row select,
+.outline-button,
+td,
+.cell-main,
+.row-actions button,
+.panel-footer,
+.panel-footer button,
+.create-drawer p,
+.drawer-body label,
+.secondary-button,
+.primary-button,
+.admin-toast {
+  font-size: 14px;
+}
+
+.ad-identity strong {
+  font-size: 15px;
+}
+
+.metric-grid strong {
+  font-size: 27px;
+}
+
+.workspace-header h1 {
+  font-size: clamp(32px, 3vw, 42px);
+}
+
+.create-drawer h2 {
+  font-size: 29px;
 }
 </style>
