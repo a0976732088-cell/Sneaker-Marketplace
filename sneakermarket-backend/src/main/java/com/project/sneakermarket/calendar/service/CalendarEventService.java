@@ -3,13 +3,18 @@ package com.project.sneakermarket.calendar.service;
 import com.project.sneakermarket.calendar.dto.CalendarEventDTO;
 import com.project.sneakermarket.calendar.entity.CalendarEvent;
 import com.project.sneakermarket.calendar.repository.CalendarEventRepository;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -32,6 +37,7 @@ public class CalendarEventService {
         event.setSourceType(dto.getSourceType());
         event.setSourceId(dto.getSourceId());
         event.setStatus(dto.getStatus());
+        event.setPhoto(dto.getPhoto());
 
         return calendarEventRepo.save(event);
     }
@@ -52,6 +58,7 @@ public class CalendarEventService {
             calendarEvent.setSourceType(dto.getSourceType());
             calendarEvent.setSourceId(dto.getSourceId());
             calendarEvent.setStatus(dto.getStatus());
+            calendarEvent.setPhoto(dto.getPhoto());
 
             calendarEventRepo.save(calendarEvent);
         }
@@ -61,10 +68,46 @@ public class CalendarEventService {
         calendarEventRepo.deleteById(eventId);
     }
 
-    public Page<CalendarEvent> findMsgByPage(Integer pageNumber){
-        Pageable pgb = PageRequest.of(pageNumber-1, 3, Sort.Direction.DESC, "createdAt");//從0開始所以要-1
+    public Page<CalendarEvent> searchEvent(
+            String title,
+            String eventType,
+            String status,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            Integer pageNumber){
+        Specification<CalendarEvent> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            // 1. 標題模糊查詢 (LIKE %title%)
+            if (title != null && !title.trim().isEmpty()) {
+                predicates.add(cb.like(root.get("title"), "%" + title.trim() + "%"));
+            }
+            // 2. 活動類型 (EQUAL)
+            if (eventType != null && !eventType.trim().isEmpty()) {
+                predicates.add(cb.equal(root.get("eventType"), eventType));
+            }
+            // 3. 活動狀態 (EQUAL)
+            if (status != null && !status.trim().isEmpty()) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            // 4. 開始時間起 (>= startDate)
+            if (startDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("startAt"), startDate));
+            }
+            // 5. 結束時間止 (<= endDate)
+            if (endDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("endAt"), endDate));
+            }
+            // 將所有條件用 AND 串起來
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        Pageable pgb = PageRequest.of(pageNumber-1, 10, Sort.Direction.DESC, "startAt");//從0開始所以要-1
 
-        return calendarEventRepo.findAll(pgb);
+        return calendarEventRepo.findAll(spec, pgb);
     }
+
+
+
+
+
 
 }

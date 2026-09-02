@@ -1,6 +1,7 @@
 package com.project.sneakermarket.calendar.entity;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -59,6 +60,10 @@ public class CalendarEvent {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @JsonIgnore
+    @Lob
+    private byte[] photo;
 
     @PrePersist
     public void onCreate() {

@@ -18,4 +18,5 @@ public class CalendarEventDTO {
     private String sourceType;
     private Long sourceId;
     private String status;
+    private byte[] photo;
 }
