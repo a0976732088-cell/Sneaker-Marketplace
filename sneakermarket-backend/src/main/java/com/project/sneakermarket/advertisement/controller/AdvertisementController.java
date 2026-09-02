@@ -38,4 +38,12 @@ public class AdvertisementController {
         );
     }
 
+    @DeleteMapping("/delete/{adId}")
+    public ResponseEntity<ApiResponse<Void>> deleteAdvertisement(@PathVariable Long adId) {
+        adService.deleteAdvertisement(adId);
+
+        return ResponseEntity.ok(ApiResponse.ok("廣告刪除成功",null));
+
+
+    }
 }

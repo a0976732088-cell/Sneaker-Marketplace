@@ -69,4 +69,9 @@ public class AdvertisementService {
 
         return response;
     }
+
+    //未來加入member="admin"需要修改
+    public void deleteAdvertisement(Long adId){
+        adRepo.deleteById(adId);
+    }
 }
