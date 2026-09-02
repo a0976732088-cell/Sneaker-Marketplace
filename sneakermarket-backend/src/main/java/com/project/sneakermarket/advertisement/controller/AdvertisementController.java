@@ -19,6 +19,7 @@ import java.util.List;
 public class AdvertisementController {
 
     private final AdvertisementService adService;
+
     @PostMapping("/add")
     public ResponseEntity<ApiResponse<Long>> insertAdvertisement(@Valid @RequestBody CreateAdvertisementRequest request) {
 
@@ -28,7 +29,7 @@ public class AdvertisementController {
                 .body(ApiResponse.ok("廣告新增成功，尚未上架", advertisement.getAdId()));
     }
 
-    @GetMapping("findAll")
+    @GetMapping("/findAll")
     public ResponseEntity<ApiResponse<List<AdvertisementResponse>>> getAllAdvertisements() {
         List<AdvertisementResponse> advertisements = adService.getAllAdvertisements();
 
