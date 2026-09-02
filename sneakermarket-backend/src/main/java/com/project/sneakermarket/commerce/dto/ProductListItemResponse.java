@@ -3,6 +3,8 @@ package com.project.sneakermarket.commerce.dto;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.math.BigDecimal;
+
 @Getter
 @AllArgsConstructor
 //商品列表頁要用的回應
@@ -12,4 +14,6 @@ public class ProductListItemResponse {
     private String productName;
     private String brandName;
     private String status;
+    private BigDecimal price;
+    private String imageUrl;
 }
