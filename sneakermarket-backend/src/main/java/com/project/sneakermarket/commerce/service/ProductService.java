@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,10 +30,17 @@ public class ProductService {
         this.productImageRepository = productImageRepository;
     }
 
-    public List<ProductListItemResponse> getAllProducts() {
+    //取得商品列表，每筆商品只顯示代表價格與一張主圖（給列表頁用）
+    public List<ProductListItemResponse> getAllProducts(Long categoryId, String keyword, String size) {
         List<Product> products = productRepository.findAll();
 
         return products.stream()
+                .filter(p -> p.getStatus().equals("ON_SALE"))
+                .filter(p -> categoryId == null || p.getCategory().getCategoryId().equals(categoryId))
+                .filter(p -> keyword == null || p.getProductName().toLowerCase().contains(keyword.toLowerCase()))
+                .filter(p -> size == null || productVariantRepository.findByProductProductId(p.getProductId())
+                        .stream()
+                        .anyMatch(v -> v.getSize().equals(size)))
                 .map(p -> {
                     List<ProductVariant> variants =
                             productVariantRepository.findByProductProductId(p.getProductId());
@@ -57,6 +63,7 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
+    //取得單一商品的完整明細，包含全部規格與全部圖片（給明細頁用）
     public ProductDetailResponse getProductDetail(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("找不到這個商品"));
