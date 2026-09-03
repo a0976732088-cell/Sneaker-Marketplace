@@ -1,6 +1,8 @@
 package com.project.sneakermarket.commerce.service;
 
+import com.project.sneakermarket.commerce.dto.ProductDetailResponse;
 import com.project.sneakermarket.commerce.dto.ProductListItemResponse;
+import com.project.sneakermarket.commerce.dto.ProductVariantResponse;
 import com.project.sneakermarket.commerce.entity.Product;
 import com.project.sneakermarket.commerce.entity.ProductImage;
 import com.project.sneakermarket.commerce.entity.ProductVariant;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,4 +56,30 @@ public class ProductService {
                 })
                 .collect(Collectors.toList());
     }
+
+    public ProductDetailResponse getProductDetail(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("找不到這個商品"));
+
+        List<ProductVariant> variants = productVariantRepository.findByProductProductId(productId);
+        List<ProductImage> images = productImageRepository.findByProductProductId(productId);
+
+        List<String> imageUrls = images.stream()
+                .map(ProductImage::getImageUrl)
+                .collect(Collectors.toList());
+
+        List<ProductVariantResponse> variantResponses = variants.stream()
+                .map(v -> new ProductVariantResponse(v.getSize(), v.getColor(), v.getPrice(), v.getStock()))
+                .collect(Collectors.toList());
+
+        return new ProductDetailResponse(
+                product.getProductId(),
+                product.getProductName(),
+                product.getBrand().getBrandName(),
+                product.getStatus(),
+                product.getDescription(),
+                imageUrls,
+                variantResponses);
+    }
+
 }

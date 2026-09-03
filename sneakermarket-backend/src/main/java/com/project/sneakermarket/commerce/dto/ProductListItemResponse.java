@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 
 @Getter
 @AllArgsConstructor
-//商品列表頁要用的回應
+//商品[列表頁]要用的回應
 public class ProductListItemResponse {
 
     private Long productId;

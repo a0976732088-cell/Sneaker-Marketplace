@@ -29,9 +29,11 @@ onMounted(async () => {
     </div>
 
     <ul v-else class="list-group mt-3">
-        <li v-for="p in products" :key="p.productId" class="list-group-item d-flex align-items-center gap-3">
-        <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.productName" style="width: 60px; height: 60px; object-fit: cover;">
-        {{ p.productName }}（{{ p.brandName }} · {{ p.status }} · NT$ {{ p.price }}）
+      <li v-for="p in products" :key="p.productId" class="list-group-item d-flex align-items-center gap-3">
+        <router-link :to="`/products/${p.productId}`" class="d-flex align-items-center gap-3 text-decoration-none text-dark w-100">
+          <img v-if="p.imageUrl" :src="p.imageUrl" :alt="p.productName" style="width: 60px; height: 60px; object-fit: cover;">
+          {{ p.productName }}（{{ p.brandName }} · {{ p.status }} · NT$ {{ p.price }}）
+        </router-link>
       </li>
     </ul>
 

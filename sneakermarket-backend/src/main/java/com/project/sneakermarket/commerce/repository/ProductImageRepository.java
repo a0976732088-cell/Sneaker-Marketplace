@@ -5,10 +5,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-// 查出「某個商品」被標記為主圖（isPrimary = true）的圖片
-// 用途：商品列表頁顯示縮圖（thumbnailUrl）
-
 public interface ProductImageRepository extends JpaRepository<ProductImage, Long> {
 
+    // 查某商品主圖（isPrimary = true）為商品列表頁顯示的縮圖（imageUrl）
     List<ProductImage> findByProductProductIdAndIsPrimaryTrue(Long productId);
+
+    // 查某商品「全部」的圖片
+    List<ProductImage> findByProductProductId(Long productId);
 }
