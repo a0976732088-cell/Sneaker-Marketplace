@@ -9,6 +9,7 @@ import {
   createAdvertisement,
   getAllAdvertisements,
   deleteAdvertisement,
+  updateAdvertisement,
 } from "@/service/advertisementService";
 
 const tabs = ["全部廣告", "進行中", "草稿", "已停用", "已結束"];
@@ -16,6 +17,8 @@ const activeTab = ref("全部廣告");
 const keyword = ref("");
 const placement = ref("全部版位");
 const showCreate = ref(false);
+const editingAdId = ref(null);
+const isEditing = computed(() => editingAdId.value !== null);
 const toast = ref("");
 
 const ads = ref([]);
@@ -101,39 +104,6 @@ function toggle(ad) {
   notify(`「${ad.name}」已${ad.status === "進行中" ? "開始投放" : "暫停投放"}`);
 }
 
-async function createDraft() {
-  const payload = {
-    createdBy: form.createdBy,
-    adName: form.adName,
-    imageUrl: form.imageUrl,
-    adDescription: form.adDescription || null,
-    adType: form.adType,
-    adPlacement: form.adPlacement,
-    startAt: form.startAt || null,
-    endAt: form.endAt || null,
-    targetType: form.targetType,
-    targetId: form.targetType === "URL" ? null : form.targetId || null,
-    targetUrl: form.targetType === "URL" ? form.targetUrl || null : null,
-    sortOrder: form.sortOrder,
-  };
-  try {
-    const result = await createAdvertisement(payload);
-
-    resetForm();
-    showCreate.value = false;
-
-    notify(result.message);
-
-    await loadAdvertisements();
-
-    console.log("新增成功");
-  } catch (error) {
-    console.error("新增失敗");
-
-    notify(error.response?.data?.message || "請確認後端與資料庫");
-  }
-}
-
 function formatDateTime(value) {
   if (!value) return "尚未設定";
 
@@ -159,14 +129,19 @@ function toAdvertisementViewModel(ad) {
     place: placementLabels[ad.adPlacement] || ad.adPlacement,
     status: statusLabels[ad.adStatus] || ad.adStatus,
 
+    adType: ad.adType,
+    adPlacement: ad.adPlacement,
+    startAt: ad.startAt,
+    endAt: ad.endAt,
+    targetType: ad.targetType,
+    targetId: ad.targetId,
+    targetUrl: ad.targetUrl,
+    sortOrder: ad.sortOrder,
+
     period:
       ad.startAt || ad.endAt
         ? `${formatDateTime(ad.startAt)} — ${formatDateTime(ad.endAt)}`
         : "尚未設定",
-
-    targetType: ad.targetType,
-    targetId: ad.targetId,
-    targetUrl: ad.targetUrl,
 
     // 後端目前沒有成效統計欄位
     views: "—",
@@ -174,6 +149,81 @@ function toAdvertisementViewModel(ad) {
     ctr: "—",
     color: "blue",
   };
+}
+
+function closeAdvertisementDrawer() {
+  showCreate.value = false;
+  editingAdId.value = null;
+  resetForm();
+}
+
+function openCreateDrawer() {
+  resetForm();
+  editingAdId.value = null;
+  showCreate.value = true;
+}
+
+function toDatePickerValue(value) {
+  if (!value) return "";
+
+  // 例如：
+  // 2026-09-04T15:30:00
+  // 轉成：
+  // 2026-09-04T15:30
+  return value.slice(0, 16);
+}
+
+function openEditDrawer(ad) {
+  editingAdId.value = ad.id;
+
+  Object.assign(form, {
+    createdBy: 1,
+    adName: ad.name,
+    imageUrl: ad.imageUrl || "",
+    adDescription: ad.desc || "",
+    adType: ad.adType,
+    adPlacement: ad.adPlacement,
+    startAt: toDatePickerValue(ad.startAt),
+    endAt: toDatePickerValue(ad.endAt),
+    targetType: ad.targetType || "URL",
+    targetId: ad.targetId ?? null,
+    targetUrl: ad.targetUrl || "",
+    sortOrder: ad.sortOrder ?? 0,
+  });
+
+  showCreate.value = true;
+}
+
+async function createDraft() {
+  const payload = {
+    createdBy: form.createdBy,
+    adName: form.adName,
+    imageUrl: form.imageUrl,
+    adDescription: form.adDescription || null,
+    adType: form.adType,
+    adPlacement: form.adPlacement,
+    startAt: form.startAt || null,
+    endAt: form.endAt || null,
+    targetType: form.targetType,
+    targetId: form.targetType === "URL" ? null : form.targetId || null,
+    targetUrl: form.targetType === "URL" ? form.targetUrl || null : null,
+    sortOrder: form.sortOrder,
+  };
+  try {
+    const result = await createAdvertisement(payload);
+
+    closeAdvertisementDrawer();
+
+    notify(result.message);
+
+    await loadAdvertisements();
+
+    console.log("新增成功");
+  } catch (error) {
+    console.error("新增失敗");
+
+    notify(error.response?.data?.message || "請確認後端與資料庫");
+  }
 }
 
 async function loadAdvertisements() {
@@ -215,6 +265,46 @@ async function handleDeleteAdvertisement(ad) {
   }
 }
 
+async function updateAd() {
+  // 沒有編輯 ID 時不送出修改
+  if (editingAdId.value === null) return;
+
+  const payload = {
+    adName: form.adName,
+    imageUrl: form.imageUrl,
+    adDescription: form.adDescription || null,
+    adType: form.adType,
+    adPlacement: form.adPlacement,
+    startAt: form.startAt || null,
+    endAt: form.endAt || null,
+    targetType: form.targetType,
+
+    targetId: form.targetType === "URL" ? null : form.targetId || null,
+
+    targetUrl: form.targetType === "URL" ? form.targetUrl || null : null,
+
+    sortOrder: form.sortOrder,
+  };
+
+  try {
+    const result = await updateAdvertisement(editingAdId.value, payload);
+
+    closeAdvertisementDrawer();
+
+    notify(result.message || "廣告修改成功");
+
+    await loadAdvertisements();
+
+    console.log("修改成功");
+  } catch (error) {
+    console.error("修改失敗", error);
+
+    notify(
+      error.response?.data?.message || "廣告修改失敗，請確認輸入資料",
+    );
+  }
+}
+
 onMounted(() => {
   loadAdvertisements();
 });
@@ -234,7 +324,7 @@ onMounted(() => {
           <p>建立、排程並追蹤平台上的每一則廣告活動。</p>
         </div>
         <div class="header-actions">
-          <button class="create-button" @click="showCreate = true">
+          <button class="create-button" @click="openCreateDrawer">
             <span>＋</span> 新增廣告
           </button>
         </div>
@@ -392,10 +482,7 @@ onMounted(() => {
                   </td>
                   <td>
                     <div class="row-actions">
-                      <button
-                        title="編輯"
-                        @click="notify(`正在開啟「${ad.name}」`)"
-                      >
+                      <button title="編輯" @click="openEditDrawer(ad)">
                         <FontAwesomeIcon :icon="faPencil" /></button
                       ><button
                         v-if="['進行中', '草稿'].includes(ad.status)"
@@ -403,7 +490,10 @@ onMounted(() => {
                         @click="toggle(ad)"
                       >
                         {{ ad.status === "進行中" ? "Ⅱ" : "▶" }}</button
-                      ><button title="刪除" @click="handleDeleteAdvertisement(ad)">
+                      ><button
+                        title="刪除"
+                        @click="handleDeleteAdvertisement(ad)"
+                      >
                         <FontAwesomeIcon :icon="faTrash" />
                       </button>
                     </div>
@@ -434,16 +524,35 @@ onMounted(() => {
     <div
       v-if="showCreate"
       class="drawer-backdrop"
-      @click.self="showCreate = false"
+      @click.self="closeAdvertisementDrawer"
     >
-      <form class="create-drawer" @submit.prevent="createDraft">
+      <form
+        class="create-drawer"
+        @submit.prevent="isEditing ? updateAd() : createDraft()"
+      >
         <header>
           <div>
-            <span>NEW CAMPAIGN</span>
-            <h2>建立新廣告</h2>
-            <p>先建立草稿，稍後可補上圖片與導向設定。</p>
+            <span>
+              {{ isEditing ? "EDIT CAMPAIGN" : "NEW CAMPAIGN" }}
+            </span>
+
+            <h2>
+              {{ isEditing ? "編輯廣告" : "建立新廣告" }}
+            </h2>
+
+            <p>
+              {{
+                isEditing
+                  ? "修改目前這則廣告的內容與設定。"
+                  : "先建立草稿，稍後可補上圖片與導向設定。"
+              }}
+            </p>
           </div>
-          <button type="button" aria-label="關閉" @click="showCreate = false">
+          <button
+            type="button"
+            aria-label="關閉"
+            @click="closeAdvertisementDrawer"
+          >
             ×
           </button>
         </header>
@@ -549,8 +658,10 @@ onMounted(() => {
           </div>
         </div>
         <footer>
-          <button type="button" @click="showCreate = false">取消</button
-          ><button class="submit">建立草稿</button>
+          <button type="button" @click="closeAdvertisementDrawer">取消</button>
+          <button class="submit">
+            {{ isEditing ? "儲存修改" : "建立草稿" }}
+          </button>
         </footer>
       </form>
     </div>

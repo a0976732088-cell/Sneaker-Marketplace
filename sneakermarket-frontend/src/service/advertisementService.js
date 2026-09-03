@@ -9,7 +9,13 @@ export async function getAllAdvertisements() {
   const response = await httpClient.get("/admin/ads/findAll");
   return response.data;
 }
+
 export async function deleteAdvertisement(adId) {
   const response = await httpClient.delete(`/admin/ads/delete/${adId}`);
+  return response.data;
+}
+
+export async function updateAdvertisement(adId, payload) {
+  const response = await httpClient.put(`/admin/ads/put/${adId}`, payload);
   return response.data;
 }
