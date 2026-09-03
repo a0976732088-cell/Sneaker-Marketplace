@@ -11,3 +11,29 @@ export function getAuctions(params = {}) {
     params,
   });
 }
+
+/**
+ * 查詢指定競標的完整詳細資料。
+ *
+ * API：
+ * GET /api/auctions/{auctionId}
+ *
+ * @param {number|string} auctionId 競標 ID
+ * @returns {Promise} API Response
+ */
+export function getAuctionDetail(auctionId) {
+  return httpClient.get(`/auctions/${auctionId}`);
+}
+
+/**
+ * 查詢指定競標的公開出價紀錄。
+ *
+ * API：
+ * GET /api/auctions/{auctionId}/bids
+ *
+ * @param {number|string} auctionId 競標 ID
+ * @returns {Promise} API Response
+ */
+export function getBidHistory(auctionId) {
+  return httpClient.get(`/auctions/${auctionId}/bids`);
+}

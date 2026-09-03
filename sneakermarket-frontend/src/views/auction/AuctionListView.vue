@@ -1,3 +1,227 @@
+<template>
+  <div class="container py-4">
+    <h1 class="mb-4">競標商城</h1>
+
+    <form class="row g-2 mb-4" @submit.prevent="searchAuctions">
+      <!-- 關鍵字搜尋 -->
+      <div class="col-md-4">
+        <input
+          v-model="keyword"
+          type="text"
+          class="form-control"
+          placeholder="搜尋商品名稱或型號"
+        />
+      </div>
+
+      <!-- 排序 -->
+      <div class="row g-2 mb-4">
+        <div class="col-md-3">
+          <select v-model="sort" class="form-select">
+            <option value="endAt,asc">即將結束</option>
+
+            <option value="createdAt,desc">最新上架</option>
+
+            <option value="currentPrice,asc">價格：低到高</option>
+
+            <option value="currentPrice,desc">價格：高到低</option>
+
+            <option value="bidCount,desc">出價次數：多到少</option>
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <button
+            type="button"
+            class="btn btn-outline-secondary w-100"
+            :disabled="loading"
+            @click="searchAuctions"
+          >
+            套用排序
+          </button>
+        </div>
+
+        <div class="col-md-2">
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            :disabled="loading"
+            @click="clearFilters"
+          >
+            清除條件
+          </button>
+        </div>
+      </div>
+
+      <!-- 競標狀態 -->
+      <div class="col-md-2">
+        <select v-model="status" class="form-select">
+          <option value="">全部狀態</option>
+          <option value="ACTIVE">競標中</option>
+          <option value="SCHEDULED">尚未開始</option>
+          <option value="SOLD">已成交</option>
+          <option value="UNSOLD">流標</option>
+        </select>
+      </div>
+
+      <!-- 商品狀況 -->
+      <div class="col-md-2">
+        <select v-model="condition" class="form-select">
+          <option value="">全部狀況</option>
+          <option value="NEW">全新</option>
+          <option value="LIKE_NEW">近全新</option>
+          <option value="USED">二手</option>
+        </select>
+      </div>
+
+      <!-- 球鞋尺寸 -->
+      <div class="col-md-2">
+        <select v-model="shoeSize" class="form-select">
+          <option value="">全部尺寸</option>
+          <option value="US 8">US 8</option>
+          <option value="US 8.5">US 8.5</option>
+          <option value="US 9">US 9</option>
+          <option value="US 9.5">US 9.5</option>
+          <option value="US 10">US 10</option>
+          <option value="US 10.5">US 10.5</option>
+        </select>
+      </div>
+
+      <!-- 價格範圍 -->
+      <div class="row g-2 mb-3">
+        <div class="col-md-3">
+          <input
+            v-model="minPrice"
+            type="number"
+            min="0"
+            step="1"
+            class="form-control"
+            placeholder="最低價格"
+          />
+        </div>
+
+        <div class="col-md-3">
+          <input
+            v-model="maxPrice"
+            type="number"
+            min="0"
+            step="1"
+            class="form-control"
+            placeholder="最高價格"
+          />
+        </div>
+
+        <div class="col-md-2">
+          <button
+            type="button"
+            class="btn btn-outline-primary w-100"
+            :disabled="loading"
+            @click="searchAuctions"
+          >
+            套用價格
+          </button>
+        </div>
+      </div>
+
+      <!-- 搜尋按鈕 -->
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100" :disabled="loading">
+          搜尋
+        </button>
+      </div>
+    </form>
+
+    <!-- 資料載入中 -->
+    <div v-if="loading">載入中...</div>
+
+    <!-- API 發生錯誤 -->
+    <div v-else-if="errorMessage" class="alert alert-danger">
+      {{ errorMessage }}
+    </div>
+
+    <!-- 查不到競標資料 -->
+    <div v-else-if="auctions.length === 0">目前沒有符合條件的競標商品。</div>
+
+    <!-- 競標列表 -->
+    <div v-else>
+      <div
+        v-for="auction in auctions"
+        :key="auction.auctionId"
+        class="card mb-3"
+      >
+        <div class="card-body">
+          <h5 class="card-title">
+            {{ auction.productName }}
+          </h5>
+
+          <p class="card-text">型號：{{ auction.model }}</p>
+
+          <p class="card-text">尺寸：{{ auction.size }}</p>
+
+          <p class="card-text">
+            商品狀況：{{ formatCondition(auction.condition) }}
+          </p>
+
+          <p class="card-text">目前價格：NT$ {{ auction.currentPrice }}</p>
+
+          <p class="card-text">出價次數：{{ auction.bidCount }}</p>
+
+          <p class="card-text">
+            上架時間：{{ formatDateTime(auction.createdAt) }}
+          </p>
+
+          <p class="card-text">結束時間：{{ formatDateTime(auction.endAt) }}</p>
+
+          <p class="card-text">剩餘時間：{{ formatRemainingTime(auction) }}</p>
+
+          <p class="card-text">競標狀態：{{ formatStatus(auction.status) }}</p>
+
+          <!-- 進入競標詳細頁 -->
+          <RouterLink
+            :to="{
+              name: 'auction-detail',
+              params: { id: auction.auctionId },
+            }"
+            class="btn btn-primary"
+          >
+            查看詳細
+          </RouterLink>
+        </div>
+      </div>
+
+      <!-- 分頁 -->
+      <div
+        v-if="totalPages > 0"
+        class="d-flex justify-content-between align-items-center mt-4"
+      >
+        <div>
+          共 {{ totalElements }} 筆， 第 {{ currentPage + 1 }} /
+          {{ totalPages }} 頁
+        </div>
+
+        <div class="d-flex gap-2">
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            :disabled="loading || currentPage === 0"
+            @click="changePage(currentPage - 1)"
+          >
+            上一頁
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            :disabled="loading || currentPage >= totalPages - 1"
+            @click="changePage(currentPage + 1)"
+          >
+            下一頁
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup>
 import { onMounted, onUnmounted, ref } from "vue";
 import { getAuctions } from "@/service/auctionService";
@@ -232,215 +456,3 @@ onUnmounted(() => {
   }
 });
 </script>
-
-<template>
-  <div class="container py-4">
-    <h1 class="mb-4">競標商城</h1>
-
-    <form class="row g-2 mb-4" @submit.prevent="searchAuctions">
-      <!-- 關鍵字搜尋 -->
-      <div class="col-md-4">
-        <input
-          v-model="keyword"
-          type="text"
-          class="form-control"
-          placeholder="搜尋商品名稱或型號"
-        />
-      </div>
-
-      <!-- 排序 -->
-      <div class="row g-2 mb-4">
-        <div class="col-md-3">
-          <select v-model="sort" class="form-select">
-            <option value="endAt,asc">即將結束</option>
-
-            <option value="createdAt,desc">最新上架</option>
-
-            <option value="currentPrice,asc">價格：低到高</option>
-
-            <option value="currentPrice,desc">價格：高到低</option>
-
-            <option value="bidCount,desc">出價次數：多到少</option>
-          </select>
-        </div>
-
-        <div class="col-md-2">
-          <button
-            type="button"
-            class="btn btn-outline-secondary w-100"
-            :disabled="loading"
-            @click="searchAuctions"
-          >
-            套用排序
-          </button>
-        </div>
-
-        <div class="col-md-2">
-          <button
-            type="button"
-            class="btn btn-outline-secondary"
-            :disabled="loading"
-            @click="clearFilters"
-          >
-            清除條件
-          </button>
-        </div>
-      </div>
-
-      <!-- 競標狀態 -->
-      <div class="col-md-2">
-        <select v-model="status" class="form-select">
-          <option value="">全部狀態</option>
-          <option value="ACTIVE">競標中</option>
-          <option value="SCHEDULED">尚未開始</option>
-          <option value="SOLD">已成交</option>
-          <option value="UNSOLD">流標</option>
-        </select>
-      </div>
-
-      <!-- 商品狀況 -->
-      <div class="col-md-2">
-        <select v-model="condition" class="form-select">
-          <option value="">全部狀況</option>
-          <option value="NEW">全新</option>
-          <option value="LIKE_NEW">近全新</option>
-          <option value="USED">二手</option>
-        </select>
-      </div>
-
-      <!-- 球鞋尺寸 -->
-      <div class="col-md-2">
-        <select v-model="shoeSize" class="form-select">
-          <option value="">全部尺寸</option>
-          <option value="US 8">US 8</option>
-          <option value="US 8.5">US 8.5</option>
-          <option value="US 9">US 9</option>
-          <option value="US 9.5">US 9.5</option>
-          <option value="US 10">US 10</option>
-          <option value="US 10.5">US 10.5</option>
-        </select>
-      </div>
-
-      <!-- 價格範圍 -->
-      <div class="row g-2 mb-3">
-        <div class="col-md-3">
-          <input
-            v-model="minPrice"
-            type="number"
-            min="0"
-            step="1"
-            class="form-control"
-            placeholder="最低價格"
-          />
-        </div>
-
-        <div class="col-md-3">
-          <input
-            v-model="maxPrice"
-            type="number"
-            min="0"
-            step="1"
-            class="form-control"
-            placeholder="最高價格"
-          />
-        </div>
-
-        <div class="col-md-2">
-          <button
-            type="button"
-            class="btn btn-outline-primary w-100"
-            :disabled="loading"
-            @click="searchAuctions"
-          >
-            套用價格
-          </button>
-        </div>
-      </div>
-
-      <!-- 搜尋按鈕 -->
-      <div class="col-md-2">
-        <button type="submit" class="btn btn-primary w-100" :disabled="loading">
-          搜尋
-        </button>
-      </div>
-    </form>
-
-    <!-- 資料載入中 -->
-    <div v-if="loading">載入中...</div>
-
-    <!-- API 發生錯誤 -->
-    <div v-else-if="errorMessage" class="alert alert-danger">
-      {{ errorMessage }}
-    </div>
-
-    <!-- 查不到競標資料 -->
-    <div v-else-if="auctions.length === 0">目前沒有符合條件的競標商品。</div>
-
-    <!-- 競標列表 -->
-    <div v-else>
-      <div
-        v-for="auction in auctions"
-        :key="auction.auctionId"
-        class="card mb-3"
-      >
-        <div class="card-body">
-          <h5 class="card-title">
-            {{ auction.productName }}
-          </h5>
-
-          <p class="card-text">型號：{{ auction.model }}</p>
-
-          <p class="card-text">尺寸：{{ auction.size }}</p>
-
-          <p class="card-text">
-            商品狀況：{{ formatCondition(auction.condition) }}
-          </p>
-
-          <p class="card-text">目前價格：NT$ {{ auction.currentPrice }}</p>
-
-          <p class="card-text">出價次數：{{ auction.bidCount }}</p>
-
-          <p class="card-text">
-            上架時間：{{ formatDateTime(auction.createdAt) }}
-          </p>
-
-          <p class="card-text">結束時間：{{ formatDateTime(auction.endAt) }}</p>
-
-          <p class="card-text">剩餘時間：{{ formatRemainingTime(auction) }}</p>
-
-          <p class="card-text">競標狀態：{{ formatStatus(auction.status) }}</p>
-        </div>
-      </div>
-      <!-- 分頁 -->
-      <div
-        v-if="totalPages > 0"
-        class="d-flex justify-content-between align-items-center mt-4"
-      >
-        <div>
-          共 {{ totalElements }} 筆， 第 {{ currentPage + 1 }} /
-          {{ totalPages }} 頁
-        </div>
-
-        <div class="d-flex gap-2">
-          <button
-            type="button"
-            class="btn btn-outline-secondary"
-            :disabled="loading || currentPage === 0"
-            @click="changePage(currentPage - 1)"
-          >
-            上一頁
-          </button>
-
-          <button
-            type="button"
-            class="btn btn-outline-secondary"
-            :disabled="loading || currentPage >= totalPages - 1"
-            @click="changePage(currentPage + 1)"
-          >
-            下一頁
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>

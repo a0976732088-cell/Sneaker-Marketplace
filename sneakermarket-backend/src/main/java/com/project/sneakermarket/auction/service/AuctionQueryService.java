@@ -6,6 +6,9 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.project.sneakermarket.auction.dto.*;
+import com.project.sneakermarket.auction.entity.AuctionProductImage;
+import com.project.sneakermarket.auction.repository.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
@@ -13,15 +16,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import com.project.sneakermarket.auction.dto.AuctionSearchCriteria;
-import com.project.sneakermarket.auction.dto.AuctionSummaryResponse;
-import com.project.sneakermarket.auction.dto.PageData;
 import com.project.sneakermarket.auction.entity.Auction;
 import com.project.sneakermarket.auction.entity.AuctionProduct;
-import com.project.sneakermarket.auction.repository.AuctionProductRepository;
-import com.project.sneakermarket.auction.repository.AuctionRepository;
-import com.project.sneakermarket.auction.repository.AuctionSpecification;
+import com.project.sneakermarket.auction.entity.AuctionBid;
 import com.project.sneakermarket.common.exception.BusinessException;
+import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -45,7 +44,8 @@ public class AuctionQueryService {
 
     private final AuctionRepository auctionRepository;
     private final AuctionProductRepository auctionProductRepository;
-
+    private final AuctionBidRepository auctionBidRepository;
+    private final AuctionProductImageRepository auctionProductImageRepository;
     /**
      * 查詢全部競標列表。
      *
@@ -120,6 +120,122 @@ public class AuctionQueryService {
                 auctionPage.getTotalPages()
         );
     }
+
+
+    /**
+     * 查詢指定競標的公開出價紀錄。
+     *
+     * 只回傳成功出價的金額、時間與遮蔽後的出價者資訊，
+     * 不直接將 AuctionBid Entity 或 bidderId 暴露給前端。
+     *
+     * @param auctionId 競標 ID
+     * @return 該場競標的公開出價紀錄
+     */
+    public List<BidHistoryResponse> getBidHistory(Long auctionId) {
+
+        // 先確認競標本身存在。
+        // 若 auctionId 不存在，不應把「不存在」誤認成「目前沒有出價」。
+        if (!auctionRepository.existsById(auctionId)) {
+            throw new ResourceNotFoundException(
+                    "找不到指定的競標資料"
+            );
+        }
+
+        // 查詢此競標所有成功出價，Repository 已依時間由新到舊排序
+        List<AuctionBid> bids =
+                auctionBidRepository
+                        .findByAuctionIdOrderByCreatedAtDesc(
+                                auctionId
+                        );
+
+        // 將 Entity 轉為公開 Response DTO
+        return bids.stream()
+                .map(this::toBidHistoryResponse)
+                .toList();
+    }
+
+    /**
+     * 查詢指定競標的完整詳細資料。
+     *
+     * 組合競標主資料、競標商品資料與商品圖片，
+     * 並由後端計算下一次最低可出價金額。
+     *
+     * @param auctionId 競標 ID
+     * @return 競標詳細資料
+     */
+    public AuctionDetailResponse getAuctionDetail(Long auctionId) {
+
+        // 查詢競標主資料；不存在時回 404
+        Auction auction = auctionRepository.findById(auctionId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "找不到指定的競標資料"
+                        )
+                );
+
+        // 查詢此競標所對應的商品資料
+        AuctionProduct product =
+                auctionProductRepository
+                        .findById(auction.getAuctionProductId())
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "找不到此競標的商品資料"
+                                )
+                        );
+
+        // 查詢商品圖片，Repository 已依 sortOrder 由小到大排序
+        List<AuctionProductImage> images =
+                auctionProductImageRepository
+                        .findByAuctionProductIdOrderBySortOrderAsc(
+                                product.getAuctionProductId()
+                        );
+
+        // 詳細頁目前只需要圖片 URL
+        List<String> imageUrls = images.stream()
+                .map(AuctionProductImage::getImageUrl)
+                .toList();
+
+        // 由後端統一計算下一次最低可出價金額
+        var nextMinimumBid =
+                auction.getBidCount() == 0
+                        ? auction.getStartPrice()
+                        : auction.getCurrentPrice()
+                        .add(auction.getMinIncrement());
+
+        // 組成詳細頁 Response DTO
+        return new AuctionDetailResponse(
+                auction.getAuctionId(),
+                auction.getAuctionProductId(),
+                product.getBrandId(),
+                product.getCategoryId(),
+                product.getProductName(),
+                product.getModel(),
+                product.getSize(),
+                product.getCondition(),
+                product.getDescription(),
+                product.getDefectNote(),
+                product.getAuthenticityNote(),
+                product.getLocation(),
+                imageUrls,
+                product.getShippingMethod(),
+                product.getShippingFee(),
+                product.getPaymentMethod(),
+                product.getAllowMeetup(),
+                product.getAllowReturn(),
+                product.getWarrantyNote(),
+                auction.getStartPrice(),
+                auction.getCurrentPrice(),
+                auction.getMinIncrement(),
+                nextMinimumBid,
+                auction.getStartAt(),
+                auction.getEndAt(),
+                auction.getStatus(),
+                auction.getBidCount(),
+                auction.getCreatedAt()
+        );
+    }
+
+
 
     /**
      * 驗證競標列表價格搜尋範圍。
@@ -219,6 +335,22 @@ public class AuctionQueryService {
                 auction.getCreatedAt(),
                 auction.getEndAt(),
                 auction.getStatus()
+        );
+    }
+
+    /**
+     * 將出價 Entity 轉換成公開出價紀錄 DTO。
+     *
+     * @param bid 出價紀錄 Entity
+     * @return 公開出價紀錄 DTO
+     */
+    private BidHistoryResponse toBidHistoryResponse(
+            AuctionBid bid) {
+
+        return new BidHistoryResponse(
+                bid.getBidAmount(),
+                bid.getCreatedAt(),
+                "匿名會員"
         );
     }
 }

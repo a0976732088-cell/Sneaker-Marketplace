@@ -1,18 +1,23 @@
 package com.project.sneakermarket.auction.controller;
 
+import java.util.List;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.sneakermarket.auction.dto.AuctionSearchCriteria;
 import com.project.sneakermarket.auction.dto.AuctionSummaryResponse;
+import com.project.sneakermarket.auction.dto.BidHistoryResponse;
 import com.project.sneakermarket.auction.dto.PageData;
 import com.project.sneakermarket.auction.service.AuctionQueryService;
 import com.project.sneakermarket.common.response.ApiResponse;
+import com.project.sneakermarket.auction.dto.AuctionDetailResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -62,6 +67,54 @@ public class AuctionController {
         return ApiResponse.ok(
                 "查詢競標列表成功",
                 auctions
+        );
+    }
+
+    /**
+     * 查詢指定競標的公開出價紀錄。
+     *
+     * API：
+     * GET /api/auctions/{auctionId}/bids
+     *
+     * @param auctionId 競標 ID
+     * @return 該場競標的公開出價紀錄
+     */
+    @GetMapping("/{auctionId}/bids")
+    public ApiResponse<List<BidHistoryResponse>> getBidHistory(
+            @PathVariable Long auctionId) {
+
+        // 呼叫 Service 查詢並轉換公開出價紀錄
+        List<BidHistoryResponse> bids =
+                auctionQueryService.getBidHistory(auctionId);
+
+        // 使用 BASE 專案統一的 ApiResponse 格式回傳成功結果
+        return ApiResponse.ok(
+                "查詢競標出價紀錄成功",
+                bids
+        );
+    }
+
+    /**
+     * 查詢指定競標的完整詳細資料。
+     *
+     * API：
+     * GET /api/auctions/{auctionId}
+     *
+     * @param auctionId 競標 ID
+     * @return 競標詳細資料
+     */
+    @GetMapping("/{auctionId}")
+    public ApiResponse<AuctionDetailResponse> getAuctionDetail(
+            @PathVariable Long auctionId) {
+
+        // 呼叫 Service 組合競標、商品與圖片資料
+        AuctionDetailResponse auction =
+                auctionQueryService.getAuctionDetail(auctionId);
+
+        // 使用 BASE 專案統一的 ApiResponse 格式回傳
+        return ApiResponse.ok(
+                "查詢競標詳細資料成功",
+                auction
         );
     }
 }

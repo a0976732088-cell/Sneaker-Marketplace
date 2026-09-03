@@ -1,0 +1,26 @@
+package com.project.sneakermarket.auction.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.project.sneakermarket.auction.entity.AuctionBid;
+
+/**
+ * 競標出價紀錄 Repository。
+ * 負責存取 dbo.auction_bids 資料表。
+ */
+public interface AuctionBidRepository
+        extends JpaRepository<AuctionBid, Long> {
+
+    /**
+     * 依競標 ID 查詢成功出價紀錄，
+     * 並依出價時間由新到舊排列。
+     *
+     * @param auctionId 競標 ID
+     * @return 該場競標的出價紀錄
+     */
+    List<AuctionBid> findByAuctionIdOrderByCreatedAtDesc(
+            Long auctionId
+    );
+}
