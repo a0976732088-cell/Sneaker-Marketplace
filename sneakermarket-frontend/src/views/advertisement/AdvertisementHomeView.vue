@@ -352,7 +352,7 @@ onMounted(() => {
                 <tr v-for="ad in filteredAds" :key="ad.id">
                   <td>
                     <div class="ad-identity">
-                      <!-- 左側廣告預覽依照原始圖片比例顯示，避免裁切內容 -->
+                      <!-- 有圖與無圖皆使用固定大小；圖片完整顯示、不裁切 -->
                       <div class="ad-thumbnail">
                         <!-- 有網址且圖片載入正常時顯示 -->
                         <img
@@ -988,13 +988,15 @@ tbody tr:hover {
 .ad-thumbnail {
   position: relative;
   display: grid;
-  /* 只固定寬度，高度交給圖片依原始比例自動撐開。 */
   width: 160px;
-  height: auto;
+  height: 120px;
+  box-sizing: border-box;
   flex: 0 0 160px;
   place-items: center;
-  overflow: visible;
+  overflow: hidden;
+  border: 1px solid #dfe3e9;
   border-radius: 6px;
+  background: #fff;
   color: #fff;
 }
 .ad-thumbnail:after {
@@ -1349,23 +1351,23 @@ tbody tr:hover {
     gap: 0;
   }
 }
-/* 保留網址圖片的完整比例，不以固定高度裁切上下或左右內容。 */
+/* 圖片填滿固定預覽區域，但保留完整比例、不裁切內容。 */
 .ad-thumbnail-image {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: contain;
   object-position: center;
-  border-radius: 6px;
 }
 
 /* 沒有圖片或圖片網址失效時的預設狀態 */
 .ad-thumbnail-empty {
   display: grid;
   width: 100%;
-  min-height: 90px;
+  height: 100%;
   place-items: center;
-  border-radius: 6px;
   color: #7b8492;
   background: #eef0f3;
   font-size: 8px;
