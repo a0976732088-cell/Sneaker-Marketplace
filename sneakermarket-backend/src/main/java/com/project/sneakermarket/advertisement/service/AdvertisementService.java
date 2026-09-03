@@ -2,9 +2,11 @@ package com.project.sneakermarket.advertisement.service;
 
 import com.project.sneakermarket.advertisement.dto.AdvertisementResponse;
 import com.project.sneakermarket.advertisement.dto.CreateAdvertisementRequest;
+import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import com.project.sneakermarket.advertisement.repository.AdvertisementRepository;
+import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +18,7 @@ public class AdvertisementService {
 
     private final AdvertisementRepository adRepo;
 
-    public Advertisement insertAdvertisement(CreateAdvertisementRequest request){
+    public Advertisement insertAdvertisement(CreateAdvertisementRequest request) {
         Advertisement advertisement = new Advertisement();
 
         advertisement.setCreatedBy(request.getCreatedBy());
@@ -41,7 +43,7 @@ public class AdvertisementService {
         return adRepo.save(advertisement);
     }
 
-    public List<AdvertisementResponse> getAllAdvertisements(){
+    public List<AdvertisementResponse> getAllAdvertisements() {
         return adRepo.findAll()
                 .stream()
                 .map(this::toResponse)
@@ -71,7 +73,29 @@ public class AdvertisementService {
     }
 
     //未來加入member="admin"需要修改
-    public void deleteAdvertisement(Long adId){
+    public void deleteAdvertisement(Long adId) {
         adRepo.deleteById(adId);
+    }
+
+    public Advertisement updateAdvertisement(Long adId, UpdateAdvertisementRequest request) {
+        Advertisement advertisement = adRepo.findById(adId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("找不到指定的廣告")
+                );
+
+        advertisement.setAdName(request.getAdName());
+        advertisement.setImageUrl(request.getImageUrl());
+        advertisement.setAdDescription(request.getAdDescription());
+        advertisement.setAdType(request.getAdType());
+        advertisement.setAdPlacement(request.getAdPlacement());
+        advertisement.setStartAt(request.getStartAt());
+        advertisement.setEndAt(request.getEndAt());
+        advertisement.setTargetType(request.getTargetType());
+        advertisement.setTargetId(request.getTargetId());
+        advertisement.setTargetUrl(request.getTargetUrl());
+
+        advertisement.setSortOrder((request.getSortOrder() == null ? 0 : request.getSortOrder()));
+
+        return adRepo.save(advertisement);
     }
 }

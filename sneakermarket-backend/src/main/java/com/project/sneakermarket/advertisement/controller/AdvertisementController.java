@@ -2,6 +2,7 @@ package com.project.sneakermarket.advertisement.controller;
 
 import com.project.sneakermarket.advertisement.dto.AdvertisementResponse;
 import com.project.sneakermarket.advertisement.dto.CreateAdvertisementRequest;
+import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.service.AdvertisementService;
 import com.project.sneakermarket.common.response.ApiResponse;
@@ -44,6 +45,15 @@ public class AdvertisementController {
 
         return ResponseEntity.ok(ApiResponse.ok("廣告刪除成功",null));
 
-
     }
+
+    @PutMapping("/put/{adId}")
+    public ResponseEntity<ApiResponse<Long>> updateAdvertisement(
+                @PathVariable Long adId,
+                @Valid @RequestBody UpdateAdvertisementRequest request){
+            Advertisement advertisement = adService.updateAdvertisement(adId,request);
+
+            return ResponseEntity.ok(ApiResponse.ok("廣告修改成功", advertisement.getAdId()));
+    }
+
 }
