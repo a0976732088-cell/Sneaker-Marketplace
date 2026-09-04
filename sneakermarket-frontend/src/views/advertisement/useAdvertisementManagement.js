@@ -291,8 +291,28 @@ export function useAdvertisementManagement() {
       const result = await getAdvertisementsByPage(pageNumber);
       const pageData = result.data;
 
-      // 無論是否靜默查詢，都更新目前廣告資料
-      ads.value = (pageData.content || []).map(toAdvertisementViewModel);
+      // 記住重新查詢前的廣告畫面狀態
+      const previousAds = new Map(ads.value.map((ad) => [ad.id, ad]));
+
+      // 將後端最新資料轉成前端格式
+      const refreshedAds = (pageData.content || []).map(
+        toAdvertisementViewModel,
+      );
+
+      ads.value = refreshedAds.map((ad) => {
+        const previousAd = previousAds.get(ad.id);
+
+        // 圖片網址沒改變時，保留之前的載入失敗結果
+        const shouldKeepImageState =
+          previousAd && previousAd.imageUrl === ad.imageUrl;
+
+        return {
+          ...ad,
+          imageLoadFailed: shouldKeepImageState
+            ? previousAd.imageLoadFailed
+            : false,
+        };
+      });
 
       currentPage.value = pageData.number;
       totalPages.value = pageData.totalPages;
