@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 import { VueDatePicker } from "@vuepic/vue-datepicker";
 import "@vuepic/vue-datepicker/dist/main.css";
 import { zhTW } from "date-fns/locale";
@@ -38,8 +38,15 @@ const {
   updateAd,
 } = useAdvertisementManagement();
 
+let refreshTimer;
 onMounted(() => {
   loadAdvertisements();
+  refreshTimer = window.setInterval(() => {
+    loadAdvertisements();
+  }, 60_000);
+});
+onUnmounted(() => {
+  window.clearInterval(refreshTimer);
 });
 </script>
 
