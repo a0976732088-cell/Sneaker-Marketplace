@@ -8,7 +8,11 @@ import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import com.project.sneakermarket.advertisement.repository.AdvertisementRepository;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -97,5 +101,11 @@ public class AdvertisementService {
         advertisement.setSortOrder((request.getSortOrder() == null ? 0 : request.getSortOrder()));
 
         return adRepo.save(advertisement);
+    }
+
+    public Page<AdvertisementResponse> findAdByPage(Integer pageNumber){
+        Pageable page = PageRequest.of(pageNumber,5, Sort.Direction.DESC, "createdAt");
+        return adRepo.findAll(page)
+                .map(this::toResponse);
     }
 }

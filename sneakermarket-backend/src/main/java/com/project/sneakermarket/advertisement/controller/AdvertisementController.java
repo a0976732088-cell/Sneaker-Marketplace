@@ -8,6 +8,7 @@ import com.project.sneakermarket.advertisement.service.AdvertisementService;
 import com.project.sneakermarket.common.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -54,6 +55,18 @@ public class AdvertisementController {
             Advertisement advertisement = adService.updateAdvertisement(adId,request);
 
             return ResponseEntity.ok(ApiResponse.ok("廣告修改成功", advertisement.getAdId()));
+    }
+
+    @GetMapping("/findPage")
+    public ResponseEntity<ApiResponse<Page<AdvertisementResponse>>> findAdByPage(
+            @RequestParam(defaultValue = "0") Integer pageNumber){
+
+        Page<AdvertisementResponse> advertisements =
+                adService.findAdByPage(pageNumber);
+
+        return ResponseEntity.ok(
+                ApiResponse.ok("廣告分頁查詢成功", advertisements)
+        );
     }
 
 }
