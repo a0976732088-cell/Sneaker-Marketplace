@@ -13,7 +13,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -107,5 +110,21 @@ public class AdvertisementService {
         Pageable page = PageRequest.of(pageNumber,5, Sort.Direction.DESC, "createdAt");
         return adRepo.findAll(page)
                 .map(this::toResponse);
+    }
+
+    @Transactional
+    public int expireEndedAdvertisements() {
+        LocalDateTime now =
+                LocalDateTime.now(ZoneId.of("Asia/Taipei"));
+
+        List<Advertisement> expiredAds = adRepo.findByAdStatusAndEndAtBefore(AdvertisementStatus.ACTIVE, now);
+
+        expiredAds.forEach(advertisement ->
+                advertisement.setAdStatus(AdvertisementStatus.EXPIRED)
+        );
+
+        adRepo.saveAll(expiredAds);
+
+        return expiredAds.size();
     }
 }
