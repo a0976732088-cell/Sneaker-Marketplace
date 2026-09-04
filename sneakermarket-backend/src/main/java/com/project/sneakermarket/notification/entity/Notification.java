@@ -1,28 +1,27 @@
 package com.project.sneakermarket.notification.entity;
 
 import jakarta.persistence.*;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
+@Data
 @Entity
-@Table(
-        name = "notifications",
-        indexes = {
-                @Index(name = "IX_notifications_member_read", columnList = "member_id, is_read")
-        }
-)
-@Getter
-@Setter
-public class Notification {@Id
-@GeneratedValue(strategy = GenerationType.IDENTITY)
-@Column(name = "notification_id")
-private Long notificationId;
+@Table(name = "notifications")
+public class Notification {
 
-    @Column(name = "member_id", nullable = false)
-    private Long memberId;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "notification_id", nullable = false)
+    private Long notificationId;
+
+    //  建立與 Member 的 FK 關聯
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "member_id", nullable = false)
+//    private Member member;
 
     @Column(name = "notification_type", nullable = false, length = 40)
     private String notificationType;
@@ -45,10 +44,15 @@ private Long notificationId;
     @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;
 
-    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "read_at")
     private LocalDateTime readAt;
+
+    // 由 Java 程式控制建立時間
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }

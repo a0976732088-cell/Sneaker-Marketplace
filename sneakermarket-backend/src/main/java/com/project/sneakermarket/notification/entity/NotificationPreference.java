@@ -2,6 +2,7 @@ package com.project.sneakermarket.notification.entity;
 
 
 import jakarta.persistence.*;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
@@ -9,24 +10,20 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+@Data
 @Entity
-@Table(
-        name = "notification_preferences",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "UQ_preference_member", columnNames = {"member_id"})
-        }
-)
-@Getter
-@Setter
+@Table(name = "notification_preferences")
 public class NotificationPreference {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "preference_id")
+    @Column(name = "preference_id", nullable = false)
     private Long preferenceId;
 
-    @Column(name = "member_id", nullable = false)
-    private Long memberId;
+    // 🎯 建立與 Member 的 FK 關聯
+//    @OneToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "member_id", nullable = false, unique = true)[cite: 10]
+//    private Member member;
 
     @Column(name = "all_enabled", nullable = false)
     private Boolean allEnabled = true;
@@ -40,11 +37,20 @@ public class NotificationPreference {
     @Column(name = "release_enabled", nullable = false)
     private Boolean releaseEnabled = true;
 
-    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    // 🎯 在 Java 新增與更新時由程式寫入時間
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

@@ -21,6 +21,19 @@
       >
         查詢活動
       </button>
+
+      <button
+        :class="[
+          'btn',
+          activeTab === 'NotificationManager'
+            ? 'btn-primary'
+            : 'btn-outline-primary',
+          'ms-2',
+        ]"
+        @click="activeTab = 'NotificationManager'"
+      >
+        通知管理系統
+      </button>
     </div>
 
     <!-- 1. 新增表單區塊 -->
@@ -56,6 +69,9 @@
       @success="fetchEvents(currentPage)"
     />
   </div>
+
+  <!-- 5. 通知管理區塊 -->
+  <NotificationManager v-if="activeTab === 'NotificationManager'" />
 </template>
 
 <script setup>
@@ -67,6 +83,7 @@ import EventSearchFilter from "@/components/events/EventSearchFilter.vue";
 import EventTable from "@/components/events/EventTable.vue";
 import EventDetailModal from "@/components/events/EventDetailModal.vue";
 import EventEditModal from "@/components/events/EventEditModal.vue";
+import NotificationManager from "@/components/notification/NotificationManager.vue";
 
 const activeTab = ref(localStorage.getItem("event_active_tab") || "search");
 

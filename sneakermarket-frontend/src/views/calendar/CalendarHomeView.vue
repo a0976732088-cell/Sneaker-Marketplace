@@ -2,9 +2,12 @@
   <section class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h1 class="h3 mb-0">行事曆</h1>
+
+      <span>
       <button type="button" class="btn btn-primary" @click="goToManage">
         Event-Manage
       </button>
+      </span>
     </div>
 
     <!-- 主月曆卡片容器 -->
