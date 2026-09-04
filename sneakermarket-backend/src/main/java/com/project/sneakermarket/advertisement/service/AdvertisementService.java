@@ -6,6 +6,7 @@ import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import com.project.sneakermarket.advertisement.repository.AdvertisementRepository;
+import com.project.sneakermarket.common.exception.BusinessException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +29,7 @@ public class AdvertisementService {
     public Advertisement insertAdvertisement(CreateAdvertisementRequest request) {
         Advertisement advertisement = new Advertisement();
 
+        validateAdvertisementTime(request.getStartAt(), request.getEndAt());
         advertisement.setCreatedBy(request.getCreatedBy());
         advertisement.setAdName(request.getAdName());
         advertisement.setImageUrl(request.getImageUrl());
@@ -89,6 +91,7 @@ public class AdvertisementService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("找不到指定的廣告")
                 );
+        validateAdvertisementTime(request.getStartAt(), request.getEndAt());
 
         advertisement.setAdName(request.getAdName());
         advertisement.setImageUrl(request.getImageUrl());
@@ -126,5 +129,17 @@ public class AdvertisementService {
         adRepo.saveAll(expiredAds);
 
         return expiredAds.size();
+    }
+
+
+    private void validateAdvertisementTime(
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    ) {
+        if (startAt != null
+                && endAt != null
+                && !startAt.isBefore(endAt)) {
+            throw new BusinessException("開始時間必須早於結束時間");
+        }
     }
 }
