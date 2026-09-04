@@ -17,6 +17,12 @@ const {
   ads,
   loadingAds,
   loadError,
+  currentPage,
+  totalPages,
+  totalElements,
+  pageNumbers,
+  firstItemNumber,
+  lastItemNumber,
   filteredAds,
   form,
   isEditing,
@@ -27,6 +33,7 @@ const {
   openEditDrawer,
   createDraft,
   loadAdvertisements,
+  goToPage,
   handleDeleteAdvertisement,
   updateAd,
 } = useAdvertisementManagement();
@@ -234,13 +241,42 @@ onMounted(() => {
             </table>
           </div>
           <footer class="panel-footer">
-            <span
-              >顯示 1–{{ filteredAds.length }}，共
-              {{ filteredAds.length }} 筆</span
-            >
+            <span>
+              顯示 {{ firstItemNumber }}–{{ lastItemNumber }}，共
+              {{ totalElements }} 筆
+            </span>
             <div>
-              <button disabled>‹</button><button class="current">1</button
-              ><button disabled>›</button>
+              <!-- 後端頁碼從 0 開始，所以顯示時加 1。 -->
+              <button
+                type="button"
+                aria-label="上一頁"
+                :disabled="currentPage === 0 || loadingAds"
+                @click="goToPage(currentPage - 1)"
+              >
+                ‹
+              </button>
+              <button
+                v-for="pageNumber in pageNumbers"
+                :key="pageNumber"
+                type="button"
+                :class="{ current: currentPage === pageNumber }"
+                :disabled="loadingAds"
+                @click="goToPage(pageNumber)"
+              >
+                {{ pageNumber + 1 }}
+              </button>
+              <button
+                type="button"
+                aria-label="下一頁"
+                :disabled="
+                  totalPages === 0 ||
+                  currentPage >= totalPages - 1 ||
+                  loadingAds
+                "
+                @click="goToPage(currentPage + 1)"
+              >
+                ›
+              </button>
             </div>
           </footer>
         </template>

@@ -19,3 +19,12 @@ export async function updateAdvertisement(adId, payload) {
   const response = await httpClient.put(`/admin/ads/put/${adId}`, payload);
   return response.data;
 }
+
+export async function getAdvertisementsByPage(pageNumber = 0) {
+  const response = await httpClient.get("/admin/ads/findPage", {
+    // Axios 會將 params 轉成 ?pageNumber=0 的查詢參數
+    params: { pageNumber },
+  });
+
+  return response.data;
+}
