@@ -110,10 +110,19 @@ public class AdvertisementService {
         return adRepo.save(advertisement);
     }
 
-    public Page<AdvertisementResponse> findAdByPage(Integer pageNumber){
+    public Page<AdvertisementResponse> findAdByPage(Integer pageNumber, AdvertisementStatus adStatus){
         Pageable page = PageRequest.of(pageNumber,5, Sort.Direction.DESC, "createdAt");
-        return adRepo.findAll(page)
-                .map(this::toResponse);
+
+        Page<Advertisement> result;
+
+        if(adStatus == null){
+            result = adRepo.findAll(page);
+        }else{
+            result = adRepo.findByAdStatus(adStatus, page);
+        }
+
+
+        return result.map(this::toResponse);
     }
 
     @Transactional

@@ -5,6 +5,7 @@ import com.project.sneakermarket.advertisement.dto.CreateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementStatusRequest;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
+import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import com.project.sneakermarket.advertisement.service.AdvertisementService;
 import com.project.sneakermarket.common.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
 
 @RestController
 @RequestMapping("/api/admin/ads")
@@ -60,13 +62,14 @@ public class AdvertisementController {
 
     @GetMapping("/findPage")
     public ResponseEntity<ApiResponse<Page<AdvertisementResponse>>> findAdByPage(
-            @RequestParam(defaultValue = "0") Integer pageNumber){
+            @RequestParam(defaultValue = "0") Integer pageNumber,
+            @RequestParam(required = false) AdvertisementStatus adStatus){
 
-        Page<AdvertisementResponse> advertisements =
-                adService.findAdByPage(pageNumber);
+        Page<AdvertisementResponse> result =
+                adService.findAdByPage(pageNumber, adStatus);
 
         return ResponseEntity.ok(
-                ApiResponse.ok("廣告分頁查詢成功", advertisements)
+                ApiResponse.ok("廣告查詢成功", result)
         );
     }
 
