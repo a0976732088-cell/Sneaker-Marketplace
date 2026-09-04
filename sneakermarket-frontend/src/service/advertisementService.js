@@ -25,6 +25,11 @@ export async function getAdvertisementsByPage(pageNumber = 0) {
     // Axios 會將 params 轉成 ?pageNumber=0 的查詢參數
     params: { pageNumber },
   });
+  return response.data;
+}
+
+export async function updateAdvertisementStatus(adId, adStatus) {
+  const response = await httpClient.put(`/admin/ads/put/${adId}/status`, {adStatus});
 
   return response.data;
 }

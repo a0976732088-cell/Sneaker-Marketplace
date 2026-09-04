@@ -225,16 +225,18 @@ onUnmounted(() => {
                     <div class="row-actions">
                       <button title="編輯" @click="openEditDrawer(ad)">
                         <FontAwesomeIcon :icon="faPencil" /></button
-                      ><button
-                        v-if="['進行中', '草稿'].includes(ad.status)"
-                        :title="ad.status === '進行中' ? '暫停' : '上架'"
+                      >
+                      <!--草稿與已停用顯示上架按鈕，進行中顯示停用按鈕，已結束不允許操作，所以不顯示按鈕。-->
+                      <button
+                        v-if="['進行中', '草稿', '已停用'].includes(ad.status)"
+                        type="button"
+                        :title="ad.status === '進行中' ? '停用' : '上架'"
                         @click="toggle(ad)"
                       >
-                        {{ ad.status === "進行中" ? "Ⅱ" : "▶" }}</button
-                      ><button
+                        {{ ad.status === "進行中" ? "Ⅱ" : "▶" }}</button>
+                        <button
                         title="刪除"
-                        @click="handleDeleteAdvertisement(ad)"
-                      >
+                        @click="handleDeleteAdvertisement(ad)">
                         <FontAwesomeIcon :icon="faTrash" />
                       </button>
                     </div>

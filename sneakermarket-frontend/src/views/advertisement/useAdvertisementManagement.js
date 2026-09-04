@@ -4,6 +4,7 @@ import {
   deleteAdvertisement,
   getAdvertisementsByPage,
   updateAdvertisement,
+  updateAdvertisementStatus,
 } from "@/service/advertisementService";
 
 export function useAdvertisementManagement() {
@@ -36,15 +37,10 @@ export function useAdvertisementManagement() {
 
   // 計算頁尾要顯示的資料範圍，例如「顯示 1–5，共 6 筆」。
   const firstItemNumber = computed(() =>
-    totalElements.value === 0
-      ? 0
-      : currentPage.value * pageSize.value + 1,
+    totalElements.value === 0 ? 0 : currentPage.value * pageSize.value + 1,
   );
   const lastItemNumber = computed(() =>
-    Math.min(
-      (currentPage.value + 1) * pageSize.value,
-      totalElements.value,
-    ),
+    Math.min((currentPage.value + 1) * pageSize.value, totalElements.value),
   );
 
   const typeLabels = {
@@ -93,23 +89,21 @@ export function useAdvertisementManagement() {
   });
 
   const timeError = computed(() => {
-  // 尚未同時選擇開始與結束時間時，不顯示錯誤
-  if (!form.startAt || !form.endAt) return "";
+    // 尚未同時選擇開始與結束時間時，不顯示錯誤
+    if (!form.startAt || !form.endAt) return "";
 
-  const startTime = new Date(form.startAt).getTime();
-  const endTime = new Date(form.endAt).getTime();
+    const startTime = new Date(form.startAt).getTime();
+    const endTime = new Date(form.endAt).getTime();
 
-  return startTime < endTime
-    ? ""
-    : "開始時間必須早於結束時間";
-});
+    return startTime < endTime ? "" : "開始時間必須早於結束時間";
+  });
 
-function validateAdvertisementTime() {
-  if (!timeError.value) return true;
+  function validateAdvertisementTime() {
+    if (!timeError.value) return true;
 
-  notify(timeError.value);
-  return false;
-}
+    notify(timeError.value);
+    return false;
+  }
 
   function resetForm() {
     Object.assign(form, {
@@ -139,11 +133,29 @@ function validateAdvertisementTime() {
     }, 2400);
   }
 
-  function toggle(ad) {
-    ad.status = ad.status === "進行中" ? "草稿" : "進行中";
-    notify(
-      `「${ad.name}」已${ad.status === "進行中" ? "開始投放" : "暫停投放"}`,
-    );
+  async function toggle(ad) {
+    // 進行中的廣告按下按鈕後停用；其他可操作狀態則上架
+    const nextStatus = ad.status === "進行中" ? "INACTIVE" : "ACTIVE";
+
+    const actionName = nextStatus === "ACTIVE" ? "上架" : "停用";
+
+    try {
+      const result = await updateAdvertisementStatus(ad.id, nextStatus);
+
+      // 使用後端回傳的新狀態，只更新目前這一列，不重新查詢整頁
+      const updatedStatus = result.data?.adStatus || nextStatus;
+
+      ad.status = statusLabels[updatedStatus] || updatedStatus;
+
+      notify(result.message || `廣告${actionName}成功`);
+    } catch (error) {
+      console.error(`廣告${actionName}失敗`, error);
+
+      notify(
+        error.response?.data?.message ||
+          `廣告${actionName}失敗，請確認後端與資料庫`,
+      );
+    }
   }
 
   function formatDateTime(value) {
@@ -234,7 +246,7 @@ function validateAdvertisementTime() {
   }
 
   async function createDraft() {
-      if (!validateAdvertisementTime()) return;
+    if (!validateAdvertisementTime()) return;
     const payload = {
       createdBy: form.createdBy,
       adName: form.adName,
@@ -281,8 +293,7 @@ function validateAdvertisementTime() {
       pageSize.value = pageData.size;
     } catch (error) {
       console.error("分頁查詢廣告失敗", error);
-      loadError.value =
-        error.response?.data?.message || "廣告列表載入失敗";
+      loadError.value = error.response?.data?.message || "廣告列表載入失敗";
     } finally {
       loadingAds.value = false;
     }
@@ -290,11 +301,7 @@ function validateAdvertisementTime() {
 
   async function goToPage(pageNumber) {
     // 避免超出第一頁、最後一頁，或載入期間重複送出請求。
-    if (
-      pageNumber < 0 ||
-      pageNumber >= totalPages.value ||
-      loadingAds.value
-    ) {
+    if (pageNumber < 0 || pageNumber >= totalPages.value || loadingAds.value) {
       return;
     }
 
@@ -327,8 +334,7 @@ function validateAdvertisementTime() {
     // 沒有編輯 ID 時不送出修改
     if (editingAdId.value === null) return;
 
-      if (!validateAdvertisementTime()) return;
-
+    if (!validateAdvertisementTime()) return;
 
     const payload = {
       adName: form.adName,

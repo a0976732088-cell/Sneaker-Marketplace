@@ -530,6 +530,11 @@ tbody tr:hover {
   color: #687386;
   background: #f0f2f5;
 }
+/* 已停用的廣告使用橘色，和草稿及進行中做出區分 */
+.status-badge.已停用 {
+  color: #b54708;
+  background: #fff4e5;
+}
 .status-badge.已結束 {
   color: #8d94a0;
   background: #f5f5f6;
