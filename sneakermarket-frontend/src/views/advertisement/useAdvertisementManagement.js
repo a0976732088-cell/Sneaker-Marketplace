@@ -277,25 +277,38 @@ export function useAdvertisementManagement() {
     }
   }
 
-  async function loadAdvertisements(pageNumber = currentPage.value) {
-    loadingAds.value = true;
-    loadError.value = "";
+  async function loadAdvertisements(
+    pageNumber = currentPage.value,
+    silent = false,
+  ) {
+    // 一般查詢才顯示載入畫面；背景查詢不顯示
+    if (!silent) {
+      loadingAds.value = true;
+      loadError.value = "";
+    }
 
     try {
       const result = await getAdvertisementsByPage(pageNumber);
-
       const pageData = result.data;
 
+      // 無論是否靜默查詢，都更新目前廣告資料
       ads.value = (pageData.content || []).map(toAdvertisementViewModel);
+
       currentPage.value = pageData.number;
       totalPages.value = pageData.totalPages;
       totalElements.value = pageData.totalElements;
       pageSize.value = pageData.size;
     } catch (error) {
       console.error("分頁查詢廣告失敗", error);
-      loadError.value = error.response?.data?.message || "廣告列表載入失敗";
+
+      // 背景更新失敗時保留原本畫面，不顯示整頁錯誤
+      if (!silent) {
+        loadError.value = error.response?.data?.message || "廣告列表載入失敗";
+      }
     } finally {
-      loadingAds.value = false;
+      if (!silent) {
+        loadingAds.value = false;
+      }
     }
   }
 

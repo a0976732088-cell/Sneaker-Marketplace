@@ -43,7 +43,7 @@ let refreshTimer;
 onMounted(() => {
   loadAdvertisements();
   refreshTimer = window.setInterval(() => {
-    loadAdvertisements();
+    loadAdvertisements(currentPage.value, true);
   }, 60_000);
 });
 onUnmounted(() => {
