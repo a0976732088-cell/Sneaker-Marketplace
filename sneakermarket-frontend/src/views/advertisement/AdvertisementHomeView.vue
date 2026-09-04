@@ -20,6 +20,7 @@ const {
   currentPage,
   totalPages,
   totalElements,
+  allAdvertisementsCount,
   pageNumbers,
   firstItemNumber,
   lastItemNumber,
@@ -104,7 +105,10 @@ onUnmounted(() => {
             :class="{ active: activeTab === tab }"
             @click="activeTab = tab"
           >
-            {{ tab }}<span v-if="tab === '全部廣告'">{{ totalElements }}</span>
+            {{ tab
+            }}<span v-if="tab === '全部廣告'">{{
+              allAdvertisementsCount
+            }}</span>
           </button>
         </div>
         <div class="filter-row">

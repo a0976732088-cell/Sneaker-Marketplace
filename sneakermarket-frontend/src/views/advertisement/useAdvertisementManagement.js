@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import {
   createAdvertisement,
   deleteAdvertisement,
@@ -27,6 +27,8 @@ export function useAdvertisementManagement() {
   const totalPages = ref(0);
   // 後端回傳的廣告總筆數
   const totalElements = ref(0);
+  // 保留「全部廣告」的總數，避免切換狀態後徽章變成該狀態的筆數。
+  const allAdvertisementsCount = ref(0);
   // 後端目前固定每頁顯示 5 筆
   const pageSize = ref(5);
 
@@ -61,11 +63,21 @@ export function useAdvertisementManagement() {
     EXPIRED: "已結束",
   };
 
+  // 將畫面頁籤轉成後端 AdvertisementStatus；全部廣告不帶狀態參數。
+  const tabStatusValues = {
+    進行中: "ACTIVE",
+    草稿: "DRAFT",
+    已停用: "INACTIVE",
+    已結束: "EXPIRED",
+  };
+  const selectedAdStatus = computed(
+    () => tabStatusValues[activeTab.value] || null,
+  );
+
   const filteredAds = computed(() =>
     ads.value.filter((ad) => {
       const term = keyword.value.trim().toLowerCase();
       return (
-        (activeTab.value === "全部廣告" || ad.status === activeTab.value) &&
         (placement.value === "全部版位" || ad.place === placement.value) &&
         (!term || `${ad.name} ${ad.id} ${ad.desc}`.toLowerCase().includes(term))
       );
@@ -288,7 +300,10 @@ export function useAdvertisementManagement() {
     }
 
     try {
-      const result = await getAdvertisementsByPage(pageNumber);
+      const result = await getAdvertisementsByPage(
+        pageNumber,
+        selectedAdStatus.value,
+      );
       const pageData = result.data;
 
       // 記住重新查詢前的廣告畫面狀態
@@ -318,6 +333,11 @@ export function useAdvertisementManagement() {
       totalPages.value = pageData.totalPages;
       totalElements.value = pageData.totalElements;
       pageSize.value = pageData.size;
+
+      // 只有查詢全部廣告時，才更新頁籤旁的全部筆數。
+      if (selectedAdStatus.value === null) {
+        allAdvertisementsCount.value = pageData.totalElements;
+      }
     } catch (error) {
       console.error("分頁查詢廣告失敗", error);
 
@@ -331,6 +351,11 @@ export function useAdvertisementManagement() {
       }
     }
   }
+
+  // 切換頁籤時回到第一頁，並交由後端依狀態篩選後再分頁。
+  watch(activeTab, () => {
+    loadAdvertisements(0);
+  });
 
   async function goToPage(pageNumber) {
     // 避免超出第一頁、最後一頁，或載入期間重複送出請求。
@@ -410,6 +435,7 @@ export function useAdvertisementManagement() {
     currentPage,
     totalPages,
     totalElements,
+    allAdvertisementsCount,
     pageSize,
     pageNumbers,
     firstItemNumber,

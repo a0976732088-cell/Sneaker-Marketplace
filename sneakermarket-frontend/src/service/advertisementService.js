@@ -20,10 +20,13 @@ export async function updateAdvertisement(adId, payload) {
   return response.data;
 }
 
-export async function getAdvertisementsByPage(pageNumber = 0) {
+export async function getAdvertisementsByPage(pageNumber = 0, adStatus = null) {
   const response = await httpClient.get("/admin/ads/findPage", {
-    // Axios 會將 params 轉成 ?pageNumber=0 的查詢參數
-    params: { pageNumber },
+    // adStatus 沒有值時查詢全部；有值時由後端先篩選狀態，再進行分頁。
+    params: {
+      pageNumber,
+      adStatus: adStatus || undefined,
+    },
   });
   return response.data;
 }
