@@ -3,6 +3,7 @@ package com.project.sneakermarket.advertisement.controller;
 import com.project.sneakermarket.advertisement.dto.AdvertisementResponse;
 import com.project.sneakermarket.advertisement.dto.CreateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementRequest;
+import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementStatusRequest;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.service.AdvertisementService;
 import com.project.sneakermarket.common.response.ApiResponse;
@@ -69,4 +70,11 @@ public class AdvertisementController {
         );
     }
 
+    @PutMapping("/put/{adId}/status")
+    public ResponseEntity<ApiResponse<AdvertisementResponse>> updateAdvertisementStatus(
+            @PathVariable Long adId, @Valid @RequestBody UpdateAdvertisementStatusRequest request){
+        AdvertisementResponse adResponse = adService.updateAdvertisementStatus(adId, request);
+
+        return ResponseEntity.ok(ApiResponse.ok("廣告狀態更新成功",adResponse));
+    }
 }

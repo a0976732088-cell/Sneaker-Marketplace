@@ -3,6 +3,7 @@ package com.project.sneakermarket.advertisement.service;
 import com.project.sneakermarket.advertisement.dto.AdvertisementResponse;
 import com.project.sneakermarket.advertisement.dto.CreateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementRequest;
+import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementStatusRequest;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import com.project.sneakermarket.advertisement.repository.AdvertisementRepository;
@@ -141,5 +142,23 @@ public class AdvertisementService {
                 && !startAt.isBefore(endAt)) {
             throw new BusinessException("開始時間必須早於結束時間");
         }
+    }
+
+    @Transactional
+    public AdvertisementResponse updateAdvertisementStatus(Long adId, UpdateAdvertisementStatusRequest request){
+        Advertisement ad = adRepo.findById(adId)
+                .orElseThrow(()->
+                        new ResourceNotFoundException("找不到指定的廣告"));
+
+        AdvertisementStatus newStatus = request.getAdStatus();
+
+        if(newStatus != AdvertisementStatus.ACTIVE && newStatus != AdvertisementStatus.INACTIVE){
+            throw new BusinessException("只能將廣告設為上架或停用");
+        }
+        ad.setAdStatus(newStatus);
+
+        Advertisement saveAd = adRepo.save(ad);
+
+        return toResponse(saveAd);
     }
 }
