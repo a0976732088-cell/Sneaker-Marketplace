@@ -25,6 +25,7 @@ const {
   lastItemNumber,
   filteredAds,
   form,
+  timeError,
   isEditing,
   notify,
   toggle,
@@ -425,6 +426,9 @@ onUnmounted(() => {
               />
             </label>
           </div>
+          <p v-if="timeError" class="form-error" role="alert">
+            {{ timeError }}
+          </p>
         </div>
         <footer>
           <button type="button" @click="closeAdvertisementDrawer">取消</button>

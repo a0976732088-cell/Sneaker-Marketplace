@@ -92,6 +92,25 @@ export function useAdvertisementManagement() {
     sortOrder: 0,
   });
 
+  const timeError = computed(() => {
+  // 尚未同時選擇開始與結束時間時，不顯示錯誤
+  if (!form.startAt || !form.endAt) return "";
+
+  const startTime = new Date(form.startAt).getTime();
+  const endTime = new Date(form.endAt).getTime();
+
+  return startTime < endTime
+    ? ""
+    : "開始時間必須早於結束時間";
+});
+
+function validateAdvertisementTime() {
+  if (!timeError.value) return true;
+
+  notify(timeError.value);
+  return false;
+}
+
   function resetForm() {
     Object.assign(form, {
       createdBy: 1,
@@ -215,6 +234,7 @@ export function useAdvertisementManagement() {
   }
 
   async function createDraft() {
+      if (!validateAdvertisementTime()) return;
     const payload = {
       createdBy: form.createdBy,
       adName: form.adName,
@@ -307,6 +327,9 @@ export function useAdvertisementManagement() {
     // 沒有編輯 ID 時不送出修改
     if (editingAdId.value === null) return;
 
+      if (!validateAdvertisementTime()) return;
+
+
     const payload = {
       adName: form.adName,
       imageUrl: form.imageUrl,
@@ -354,6 +377,7 @@ export function useAdvertisementManagement() {
     lastItemNumber,
     filteredAds,
     form,
+    timeError,
     isEditing,
     notify,
     toggle,

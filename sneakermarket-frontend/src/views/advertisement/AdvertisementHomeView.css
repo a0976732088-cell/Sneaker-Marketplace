@@ -671,6 +671,12 @@ tbody tr:hover {
   border-color: var(--coral);
   box-shadow: 0 0 0 3px #ff5c4d1a;
 }
+.form-error {
+  margin: -6px 0 0;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
