@@ -44,3 +44,6 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# 競標系統本機上傳圖片
+uploads/

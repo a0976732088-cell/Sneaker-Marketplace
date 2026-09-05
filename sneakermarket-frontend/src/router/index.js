@@ -43,6 +43,11 @@ const routes = [
     component: () => import("@/views/auction/AuctionListView.vue"),
   },
   {
+    path: "/auctions/create",
+    name: "auction-create",
+    component: () => import("@/views/auction/AuctionCreateView.vue"),
+  },
+  {
     path: "/auctions/:id",
     name: "auction-detail",
     component: () => import("@/views/auction/AuctionDetailView.vue"),

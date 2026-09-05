@@ -26,7 +26,7 @@
               class="col-md-4"
             >
               <img
-                :src="imageUrl"
+                :src="resolveImageUrl(imageUrl)"
                 :alt="`${auction.productName} 圖片 ${index + 1}`"
                 class="img-fluid border rounded"
               />
@@ -293,4 +293,37 @@ function formatBoolean(value) {
 onMounted(() => {
   loadAuctionDetail();
 });
+
+/**
+ * 將後端回傳的圖片相對路徑，
+ * 組合成瀏覽器可以實際存取的完整 Backend URL。
+ *
+ * API Base：
+ * http://localhost:8080/api
+ *
+ * 圖片路徑：
+ * /uploads/auctions/...
+ *
+ * 最後：
+ * http://localhost:8080/uploads/auctions/...
+ */
+function resolveImageUrl(imageUrl) {
+  if (!imageUrl) {
+    return "";
+  }
+
+  // 如果未來 Storage 直接回傳完整 http/https URL，
+  // 就直接使用，不另外加工。
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    return imageUrl;
+  }
+
+  const apiBaseUrl =
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+
+  // 將最後的 /api 移除，取得 Backend 根網址。
+  const backendBaseUrl = apiBaseUrl.replace(/\/api\/?$/, "");
+
+  return `${backendBaseUrl}${imageUrl}`;
+}
 </script>

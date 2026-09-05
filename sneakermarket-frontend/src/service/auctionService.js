@@ -37,3 +37,41 @@ export function getAuctionDetail(auctionId) {
 export function getBidHistory(auctionId) {
   return httpClient.get(`/auctions/${auctionId}/bids`);
 }
+
+/**
+ * 建立新的競標。
+ *
+ * API：
+ * POST /api/auctions
+ *
+ * 後端使用 multipart/form-data 接收：
+ * - request：建立競標 JSON
+ * - images：商品圖片
+ *
+ * @param {Object} request 建立競標表單資料
+ * @param {File[]} images 商品圖片
+ * @returns {Promise} API Response
+ */
+export function createAuction(request, images) {
+  const formData = new FormData();
+
+  /*
+   * AuctionCreateRequest 必須以 application/json
+   * 的 multipart Part 傳給 Spring @RequestPart("request")。
+   */
+  const requestBlob = new Blob([JSON.stringify(request)], {
+    type: "application/json",
+  });
+
+  formData.append("request", requestBlob);
+
+  /*
+   * 後端接收 List<MultipartFile> images，
+   * 因此每一張圖片都使用同一個 Part 名稱 images。
+   */
+  images.forEach((image) => {
+    formData.append("images", image);
+  });
+
+  return httpClient.post("/auctions", formData);
+}

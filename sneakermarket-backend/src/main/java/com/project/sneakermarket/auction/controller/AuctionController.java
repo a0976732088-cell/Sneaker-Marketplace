@@ -5,34 +5,61 @@ import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.project.sneakermarket.auction.dto.AuctionCreateRequest;
+import com.project.sneakermarket.auction.dto.AuctionDetailResponse;
 import com.project.sneakermarket.auction.dto.AuctionSearchCriteria;
 import com.project.sneakermarket.auction.dto.AuctionSummaryResponse;
 import com.project.sneakermarket.auction.dto.BidHistoryResponse;
 import com.project.sneakermarket.auction.dto.PageData;
+import com.project.sneakermarket.auction.service.AuctionCommandService;
 import com.project.sneakermarket.auction.service.AuctionQueryService;
+import com.project.sneakermarket.auction.service.AuctionSessionMemberResolver;
 import com.project.sneakermarket.common.response.ApiResponse;
-import com.project.sneakermarket.auction.dto.AuctionDetailResponse;
 
+import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 競標系統公開 API Controller。
+ * 競標系統 API Controller。
  *
- * 負責接收競標相關的 HTTP 請求，
- * 並將實際商業邏輯交由 Service 處理。
+ * 負責接收競標相關 HTTP 請求，
+ * 實際查詢與寫入邏輯交由 Service 處理。
  */
 @RestController
 @RequestMapping("/api/auctions")
 @RequiredArgsConstructor
+@Validated
 public class AuctionController {
 
     private final AuctionQueryService auctionQueryService;
+
+    // 處理建立、修改、取消等競標寫入操作
+    private final AuctionCommandService auctionCommandService;
+
+    /*
+     * 【臨時開發整合層】
+     *
+     * 目前會員模組 Session 契約尚未完成，
+     * 因此先透過 AuctionSessionMemberResolver 取得 memberId。
+     *
+     * 未來會員模組合板後，
+     * Session Key / Session Value 型別只需修改 Resolver，
+     * Controller 不需要跟著修改。
+     */
+    private final AuctionSessionMemberResolver sessionMemberResolver;
 
     /**
      * 查詢競標列表。
@@ -68,6 +95,69 @@ public class AuctionController {
                 "查詢競標列表成功",
                 auctions
         );
+    }
+
+    /**
+     * 建立新的競標。
+     *
+     * API：
+     * POST /api/auctions
+     *
+     * Content-Type：
+     * multipart/form-data
+     *
+     * multipart 內容：
+     * request = AuctionCreateRequest JSON
+     * images  = 一張以上的圖片
+     *
+     * @param request 建立競標資料
+     * @param images 商品圖片
+     * @param session 目前瀏覽器的 HttpSession
+     * @return 新建立的 auctionId
+     */
+    @PostMapping
+    public ResponseEntity<ApiResponse<Long>> createAuction(
+            @Valid
+            @RequestPart("request")
+            AuctionCreateRequest request,
+
+            @RequestPart(
+                    value = "images",
+                    required = false
+            )
+            List<MultipartFile> images,
+
+            HttpSession session) {
+
+        /*
+         * 正式設計：
+         * sellerId 不接受前端傳入，
+         * 必須從目前登入會員的 Session 取得。
+         *
+         * 目前會員模組尚未合板時，
+         * Resolver 可依 local 設定暫時使用 fallback memberId。
+         */
+        Long sellerId =
+                sessionMemberResolver.resolveMemberId(session);
+
+        // 呼叫競標寫入 Service 建立商品、圖片與競標
+        Long auctionId =
+                auctionCommandService.createAuction(
+                        sellerId,
+                        request,
+                        images
+                );
+
+        ApiResponse<Long> response =
+                ApiResponse.ok(
+                        "建立競標成功",
+                        auctionId
+                );
+
+        // 建立新資源使用 HTTP 201 Created
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
     }
 
     /**
