@@ -3,6 +3,7 @@ package com.project.sneakermarket.commerce.controller;
 import com.project.sneakermarket.commerce.dto.ProductDetailResponse;
 import com.project.sneakermarket.commerce.dto.ProductListItemResponse;
 import com.project.sneakermarket.commerce.service.ProductService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -11,13 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
+@RequiredArgsConstructor
 public class ProductController {
 
     private final ProductService productService;
-
-    public ProductController(ProductService productService) {
-        this.productService = productService;
-    }
 
     //商品列表（給列表頁用）
     @GetMapping("/api/products")

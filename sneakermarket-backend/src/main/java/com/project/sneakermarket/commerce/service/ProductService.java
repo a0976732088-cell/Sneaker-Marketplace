@@ -9,6 +9,7 @@ import com.project.sneakermarket.commerce.entity.ProductVariant;
 import com.project.sneakermarket.commerce.repository.ProductImageRepository;
 import com.project.sneakermarket.commerce.repository.ProductRepository;
 import com.project.sneakermarket.commerce.repository.ProductVariantRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -16,28 +17,24 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ProductService {
 
     private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
     private final ProductImageRepository productImageRepository;
 
-    public ProductService(ProductRepository productRepository,
-                          ProductVariantRepository productVariantRepository,
-                          ProductImageRepository productImageRepository) {
-        this.productRepository = productRepository;
-        this.productVariantRepository = productVariantRepository;
-        this.productImageRepository = productImageRepository;
-    }
-
-    //取得商品列表，每筆商品只顯示代表價格與一張主圖（給列表頁用）
+    // 取得商品列表，每筆商品只顯示代表價格與一張主圖（給列表頁用）
+    // categoryId、keyword、size 都可以不帶（null），代表使用者沒有指定該項篩選條件
     public List<ProductListItemResponse> getAllProducts(Long categoryId, String keyword, String size) {
         List<Product> products = productRepository.findAll();
 
         return products.stream()
+                // 固定規則：不管有沒有篩選條件，永遠只顯示上架中的商品
                 .filter(p -> p.getStatus().equals("ON_SALE"))
                 .filter(p -> categoryId == null || p.getCategory().getCategoryId().equals(categoryId))
                 .filter(p -> keyword == null || p.getProductName().toLowerCase().contains(keyword.toLowerCase()))
+                // 尺寸篩選（可選）：跨表查這個商品的規格裡，有沒有符合指定尺寸的
                 .filter(p -> size == null || productVariantRepository.findByProductProductId(p.getProductId())
                         .stream()
                         .anyMatch(v -> v.getSize().equals(size)))
@@ -45,6 +42,7 @@ public class ProductService {
                     List<ProductVariant> variants =
                             productVariantRepository.findByProductProductId(p.getProductId());
 
+                    // 同商品所有規格價格相同，直接抓第一筆；沒有規格資料就顯示 null
                     BigDecimal price = variants.isEmpty() ? null : variants.get(0).getPrice();
 
                     List<ProductImage> images =
@@ -63,7 +61,7 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-    //取得單一商品的完整明細，包含全部規格與全部圖片（給明細頁用）
+    // 取得單一商品的完整明細，包含全部規格與全部圖片（給明細頁用）
     public ProductDetailResponse getProductDetail(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("找不到這個商品"));
