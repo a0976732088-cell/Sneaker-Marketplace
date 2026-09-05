@@ -375,6 +375,8 @@ export function useAdvertisementManagement() {
     try {
       const result = await deleteAdvertisement(ad.id);
 
+      allAdvertisementsCount.value = Math.max(0, allAdvertisementsCount.value -1,);
+
       // 若刪除目前頁面最後一筆，回到上一頁，避免停在空白頁面。
       const targetPage =
         ads.value.length === 1 && currentPage.value > 0

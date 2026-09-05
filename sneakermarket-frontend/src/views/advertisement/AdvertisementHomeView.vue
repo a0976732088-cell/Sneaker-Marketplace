@@ -228,8 +228,8 @@ onUnmounted(() => {
                   <td>
                     <div class="row-actions">
                       <button title="編輯" @click="openEditDrawer(ad)">
-                        <FontAwesomeIcon :icon="faPencil" /></button
-                      >
+                        <FontAwesomeIcon :icon="faPencil" />
+                      </button>
                       <!--草稿與已停用顯示上架按鈕，進行中顯示停用按鈕，已結束不允許操作，所以不顯示按鈕。-->
                       <button
                         v-if="['進行中', '草稿', '已停用'].includes(ad.status)"
@@ -237,10 +237,13 @@ onUnmounted(() => {
                         :title="ad.status === '進行中' ? '停用' : '上架'"
                         @click="toggle(ad)"
                       >
-                        {{ ad.status === "進行中" ? "Ⅱ" : "▶" }}</button>
-                        <button
+                        {{ ad.status === "進行中" ? "Ⅱ" : "▶" }}
+                      </button>
+                      <button
+                        v-if="ad.status !== '已結束'"
                         title="刪除"
-                        @click="handleDeleteAdvertisement(ad)">
+                        @click="handleDeleteAdvertisement(ad)"
+                      >
                         <FontAwesomeIcon :icon="faTrash" />
                       </button>
                     </div>
@@ -413,6 +416,7 @@ onUnmounted(() => {
                 model-type="yyyy-MM-dd'T'HH:mm"
                 :locale="zhTW"
                 :teleport="true"
+                six-weeks
                 :formats="{ input: 'yyyy/MM/dd HH:mm' }"
                 :time-config="{ is24: true, timePickerInline: true }"
                 placeholder="選擇日期與時間"
@@ -426,6 +430,8 @@ onUnmounted(() => {
                 model-type="yyyy-MM-dd'T'HH:mm"
                 :locale="zhTW"
                 :teleport="true"
+                :transitions="false"
+                six-weeks
                 :formats="{ input: 'yyyy/MM/dd HH:mm' }"
                 :time-config="{ is24: true, timePickerInline: true }"
                 placeholder="選擇日期與時間"

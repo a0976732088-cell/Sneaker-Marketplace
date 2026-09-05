@@ -84,7 +84,21 @@ public class AdvertisementService {
 
     //未來加入member="admin"需要修改
     public void deleteAdvertisement(Long adId) {
-        adRepo.deleteById(adId);
+
+        Advertisement advertisement = adRepo.findById(adId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("找不到指定的廣告")
+                );
+
+        ensureAdvertisementIsNotExpired(advertisement);
+
+        adRepo.delete(advertisement);
+    }
+
+    private void ensureAdvertisementIsNotExpired(Advertisement advertisement) {
+        if (advertisement.getAdStatus() == AdvertisementStatus.EXPIRED) {
+            throw new BusinessException("已結束的廣告不可修改、刪除或變更狀態");
+        }
     }
 
     public Advertisement updateAdvertisement(Long adId, UpdateAdvertisementRequest request) {
@@ -92,6 +106,9 @@ public class AdvertisementService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("找不到指定的廣告")
                 );
+
+        ensureAdvertisementIsNotExpired(advertisement);
+
         validateAdvertisementTime(request.getStartAt(), request.getEndAt());
 
         advertisement.setAdName(request.getAdName());
@@ -159,6 +176,8 @@ public class AdvertisementService {
                 .orElseThrow(()->
                         new ResourceNotFoundException("找不到指定的廣告"));
 
+        ensureAdvertisementIsNotExpired(ad);
+
         AdvertisementStatus newStatus = request.getAdStatus();
 
         if(newStatus != AdvertisementStatus.ACTIVE && newStatus != AdvertisementStatus.INACTIVE){
@@ -170,4 +189,6 @@ public class AdvertisementService {
 
         return toResponse(saveAd);
     }
+
+
 }
