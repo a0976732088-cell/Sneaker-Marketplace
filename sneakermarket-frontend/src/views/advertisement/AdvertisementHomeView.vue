@@ -127,9 +127,9 @@ onUnmounted(() => {
           </select>
 
           <!-- 未來有機會可以匯出到excel檔案 -->
-          <button class="outline-button" @click="notify('報表已匯出')">
+          <!-- <button class="outline-button" @click="notify('報表已匯出')">
             ⇩ 匯出報表
-          </button>
+          </button> -->
         </div>
 
         <!-- 查詢 API 尚未完成時顯示載入狀態 -->
@@ -227,7 +227,11 @@ onUnmounted(() => {
                   </td>
                   <td>
                     <div class="row-actions">
-                      <button title="編輯" @click="openEditDrawer(ad)">
+                      <button
+                        v-if="['草稿', '已停用'].includes(ad.status)"
+                        title="編輯"
+                        @click="openEditDrawer(ad)"
+                      >
                         <FontAwesomeIcon :icon="faPencil" />
                       </button>
                       <!--草稿與已停用顯示上架按鈕，進行中顯示停用按鈕，已結束不允許操作，所以不顯示按鈕。-->
@@ -390,7 +394,7 @@ onUnmounted(() => {
             </label>
 
             <!-- 這段不是必須的，測試功能所使用正式會需要依賴其他組員API -->
-            <label v-else>
+            <!-- <label v-else>
               導向目標編號
               <input
                 v-model.number="form.targetId"
@@ -399,7 +403,7 @@ onUnmounted(() => {
                 required
                 placeholder="請輸入目標 ID"
               />
-            </label>
+            </label> -->
           </div>
           <label
             >廣告說明<textarea

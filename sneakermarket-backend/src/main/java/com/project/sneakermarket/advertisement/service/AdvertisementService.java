@@ -107,7 +107,7 @@ public class AdvertisementService {
                         new ResourceNotFoundException("找不到指定的廣告")
                 );
 
-        ensureAdvertisementIsNotExpired(advertisement);
+        ensureAdvertisementIsEditable(advertisement);
 
         validateAdvertisementTime(request.getStartAt(), request.getEndAt());
 
@@ -158,6 +158,13 @@ public class AdvertisementService {
         return expiredAds.size();
     }
 
+
+    private void ensureAdvertisementIsEditable(Advertisement advertisement) {
+        if (advertisement.getAdStatus() != AdvertisementStatus.DRAFT
+                && advertisement.getAdStatus() != AdvertisementStatus.INACTIVE) {
+            throw new BusinessException("只有草稿或已停用的廣告可以編輯");
+        }
+    }
 
     private void validateAdvertisementTime(
             LocalDateTime startAt,

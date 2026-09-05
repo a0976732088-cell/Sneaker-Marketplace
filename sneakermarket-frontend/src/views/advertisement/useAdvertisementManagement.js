@@ -146,18 +146,29 @@ export function useAdvertisementManagement() {
   }
 
   async function toggle(ad) {
-    // 進行中的廣告按下按鈕後停用；其他可操作狀態則上架
+    // 畫面顯示「進行中」時，按下按鈕就改成停用；
+    // 草稿或已停用時，按下按鈕就改成上架。
     const nextStatus = ad.status === "進行中" ? "INACTIVE" : "ACTIVE";
 
     const actionName = nextStatus === "ACTIVE" ? "上架" : "停用";
 
     try {
+      // 1. 先讓後端真正更新資料庫狀態。
       const result = await updateAdvertisementStatus(ad.id, nextStatus);
 
-      // 使用後端回傳的新狀態，只更新目前這一列，不重新查詢整頁
-      const updatedStatus = result.data?.adStatus || nextStatus;
+      // 2. 若目前頁面只有最後一筆資料，且不是第一頁，
+      //    狀態改變後這一頁可能會變空，因此回前一頁。
+      const targetPage =
+        ads.value.length === 1 && currentPage.value > 0
+          ? currentPage.value - 1
+          : currentPage.value;
 
-      ad.status = statusLabels[updatedStatus] || updatedStatus;
+      // 3. 重新向後端查詢「目前頁籤」對應的資料。
+      //    例如現在在草稿頁籤，後端會再查 DRAFT；
+      //    剛上架的資料已變 ACTIVE，因此不會再回傳。
+      await loadAdvertisements(targetPage, true);
+
+      // 4. 顯示成功訊息。
 
       notify(result.message || `廣告${actionName}成功`);
     } catch (error) {
@@ -280,7 +291,7 @@ export function useAdvertisementManagement() {
       closeAdvertisementDrawer();
       notify(result.message);
       // 新增資料會依 createdAt 排在最前面，因此回到第一頁。
-      await loadAdvertisements(0);
+      await loadAdvertisements(0, true);
 
       console.log("新增成功");
     } catch (error) {
@@ -375,14 +386,17 @@ export function useAdvertisementManagement() {
     try {
       const result = await deleteAdvertisement(ad.id);
 
-      allAdvertisementsCount.value = Math.max(0, allAdvertisementsCount.value -1,);
+      allAdvertisementsCount.value = Math.max(
+        0,
+        allAdvertisementsCount.value - 1,
+      );
 
       // 若刪除目前頁面最後一筆，回到上一頁，避免停在空白頁面。
       const targetPage =
         ads.value.length === 1 && currentPage.value > 0
           ? currentPage.value - 1
           : currentPage.value;
-      await loadAdvertisements(targetPage);
+      await loadAdvertisements(targetPage, true);
       notify(result.message || "廣告刪除成功");
     } catch (error) {
       console.error("刪除廣告失敗", error);
@@ -415,7 +429,7 @@ export function useAdvertisementManagement() {
 
       closeAdvertisementDrawer();
       notify(result.message || "廣告修改成功");
-      await loadAdvertisements();
+      await loadAdvertisements(currentPage.value, true);
 
       console.log("修改成功");
     } catch (error) {
