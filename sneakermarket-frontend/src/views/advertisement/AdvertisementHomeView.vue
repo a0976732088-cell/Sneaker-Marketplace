@@ -65,7 +65,13 @@ onUnmounted(() => {
           <h1>廣告管理</h1>
           <p>建立、排程並追蹤平台上的每一則廣告活動。</p>
         </div>
+
         <div class="header-actions">
+          <RouterLink
+            class="btn btn-primary d-inline-flex align-items-center justify-content-center"
+            to="/ads/preview"
+            >檢視廣告</RouterLink
+          >
           <button class="create-button" @click="openCreateDrawer">
             <span>＋</span> 新增廣告
           </button>
