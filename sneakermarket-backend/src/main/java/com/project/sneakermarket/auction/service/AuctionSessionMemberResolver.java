@@ -102,6 +102,45 @@ public class AuctionSessionMemberResolver {
         throw new BusinessException("尚未登入會員");
     }
 
+
+    /**
+     * 嘗試取得目前登入會員 ID。
+     *
+     * 與 resolveMemberId() 不同：
+     * 此方法適合競標詳細頁等「訪客也可以瀏覽」的公開 API。
+     *
+     * 如果有登入會員資料，回傳 memberId。
+     * local 開發環境若啟用 fallback，則回傳 fallback memberId。
+     * 若沒有登入且沒有啟用 fallback，回傳 null，
+     * 不會因未登入而拋出例外。
+     *
+     * @param session HttpSession
+     * @return 目前會員 ID；未登入時可能為 null
+     */
+    public Long resolveMemberIdOrNull(HttpSession session) {
+
+        if (session != null) {
+
+            Object sessionValue =
+                    session.getAttribute(memberIdSessionKey);
+
+            if (sessionValue != null) {
+                return extractMemberId(sessionValue);
+            }
+        }
+
+        /*
+         * local 開發期間仍沿用 fallback，
+         * 讓目前功能可以用 memberId = 1 驗收。
+         */
+        if (fallbackEnabled) {
+            return fallbackMemberId;
+        }
+
+        // 公開查詢不因訪客未登入而失敗
+        return null;
+    }
+
     /**
      * 將 Session 中的會員資料轉成 Long memberId。
      *

@@ -34,4 +34,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.fail("欄位驗證失敗", errors));
     }
+
+    /**
+     * 使用者已有身分，
+     * 但沒有權限操作指定資源時回傳 403。
+     */
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbidden(ForbiddenException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.fail(ex.getMessage(), null));
+    }
 }

@@ -98,7 +98,10 @@ public record AuctionDetailResponse(
         Integer bidCount,
 
         // 商品刊登建立時間
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+
+        // 目前瀏覽者是否為此競標的賣家本人
+        Boolean isOwner
 
 ) {
 }

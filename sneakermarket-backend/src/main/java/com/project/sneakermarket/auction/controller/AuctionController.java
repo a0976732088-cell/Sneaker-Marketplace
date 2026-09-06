@@ -27,6 +27,10 @@ import com.project.sneakermarket.auction.service.AuctionCommandService;
 import com.project.sneakermarket.auction.service.AuctionQueryService;
 import com.project.sneakermarket.auction.service.AuctionSessionMemberResolver;
 import com.project.sneakermarket.common.response.ApiResponse;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import com.project.sneakermarket.auction.dto.AuctionUpdateRequest;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -161,6 +165,54 @@ public class AuctionController {
     }
 
     /**
+     * 修改指定競標。
+     *
+     * API：
+     * PUT /api/auctions/{auctionId}
+     *
+     * 規則：
+     * - 只有該競標商品的賣家本人可以修改。
+     * - 已有出價後不可修改。
+     * - SCHEDULED 且無出價時，可修改所有一般可編輯欄位。
+     * - ACTIVE 且無出價時，可修改商品、交易、價格與結束時間，
+     *   但不可修改已經發生的開始時間。
+     *
+     * sellerId 不接受前端傳入，
+     * 仍由目前登入 Session 取得。
+     *
+     * @param auctionId 要修改的競標 ID
+     * @param request 修改資料
+     * @param session 目前瀏覽器的 HttpSession
+     * @return 修改結果
+     */
+    @PutMapping("/{auctionId}")
+    public ApiResponse<Void> updateAuction(
+            @PathVariable Long auctionId,
+
+            @Valid
+            @RequestBody
+            AuctionUpdateRequest request,
+
+            HttpSession session) {
+
+        // 從目前登入 Session 取得會員 ID
+        Long sellerId =
+                sessionMemberResolver.resolveMemberId(session);
+
+        // 修改規則與 Transaction 統一由 Command Service 處理
+        auctionCommandService.updateAuction(
+                auctionId,
+                sellerId,
+                request
+        );
+
+        return ApiResponse.ok(
+                "修改競標成功",
+                null
+        );
+    }
+
+    /**
      * 查詢指定競標的公開出價紀錄。
      *
      * API：
@@ -187,24 +239,80 @@ public class AuctionController {
     /**
      * 查詢指定競標的完整詳細資料。
      *
-     * API：
-     * GET /api/auctions/{auctionId}
+     * 訪客可以瀏覽。
+     * 若目前有登入會員，額外判斷該會員是否為賣家本人，
+     * 但不公開 sellerId。
      *
      * @param auctionId 競標 ID
+     * @param session 目前瀏覽器 Session
      * @return 競標詳細資料
      */
     @GetMapping("/{auctionId}")
     public ApiResponse<AuctionDetailResponse> getAuctionDetail(
-            @PathVariable Long auctionId) {
+            @PathVariable Long auctionId,
+            HttpSession session) {
 
-        // 呼叫 Service 組合競標、商品與圖片資料
+        /*
+         * 詳細頁是公開 API，
+         * 因此使用可回 null 的 Resolver。
+         *
+         * 未登入訪客不應因為沒有 memberId
+         * 而無法查看競標詳細頁。
+         */
+        Long currentMemberId =
+                sessionMemberResolver
+                        .resolveMemberIdOrNull(session);
+
+        // 呼叫 Service 組合競標、商品、圖片與擁有者資訊
         AuctionDetailResponse auction =
-                auctionQueryService.getAuctionDetail(auctionId);
+                auctionQueryService.getAuctionDetail(
+                        auctionId,
+                        currentMemberId
+                );
 
-        // 使用 BASE 專案統一的 ApiResponse 格式回傳
         return ApiResponse.ok(
                 "查詢競標詳細資料成功",
                 auction
+        );
+    }
+
+    /**
+     * 取消指定競標。
+     *
+     * API：
+     * DELETE /api/auctions/{auctionId}
+     *
+     * 目前登入會員必須是該競標商品的賣家，
+     * 且該競標尚未存在任何成功出價。
+     *
+     * 此操作不會真正刪除資料，
+     * 而是將競標狀態改為 CANCELLED。
+     *
+     * @param auctionId 要取消的競標 ID
+     * @param session 目前瀏覽器的 HttpSession
+     * @return 取消結果
+     */
+    @DeleteMapping("/{auctionId}")
+    public ApiResponse<Void> cancelAuction(
+            @PathVariable Long auctionId,
+            HttpSession session) {
+
+        /*
+         * sellerId 不接受前端指定，
+         * 仍沿用建立競標時的 Session Resolver。
+         */
+        Long sellerId =
+                sessionMemberResolver.resolveMemberId(session);
+
+        // 商業規則與資料修改交由 Command Service
+        auctionCommandService.cancelAuction(
+                auctionId,
+                sellerId
+        );
+
+        return ApiResponse.ok(
+                "取消競標成功",
+                null
         );
     }
 }

@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.project.sneakermarket.common.exception.ForbiddenException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,6 +18,8 @@ import com.project.sneakermarket.auction.repository.AuctionProductImageRepositor
 import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
 import com.project.sneakermarket.common.exception.BusinessException;
+import com.project.sneakermarket.common.exception.ResourceNotFoundException;
+import com.project.sneakermarket.auction.dto.AuctionUpdateRequest;
 
 import lombok.RequiredArgsConstructor;
 
@@ -130,6 +133,419 @@ public class AuctionCommandService {
 
             throw ex;
         }
+    }
+
+    /**
+     * 修改指定競標。
+     *
+     * 規則：
+     * 1. 只有商品賣家本人可以修改。
+     * 2. 已有成功出價後不可修改。
+     * 3. SCHEDULED 且無出價時，可修改所有一般可編輯欄位。
+     * 4. ACTIVE 且無出價時，可修改商品、交易、價格與結束時間，
+     *    但不可修改已經發生的開始時間。
+     * 5. SOLD、UNSOLD、CANCELLED、REMOVED 不可修改。
+     *
+     * @param auctionId 競標 ID
+     * @param sellerId 目前登入會員 ID
+     * @param request 修改資料
+     */
+    @Transactional
+    public void updateAuction(
+            Long auctionId,
+            Long sellerId,
+            AuctionUpdateRequest request) {
+
+        validateSellerId(sellerId);
+
+        LocalDateTime now = LocalDateTime.now();
+
+        /*
+         * 編輯與未來的出價功能都鎖定同一筆 Auction。
+         *
+         * 取得鎖後才重新判斷 bidCount，
+         * 避免賣家修改價格時剛好有人成功出價。
+         */
+        Auction auction =
+                auctionRepository
+                        .findByIdForUpdate(auctionId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "找不到指定的競標資料"
+                                )
+                        );
+
+        AuctionProduct product =
+                auctionProductRepository
+                        .findById(
+                                auction.getAuctionProductId()
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "找不到指定的競標商品資料"
+                                )
+                        );
+
+        // 只有刊登者本人可以修改
+        if (!product.getSellerId().equals(sellerId)) {
+            throw new ForbiddenException(
+                    "你無權修改此競標"
+            );
+        }
+
+        /*
+         * 必須在取得 Lock 後才檢查。
+         * 如果剛剛有人先完成出價，
+         * 這裡就會讀到最新的 bidCount。
+         */
+        if (auction.getBidCount() != null
+                && auction.getBidCount() > 0) {
+
+            throw new BusinessException(
+                    "此競標已有出價紀錄，無法修改"
+            );
+        }
+
+        AuctionStatus currentStatus =
+                auction.getStatus();
+
+        /*
+         * 已經結束、取消或下架的競標
+         * 不允許再修改。
+         */
+        if (currentStatus == AuctionStatus.SOLD
+                || currentStatus == AuctionStatus.UNSOLD
+                || currentStatus == AuctionStatus.CANCELLED
+                || currentStatus == AuctionStatus.REMOVED) {
+
+            throw new BusinessException(
+                    "目前競標狀態不允許修改"
+            );
+        }
+
+        /*
+         * 目前功能 4 正式支援的編輯狀態
+         * 只有 SCHEDULED 與 ACTIVE。
+         */
+        if (currentStatus != AuctionStatus.SCHEDULED
+                && currentStatus != AuctionStatus.ACTIVE) {
+
+            throw new BusinessException(
+                    "目前競標狀態不允許修改"
+            );
+        }
+
+        /*
+         * ACTIVE 代表競標已經開始，
+         * startAt 已經成為歷史事實，因此不可修改。
+         */
+        if (currentStatus == AuctionStatus.ACTIVE
+                && !auction.getStartAt()
+                .equals(request.startAt())) {
+
+            throw new BusinessException(
+                    "競標開始後不可修改開始時間"
+            );
+        }
+
+        /*
+         * SCHEDULED 時使用新的 startAt。
+         * ACTIVE 時則一定沿用原本 startAt。
+         */
+        LocalDateTime effectiveStartAt =
+                currentStatus == AuctionStatus.SCHEDULED
+                        ? request.startAt()
+                        : auction.getStartAt();
+
+        // 結束時間一定必須晚於開始時間
+        if (!request.endAt()
+                .isAfter(effectiveStartAt)) {
+
+            throw new BusinessException(
+                    "競標結束時間必須晚於開始時間"
+            );
+        }
+
+        // 修改後不能產生已經過期的競標
+        if (!request.endAt()
+                .isAfter(now)) {
+
+            throw new BusinessException(
+                    "競標結束時間必須晚於目前時間"
+            );
+        }
+
+        /*
+         * 修改商品資料。
+         *
+         * SCHEDULED 尚未開始時：
+         * brand/category 也可以修改。
+         *
+         * ACTIVE 後：
+         * 依目前定案規則保留原本 brand/category，
+         * 其他商品資訊仍可修改。
+         */
+        if (currentStatus == AuctionStatus.SCHEDULED) {
+            product.setBrandId(
+                    request.brandId()
+            );
+            product.setCategoryId(
+                    request.categoryId()
+            );
+        }
+
+        product.setProductName(
+                request.productName()
+        );
+
+        product.setModel(
+                request.model()
+        );
+
+        product.setSize(
+                request.size()
+        );
+
+        product.setCondition(
+                request.condition()
+        );
+
+        product.setDescription(
+                request.description()
+        );
+
+        product.setDefectNote(
+                request.defectNote()
+        );
+
+        product.setAuthenticityNote(
+                request.authenticityNote()
+        );
+
+        product.setLocation(
+                request.location()
+        );
+
+        product.setShippingMethod(
+                request.shippingMethod()
+        );
+
+        product.setShippingFee(
+                request.shippingFee()
+        );
+
+        product.setPaymentMethod(
+                request.paymentMethod()
+        );
+
+        product.setAllowMeetup(
+                request.allowMeetup()
+        );
+
+        product.setAllowReturn(
+                request.allowReturn()
+        );
+
+        product.setWarrantyNote(
+                request.warrantyNote()
+        );
+
+        product.setUpdatedAt(now);
+
+        /*
+         * bidCount 已確認為 0，
+         * 因此目前 currentPrice 必然屬於尚未成交的起始價格。
+         *
+         * 修改 startPrice 時，
+         * currentPrice 必須一起同步。
+         */
+        auction.setStartPrice(
+                request.startPrice()
+        );
+
+        auction.setCurrentPrice(
+                request.startPrice()
+        );
+
+        auction.setMinIncrement(
+                request.minIncrement()
+        );
+
+        /*
+         * SCHEDULED 尚未開始，
+         * 因此允許改 startAt。
+         *
+         * ACTIVE 則完全保留原本值。
+         */
+        if (currentStatus == AuctionStatus.SCHEDULED) {
+            auction.setStartAt(
+                    request.startAt()
+            );
+        }
+
+        auction.setEndAt(
+                request.endAt()
+        );
+
+        /*
+         * 如果原本是 SCHEDULED，
+         * 但修改後 startAt 已經到達，
+         * 競標立即轉為 ACTIVE。
+         *
+         * 不允許 ACTIVE 反向變回 SCHEDULED。
+         */
+        if (currentStatus == AuctionStatus.SCHEDULED) {
+
+            AuctionStatus newStatus =
+                    request.startAt().isAfter(now)
+                            ? AuctionStatus.SCHEDULED
+                            : AuctionStatus.ACTIVE;
+
+            auction.setStatus(newStatus);
+        }
+
+        auction.setUpdatedAt(now);
+
+        /*
+         * 目前使用 managed Entity，
+         * Transaction Commit 時 Dirty Checking
+         * 本身就能寫回 DB。
+         *
+         * 這裡仍明確 save，
+         * 延續目前專案較容易閱讀的寫入方式。
+         */
+        auctionProductRepository.save(product);
+        auctionRepository.save(auction);
+    }
+
+    /**
+     * 取消一場競標。
+     *
+     * 規則：
+     * 1. 競標必須存在。
+     * 2. 只有刊登此商品的賣家本人可以取消。
+     * 3. 只要尚未有人成功出價，賣家即可取消。
+     * 4. 已有任何成功出價後，不允許賣家自行取消。
+     *
+     * 取消採邏輯取消，只將狀態改為 CANCELLED，
+     * 不直接刪除 auctions、auction_products 或圖片資料。
+     *
+     * @param auctionId 要取消的競標 ID
+     * @param sellerId  目前登入會員 ID
+     */
+    @Transactional
+    public void cancelAuction(
+            Long auctionId,
+            Long sellerId) {
+
+        validateSellerId(sellerId);
+
+        /*
+         * 使用 PESSIMISTIC_WRITE 鎖住這場競標。
+         *
+         * 避免賣家讀到 bidCount=0 的同時，
+         * 另一個會員剛好完成出價，
+         * 最後卻又被賣家取消。
+         */
+        Auction auction =
+                auctionRepository
+                        .findByIdForUpdate(auctionId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "找不到指定的競標資料"
+                                )
+                        );
+
+        /*
+         * Auction 本身目前只有 auctionProductId，
+         * sellerId 存在 AuctionProduct，
+         * 因此需要取得對應商品確認擁有者。
+         */
+        AuctionProduct product =
+                auctionProductRepository
+                        .findById(
+                                auction.getAuctionProductId()
+                        )
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "找不到指定的競標商品資料"
+                                )
+                        );
+
+        // 只有刊登商品的賣家本人可以取消
+        if (!product.getSellerId().equals(sellerId)) {
+            throw new ForbiddenException(
+                    "你無權取消此競標"
+            );
+        }
+
+        /*
+         * 核心規則：
+         * 只要已經存在成功出價，
+         * 賣家便不能再自行取消競標。
+         */
+        if (auction.getBidCount() != null
+                && auction.getBidCount() > 0) {
+
+            throw new BusinessException(
+                    "此競標已有出價紀錄，無法自行取消"
+            );
+        }
+
+        /*
+         * 已經進入終止狀態的競標，
+         * 不允許再由賣家改成 CANCELLED。
+         *
+         * UNSOLD 即使 bidCount = 0，
+         * 也代表競標已正式結束並流標，
+         * 不應事後改寫歷史狀態。
+         */
+        if (auction.getStatus() == AuctionStatus.SOLD) {
+            throw new BusinessException(
+                    "此競標已成交，無法取消"
+            );
+        }
+
+        if (auction.getStatus() == AuctionStatus.UNSOLD) {
+            throw new BusinessException(
+                    "此競標已流標，無法取消"
+            );
+        }
+
+        if (auction.getStatus() == AuctionStatus.CANCELLED) {
+            throw new BusinessException(
+                    "此競標已經取消"
+            );
+        }
+
+        if (auction.getStatus() == AuctionStatus.REMOVED) {
+            throw new BusinessException(
+                    "此競標已被管理員下架"
+            );
+        }
+
+        /*
+         * 不實際 DELETE。
+         *
+         * 保留商品、競標與歷史資料，
+         * 只將競標生命週期改為 CANCELLED。
+         */
+        auction.setStatus(
+                AuctionStatus.CANCELLED
+        );
+
+        auction.setUpdatedAt(
+                LocalDateTime.now()
+        );
+
+        /*
+         * 因為目前方法有 @Transactional，
+         * Auction 又是 Persistence Context 中的 managed Entity，
+         * 理論上交易結束時 Dirty Checking 就會 UPDATE。
+         *
+         * 此處仍明確 save，讓目前初期專案的寫入流程比較容易理解。
+         */
+        auctionRepository.save(auction);
     }
 
     /**

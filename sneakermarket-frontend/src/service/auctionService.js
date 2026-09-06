@@ -75,3 +75,27 @@ export function createAuction(request, images) {
 
   return httpClient.post("/auctions", formData);
 }
+
+/**
+ * 修改指定競標。
+ *
+ * @param {number|string} auctionId 競標 ID
+ * @param {Object} request 修改競標資料
+ * @returns {Promise} Axios Response
+ */
+export const updateAuction = (auctionId, request) => {
+  return httpClient.put(`/auctions/${auctionId}`, request);
+};
+
+/**
+ * 取消指定競標。
+ *
+ * 實際後端不會 DELETE 資料，
+ * 而是將競標狀態改為 CANCELLED。
+ *
+ * @param {number|string} auctionId 競標 ID
+ * @returns {Promise} Axios Response
+ */
+export const cancelAuction = (auctionId) => {
+  return httpClient.delete(`/auctions/${auctionId}`);
+};

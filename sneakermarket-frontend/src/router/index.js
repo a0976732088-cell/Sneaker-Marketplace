@@ -53,6 +53,11 @@ const routes = [
     component: () => import("@/views/auction/AuctionDetailView.vue"),
   },
   {
+    path: "/auctions/:id/edit",
+    name: "auction-edit",
+    component: () => import("@/views/auction/AuctionEditView.vue"),
+  },
+  {
     path: "/admin",
     name: "admin",
     component: () => import("@/views/admin/AdminHomeView.vue"),
@@ -61,6 +66,11 @@ const routes = [
     path: "/:pathMatch(.*)*",
     name: "not-found",
     component: () => import("@/views/NotFoundView.vue"),
+  },
+  {
+    path: "/forbidden",
+    name: "forbidden",
+    component: () => import("@/views/error/ForbiddenView.vue"),
   },
 ];
 

@@ -163,7 +163,9 @@ public class AuctionQueryService {
      * @param auctionId 競標 ID
      * @return 競標詳細資料
      */
-    public AuctionDetailResponse getAuctionDetail(Long auctionId) {
+    public AuctionDetailResponse getAuctionDetail(
+            Long auctionId,
+            Long currentMemberId) {
 
         // 查詢競標主資料；不存在時回 404
         Auction auction = auctionRepository.findById(auctionId)
@@ -182,6 +184,19 @@ public class AuctionQueryService {
                                         "找不到此競標的商品資料"
                                 )
                         );
+
+
+        /*
+         * 判斷目前瀏覽者是否為此競標的賣家。
+         *
+         * 訪客 currentMemberId = null 時，
+         * isOwner 一律為 false。
+         */
+        boolean isOwner =
+                currentMemberId != null
+                        && currentMemberId.equals(
+                        product.getSellerId()
+                );
 
         // 查詢商品圖片，Repository 已依 sortOrder 由小到大排序
         List<AuctionProductImage> images =
@@ -231,7 +246,8 @@ public class AuctionQueryService {
                 auction.getEndAt(),
                 auction.getStatus(),
                 auction.getBidCount(),
-                auction.getCreatedAt()
+                auction.getCreatedAt(),
+                isOwner
         );
     }
 

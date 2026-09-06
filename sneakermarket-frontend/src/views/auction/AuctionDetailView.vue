@@ -14,6 +14,42 @@
         {{ auction.productName }}
       </h1>
 
+      <!-- 賣家競標操作 -->
+      <div v-if="auction.isOwner" class="card mb-4">
+        <div class="card-header">我的競標操作</div>
+
+        <div class="card-body">
+          <!-- 尚可編輯／取消 -->
+          <div v-if="canOwnerManageAuction" class="d-flex gap-2">
+            <RouterLink
+              :to="{
+                name: 'auction-edit',
+                params: {
+                  id: auction.auctionId,
+                },
+              }"
+              class="btn btn-primary"
+            >
+              編輯競標
+            </RouterLink>
+
+            <button
+              type="button"
+              class="btn btn-outline-danger"
+              :disabled="cancelling"
+              @click="handleCancelAuction"
+            >
+              {{ cancelling ? "取消中..." : "取消競標" }}
+            </button>
+          </div>
+
+          <!-- 本人的競標，但現在不能再操作 -->
+          <div v-else class="text-muted">
+            {{ ownerManageMessage }}
+          </div>
+        </div>
+      </div>
+
       <!-- 商品圖片 -->
       <div class="mb-4">
         <h5>商品圖片</h5>
@@ -181,10 +217,14 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 
-import { getAuctionDetail, getBidHistory } from "@/service/auctionService";
+import {
+  cancelAuction,
+  getAuctionDetail,
+  getBidHistory,
+} from "@/service/auctionService";
 
 // 取得目前路由資訊
 const route = useRoute();
@@ -200,6 +240,9 @@ const loading = ref(false);
 
 // 頁面錯誤訊息
 const errorMessage = ref("");
+
+// 是否正在執行取消競標
+const cancelling = ref(false);
 
 /**
  * 讀取競標詳細資料與出價紀錄。
@@ -232,6 +275,92 @@ async function loadAuctionDetail() {
     }
   } finally {
     loading.value = false;
+  }
+}
+
+/**
+ * 判斷目前賣家是否仍可編輯／取消競標。
+ *
+ * 前端只負責顯示控制；
+ * 最終權限與 bidCount 判斷仍由後端重新確認。
+ */
+const canOwnerManageAuction = computed(() => {
+  if (!auction.value?.isOwner) {
+    return false;
+  }
+
+  if (auction.value.bidCount > 0) {
+    return false;
+  }
+
+  return (
+    auction.value.status === "SCHEDULED" || auction.value.status === "ACTIVE"
+  );
+});
+
+/**
+ * 本人競標目前不能修改／取消時的提示。
+ */
+const ownerManageMessage = computed(() => {
+  if (!auction.value) {
+    return "";
+  }
+
+  if (auction.value.bidCount > 0) {
+    return "此競標已有出價紀錄，無法再修改或自行取消。";
+  }
+
+  const statusMessageMap = {
+    SOLD: "此競標已成交，無法再修改或取消。",
+    UNSOLD: "此競標已流標，無法再修改或取消。",
+    CANCELLED: "此競標已取消。",
+    REMOVED: "此競標已被下架。",
+  };
+
+  return statusMessageMap[auction.value.status] ?? "目前競標狀態不允許操作。";
+});
+
+/**
+ * 賣家取消自己的競標。
+ *
+ * 實際後端不會刪除資料，
+ * 而是將競標狀態改為 CANCELLED。
+ */
+async function handleCancelAuction() {
+  if (!auction.value) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "確定要取消這場競標嗎？取消後將無法再恢復。",
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  cancelling.value = true;
+  errorMessage.value = "";
+
+  try {
+    await cancelAuction(auction.value.auctionId);
+
+    /*
+     * 取消成功後重新讀取詳細資料，
+     * 讓畫面立即取得最新的 CANCELLED 狀態。
+     */
+    await loadAuctionDetail();
+  } catch (error) {
+    console.error("取消競標失敗：", error);
+
+    /*
+     * 例如剛好有人先完成出價，
+     * 後端會重新檢查 bidCount 並拒絕取消。
+     */
+    errorMessage.value =
+      error.response?.data?.message ?? "取消競標失敗，請稍後再試";
+  } finally {
+    cancelling.value = false;
   }
 }
 
