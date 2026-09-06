@@ -111,10 +111,10 @@ onUnmounted(() => {
             :class="{ active: activeTab === tab }"
             @click="activeTab = tab"
           >
-            {{ tab
-            }}<span v-if="tab === '全部廣告'">{{
+            {{ tab }}
+            <!-- <span v-if="tab === '全部廣告'">{{
               allAdvertisementsCount
-            }}</span>
+            }}</span> -->
           </button>
         </div>
         <div class="filter-row">
