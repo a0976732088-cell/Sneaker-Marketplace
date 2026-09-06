@@ -49,7 +49,8 @@ public class CartService {
                             item.getVariant().getColor(),
                             item.getQuantity(),
                             item.getSelected(),
-                            item.getVariant().getPrice()
+                            item.getVariant().getPrice(),
+                            item.getVariant().getStock()
                     );
                 })
                 .collect(Collectors.toList());
@@ -99,16 +100,28 @@ public class CartService {
     }
 
     // 改數量
-    public void updateCart(Long cartItemId, Integer quantity) {
-
+    public void updateCart(Long cartItemId, Integer quantity, Boolean selected) {
         CartItem item = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("找不到這個購物車品項"));
+                .orElseThrow(() -> new RuntimeException("找不到購物車品項"));
 
-        if (quantity > item.getVariant().getStock()) {
-            throw new RuntimeException("庫存不足");
+        /* quantity 跟 selected 現在都是可選的：
+        前端「改數量」跟「勾選/取消勾選」是兩個不同的操作，
+        呼叫這支 API 時通常只會傳其中一個，另一個是 null，
+        所以要各自判斷「有沒有傳這個值」，不要兩個綁在一起改。*/
+
+        if (quantity != null) {
+            // 合併後的數量不能超過庫存，才不會允許超賣
+            if (quantity > item.getVariant().getStock()) {
+                throw new RuntimeException("庫存不足");
+            }
+            item.setQuantity(quantity);
         }
 
-        item.setQuantity(quantity);
+        if (selected != null) {
+            item.setSelected(selected);
+        }
+
+        // 不管剛才改的是哪一個（或兩個都改），最後都要存回資料庫
         cartItemRepository.save(item);
     }
 

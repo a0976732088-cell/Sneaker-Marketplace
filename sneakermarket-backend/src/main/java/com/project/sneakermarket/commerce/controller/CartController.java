@@ -31,9 +31,13 @@ public class CartController {
     }
 
     // 改數量
+    // quantity、selected 都是可選參數，各自代表「改數量」或「勾選/取消勾選」其中一種操作
     @PutMapping("/api/cart/items/{id}")
-    public void updateCart(@PathVariable Long id, @RequestParam Integer quantity) {
-        cartService.updateCart(id, quantity);
+    public void updateCart(
+            @PathVariable Long id,
+            @RequestParam(required = false) Integer quantity,
+            @RequestParam(required = false) Boolean selected) {
+        cartService.updateCart(id, quantity, selected);
     }
 
     // 刪除品項

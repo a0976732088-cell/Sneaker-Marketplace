@@ -16,4 +16,5 @@ public class CartItemResponse {
     private Integer quantity;
     private Boolean selected;
     private BigDecimal price;
+    private Integer stock;
 }

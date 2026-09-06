@@ -36,6 +36,9 @@
 
         <ul class="navbar-nav ms-auto">
           <li class="nav-item">
+            <RouterLink class="nav-link" to="/cart">購物車</RouterLink>
+          </li>
+          <li class="nav-item">
             <RouterLink class="nav-link" to="/member">會員中心</RouterLink>
           </li>
           <li class="nav-item">
