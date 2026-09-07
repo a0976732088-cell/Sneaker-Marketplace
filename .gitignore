@@ -63,6 +63,7 @@ Thumbs.db
 .env.local
 .env.*.local
 
+<<<<<<< HEAD
 
 # =========================
 # Temporary files
@@ -71,3 +72,7 @@ Thumbs.db
 *.temp
 *.swp
 *~
+=======
+# 競標系統本機上傳圖片
+uploads/
+>>>>>>> auction-by伯瑋

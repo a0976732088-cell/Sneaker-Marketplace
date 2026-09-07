@@ -65,7 +65,22 @@ const routes = [
   {
     path: "/auctions",
     name: "auction",
-    component: () => import("@/views/auction/AuctionHomeView.vue"),
+    component: () => import("@/views/auction/AuctionListView.vue"),
+  },
+  {
+    path: "/auctions/create",
+    name: "auction-create",
+    component: () => import("@/views/auction/AuctionCreateView.vue"),
+  },
+  {
+    path: "/auctions/:id",
+    name: "auction-detail",
+    component: () => import("@/views/auction/AuctionDetailView.vue"),
+  },
+  {
+    path: "/auctions/:id/edit",
+    name: "auction-edit",
+    component: () => import("@/views/auction/AuctionEditView.vue"),
   },
   {
     path: "/admin",
@@ -82,6 +97,11 @@ const routes = [
     path: "/:pathMatch(.*)*",
     name: "not-found",
     component: () => import("@/views/NotFoundView.vue"),
+  },
+  {
+    path: "/forbidden",
+    name: "forbidden",
+    component: () => import("@/views/error/ForbiddenView.vue"),
   },
 ];
 
