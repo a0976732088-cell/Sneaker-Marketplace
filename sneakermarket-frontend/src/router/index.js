@@ -73,6 +73,12 @@ const routes = [
     component: () => import("@/views/admin/AdminHomeView.vue"),
   },
   {
+    path: "/ads/preview",
+    name: "advertisement-preview",
+    component: () =>
+      import("@/views/advertisement/AdvertisementPreviewView.vue"),
+  },
+  {
     path: "/:pathMatch(.*)*",
     name: "not-found",
     component: () => import("@/views/NotFoundView.vue"),

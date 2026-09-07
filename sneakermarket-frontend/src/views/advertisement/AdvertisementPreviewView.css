@@ -1,0 +1,200 @@
+/* 整個預覽頁 */
+.advertisement-preview {
+  position: relative;
+  min-height: 600px;
+}
+
+/* ==================== */
+/* BANNER */
+/* ==================== */
+
+.banner-ad {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 10 / 3;
+  border-radius: 12px;
+  background-color: #e9ecef;
+}
+
+/* BANNER 圖片填滿區域 */
+.banner-ad > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 左右切換按鈕 */
+.banner-arrow {
+  position: absolute;
+  top: 50%;
+  width: 42px;
+  height: 60px;
+  border: none;
+  color: white;
+  background-color: rgb(0 0 0 / 35%);
+  font-size: 36px;
+  transform: translateY(-50%);
+  /* 預設隱藏左右按鈕 */
+  opacity: 0;
+
+  /* 隱藏時不能被滑鼠點擊 */
+  pointer-events: none;
+
+  /* 顯示及隱藏時有淡入淡出效果 */
+  transition: opacity 0.2s ease;
+
+  cursor: pointer;
+}
+/* 滑鼠移入整個 BANNER 時，顯示左右按鈕 */
+.banner-ad:hover .banner-arrow {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 左邊按鈕位置 */
+.banner-arrow.left {
+  left: 0;
+}
+
+/* 右邊按鈕位置 */
+.banner-arrow.right {
+  right: 0;
+}
+
+/* BANNER 下方圓點區 */
+.banner-dots {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  display: flex;
+  gap: 7px;
+  transform: translateX(-50%);
+}
+
+/* 每一個圓點 */
+.banner-dots button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid rgb(209, 207, 207);
+  border-radius: 50%;
+  background-color: rgb(255 255 255 / 60%);
+}
+
+/* 目前顯示中的圓點 */
+.banner-dots button.active {
+  background-color: #858f9e;
+}
+
+/* 暫時的商城內容區 */
+.page-content {
+  min-height: 300px;
+  margin-top: 24px;
+  padding: 40px;
+  border-radius: 12px;
+  background-color: #f8f9fa;
+  text-align: center;
+}
+
+/* 沒有廣告時的訊息 */
+.empty-ad {
+  padding: 50px;
+  color: #6c757d;
+  background-color: #f8f9fa;
+  text-align: center;
+}
+
+/* ==================== */
+/* SMALL_BLOCK */
+/* ==================== */
+
+.small-block-ad {
+  position: fixed;
+  right: 30px;
+  bottom: 30px;
+  z-index: 1000;
+}
+
+/* SMALL_BLOCK 圓形圖片 */
+.small-block-ad img {
+  width: 90px;
+  height: 90px;
+  border: 4px solid white;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 5px 18px rgb(0 0 0 / 30%);
+}
+
+/* SMALL_BLOCK 關閉按鈕 */
+.small-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid white;
+  border-radius: 50%;
+  color: white;
+  background-color: #495057;
+  font-size: 18px;
+}
+
+/* ==================== */
+/* POPUP */
+/* ==================== */
+
+/* POPUP 後方的半透明黑色遮罩 */
+.popup-background {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background-color: rgb(0 0 0 / 60%);
+}
+
+/* POPUP 本體 */
+.popup-ad {
+  position: relative;
+  width: min(420px, 90vw);
+}
+
+/* POPUP 圖片 */
+.popup-ad img {
+  display: block;
+  width: 100%;
+  max-height: 75vh;
+  border-radius: 24px;
+  object-fit: contain;
+}
+
+/* POPUP 關閉按鈕 */
+.popup-close {
+  position: absolute;
+  top: -15px;
+  right: -15px;
+  z-index: 1;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 3px solid white;
+  border-radius: 50%;
+  color: white;
+  background-color: #495057;
+  font-size: 25px;
+}
+
+/* 手機版調整
+@media (max-width: 767px) {
+  .banner-ad {
+    height: 190px;
+  }
+
+  .small-block-ad {
+    right: 15px;
+    bottom: 15px;
+  }
+} */
