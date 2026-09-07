@@ -17,11 +17,11 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "notification_id", nullable = false)
     private Long notificationId;
-
-    //  建立與 Member 的 FK 關聯
+//
+//      建立與 Member 的 FK 關聯
 //    @ManyToOne(fetch = FetchType.LAZY)
 //    @JoinColumn(name = "member_id", nullable = false)
-//    private Member member;
+//    private Long memberId;
 
     @Column(name = "notification_type", nullable = false, length = 40)
     private String notificationType;
@@ -55,4 +55,5 @@ public class Notification {
     public void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
 }

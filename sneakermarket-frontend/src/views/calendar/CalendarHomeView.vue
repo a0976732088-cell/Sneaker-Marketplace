@@ -4,9 +4,9 @@
       <h1 class="h3 mb-0">行事曆</h1>
 
       <span>
-      <button type="button" class="btn btn-primary" @click="goToManage">
-        Event-Manage
-      </button>
+        <button type="button" class="btn btn-primary" @click="goToManage">
+          Event-Manage
+        </button>
       </span>
     </div>
 
@@ -135,28 +135,31 @@ const fetchMonthEvents = async () => {
     const rawData =
       response.data.content || response.data.data || response.data || [];
 
-    events.value = rawData.map((item) => {
-      // 修正：同時相容 "T" 與空白分割日期，確保取出的 datePart 為 "YYYY-MM-DD"
-      const rawStartAt = item.startAt || "";
-      const datePart = rawStartAt
-        ? rawStartAt.replace(" ", "T").split("T")[0]
-        : "";
+    events.value = rawData
+    //若Status為inActive或Draft則不顯示在行事曆上
+      .filter((item) => item.status !== "INACTIVE" && item.status !== "DRAFT")
+      .map((item) => {
+        // 修正：同時相容 "T" 與空白分割日期，確保取出的 datePart 為 "YYYY-MM-DD"
+        const rawStartAt = item.startAt || "";
+        const datePart = rawStartAt
+          ? rawStartAt.replace(" ", "T").split("T")[0]
+          : "";
 
-      const startTime = item?.startAt ? formatTimeStr(item.startAt) : "";
-      const endTime = item?.endAt ? formatTimeStr(item.endAt) : "";
+        const startTime = item?.startAt ? formatTimeStr(item.startAt) : "";
+        const endTime = item?.endAt ? formatTimeStr(item.endAt) : "";
 
-      return {
-        id: item.eventId,
-        date: datePart,
-        time: endTime ? `${startTime} - ${endTime}` : startTime,
-        title: item.title,
-        description: item.description,
-        color: eventTypeColorMap[item.eventType] || "#6366f1",
-        status: item.status,
-        eventType: item.eventType || "OTHER",
-        targetUrl: item.targetUrl,
-      };
-    });
+        return {
+          id: item.eventId,
+          date: datePart,
+          time: endTime ? `${startTime} - ${endTime}` : startTime,
+          title: item.title,
+          description: item.description,
+          color: eventTypeColorMap[item.eventType] || "#6366f1",
+          status: item.status,
+          eventType: item.eventType || "OTHER",
+          targetUrl: item.targetUrl,
+        };
+      });
   } catch (error) {
     console.error("抓取活動失敗:", error);
   } finally {
