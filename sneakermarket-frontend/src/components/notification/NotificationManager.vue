@@ -1,7 +1,10 @@
+<!-- components/notification/NotificationManager.vue -->
 <template>
   <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
-    <!-- 標題 -->
-    <h4 class="fw-bold mb-4">通知管理系統</h4>
+    <!-- 標題區域 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h4 class="fw-bold mb-0">通知管理系統</h4>
+    </div>
 
     <!-- 頂部搜尋與篩選區域 -->
     <div class="row g-3 mb-4">
@@ -37,7 +40,7 @@
 
       <div class="col-12 text-end">
         <button class="btn btn-outline-secondary me-2" @click="handleReset">重設</button>
-        <button class="btn btn-primary px-4" @click="fetchNotifications">查詢</button>
+        <button class="btn btn-primary px-4" @click="fetchNotifications(1)">查詢</button>
       </div>
     </div>
 
@@ -67,8 +70,9 @@
             <td>{{ formatDate(item.createdAt) }}</td>
             <td class="text-center">
               <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-info" @click="openModal('VIEW', item)">查看</button>
-                <button class="btn btn-outline-primary" @click="openModal('EDIT', item)">編輯</button>
+                <!-- 補回「查看」按鈕 -->
+                <button class="btn btn-outline-info" @click="openDetailModal(item)">查看</button>
+                <button class="btn btn-outline-primary" @click="openEditModal(item)">編輯</button>
                 <button class="btn btn-outline-success" @click="handleSendNotice(item)">發送</button>
                 <button class="btn btn-outline-danger" @click="handleDelete(item.notificationId)">刪除</button>
               </div>
@@ -81,141 +85,99 @@
       </table>
     </div>
 
-    <!-- 查看 / 編輯 / 新增 彈窗 (Modal) -->
-    <div ref="modalRef" class="modal fade" tabindex="-1">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title fw-bold">
-              {{ modalMode === 'VIEW' ? '查看通知' : modalMode === 'EDIT' ? '編輯通知' : '新增通知' }}
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <form>
-              <div class="mb-3">
-                <label class="form-label">通知標題</label>
-                <input
-                  v-model="formData.title"
-                  :disabled="modalMode === 'VIEW'"
-                  type="text"
-                  class="form-control"
-                />
-              </div>
+    <!-- 分頁導覽 -->
+    <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-3">
+      <ul class="pagination">
+        <li :class="['page-item', currentPage === 1 ? 'disabled' : '']">
+          <button class="page-link" @click="fetchNotifications(currentPage - 1)">上一頁</button>
+        </li>
+        <li
+          v-for="page in totalPages"
+          :key="page"
+          :class="['page-item', currentPage === page ? 'active' : '']"
+        >
+          <button class="page-link" @click="fetchNotifications(page)">{{ page }}</button>
+        </li>
+        <li :class="['page-item', currentPage === totalPages ? 'disabled' : '']">
+          <button class="page-link" @click="fetchNotifications(currentPage + 1)">下一頁</button>
+        </li>
+      </ul>
+    </nav>
 
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">通知類型</label>
-                  <input
-                    v-model="formData.notificationType"
-                    :disabled="modalMode === 'VIEW'"
-                    type="text"
-                    class="form-control"
-                  />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">目標類型 (Target Type)</label>
-                  <input
-                    v-model="formData.targetType"
-                    :disabled="modalMode === 'VIEW'"
-                    type="text"
-                    class="form-control"
-                  />
-                </div>
-              </div>
+    <!-- 查看詳情彈窗 Component -->
+    <NotificationDetailModal
+      v-if="showDetailModal"
+      :notification="selectedNotification"
+      @close="showDetailModal = false"
+    />
 
-              <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">目標 ID (Target ID)</label>
-                  <input
-                    v-model="formData.targetId"
-                    :disabled="modalMode === 'VIEW'"
-                    type="number"
-                    class="form-control"
-                  />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">跳轉 URL (Target URL)</label>
-                  <input
-                    v-model="formData.targetUrl"
-                    :disabled="modalMode === 'VIEW'"
-                    type="text"
-                    class="form-control"
-                  />
-                </div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">通知內文</label>
-                <textarea
-                  v-model="formData.content"
-                  :disabled="modalMode === 'VIEW'"
-                  rows="4"
-                  class="form-control"
-                ></textarea>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
-            <button
-              v-if="modalMode !== 'VIEW'"
-              type="button"
-              class="btn btn-primary"
-              @click="submitForm"
-            >
-              儲存變更
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- 編輯彈窗 Component -->
+    <NotificationEditModal
+      v-if="showEditModal"
+      :notification="selectedNotification"
+      @close="showEditModal = false"
+      @success="handleEditSuccess"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
-import { Modal } from 'bootstrap';
+import NotificationDetailModal from './NotificationDetailModal.vue';
+import NotificationEditModal from './NotificationEditModal.vue';
 
-// 查詢條件
+// 查詢條件與分頁狀態
 const searchParams = ref({
   title: '',
   notificationType: '',
   startDate: '',
   endDate: ''
 });
-
-// 資料清單
+const currentPage = ref(1);
+const totalPages = ref(1);
 const notificationList = ref([]);
 
-// Modal 相關控制
-const modalRef = ref(null);
-let modalInstance = null;
-const modalMode = ref('VIEW'); // 'VIEW', 'EDIT', 'CREATE'
-
-const formData = ref({
-  notificationId: null,
-  title: '',
-  notificationType: '',
-  content: '',
-  targetType: '',
-  targetId: null,
-  targetUrl: ''
-});
+// Modal 控制狀態
+const showDetailModal = ref(false);
+const showEditModal = ref(false);
+const selectedNotification = ref(null);
 
 onMounted(() => {
-  if (modalRef.value) {
-    modalInstance = new Modal(modalRef.value);
-  }
-  fetchNotifications();
+  fetchNotifications(1);
 });
 
+// 時間格式處理 helper
+const formatToIsoDateTime = (dateTimeLocalStr) => {
+  if (!dateTimeLocalStr) return null;
+  return dateTimeLocalStr.length === 16 ? `${dateTimeLocalStr}:00` : dateTimeLocalStr;
+};
+
 // 撈取資料 API
-const fetchNotifications = async () => {
+const fetchNotifications = async (page = 1) => {
   try {
-    const res = await axios.get('/api/notifications', { params: searchParams.value });
-    notificationList.value = Array.isArray(res.data) ? res.data : (res.data.content || []);
+    const params = {
+      pageNumber: page,
+      pageSize: 10
+    };
+
+    if (searchParams.value.title?.trim()) {
+      params.title = searchParams.value.title.trim();
+    }
+    if (searchParams.value.notificationType) {
+      params.notificationType = searchParams.value.notificationType;
+    }
+    if (searchParams.value.startDate) {
+      params.startCreatedAt = formatToIsoDateTime(searchParams.value.startDate);
+    }
+    if (searchParams.value.endDate) {
+      params.endCreatedAt = formatToIsoDateTime(searchParams.value.endDate);
+    }
+
+    const res = await axios.get('/api/notification/notificationPage', { params });
+    notificationList.value = res.data.content || [];
+    totalPages.value = res.data.totalPages || 1;
+    currentPage.value = page;
   } catch (err) {
     console.error('查詢失敗', err);
   }
@@ -224,48 +186,39 @@ const fetchNotifications = async () => {
 // 重設查詢
 const handleReset = () => {
   searchParams.value = { title: '', notificationType: '', startDate: '', endDate: '' };
-  fetchNotifications();
+  fetchNotifications(1);
 };
 
-// 打開 Modal (查看/編輯)
-const openModal = (mode, item) => {
-  modalMode.value = mode;
-  formData.value = { ...item };
-  modalInstance.show();
+// 開啟查看 Modal
+const openDetailModal = (item) => {
+  selectedNotification.value = item;
+  showDetailModal.value = true;
 };
 
-// 儲存表單 (新增 / 編輯)
-const submitForm = async () => {
-  try {
-    if (modalMode.value === 'EDIT') {
-      await axios.put(`/api/notifications/${formData.value.notificationId}`, formData.value);
-      alert('更新成功');
-    }
-    modalInstance.hide();
-    fetchNotifications();
-  } catch (err) {
-    console.error('儲存失敗', err);
-    alert('操作失敗');
-  }
+// 開啟編輯 Modal
+const openEditModal = (item) => {
+  selectedNotification.value = item;
+  showEditModal.value = true;
 };
 
-// 點擊「發送」按鈕
+// 編輯成功處置
+const handleEditSuccess = () => {
+  showEditModal.value = false;
+  fetchNotifications(currentPage.value);
+};
+
+// 點擊「發送」推播按鈕
 const handleSendNotice = async (item) => {
   if (!confirm(`確定要向全體會員推播「${item.title}」嗎？`)) return;
 
   try {
-    await axios.post('/api/notification/createNotice', {
-      notificationType: item.notificationType,
-      title: item.title,
-      content: item.content,
-      targetType: item.targetType,
-      targetId: item.targetId,
-      targetUrl: item.targetUrl
-    });
+    // 改為呼叫發送通知 API
+    await axios.post(`/api/notification/send/${item.notificationId}`);
     alert('發送推播成功！');
+    fetchNotifications(currentPage.value);
   } catch (err) {
     console.error('發送失敗', err);
-    alert('發送失敗');
+    alert('發送失敗，請稍後再試。');
   }
 };
 
@@ -274,17 +227,20 @@ const handleDelete = async (id) => {
   if (!confirm('確定要刪除這筆通知紀錄嗎？')) return;
 
   try {
-    await axios.delete(`/api/notifications/${id}`);
+    await axios.delete('/api/notification/notificationDelete', {
+      params: { notificationId: id }
+    });
     alert('刪除成功');
-    fetchNotifications();
+    fetchNotifications(currentPage.value);
   } catch (err) {
     console.error('刪除失敗', err);
+    alert('刪除失敗');
   }
 };
 
 // 時間格式化
 const formatDate = (dateStr) => {
   if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleString();
+  return new Date(dateStr).toLocaleString('zh-TW', { hour12: false });
 };
 </script>

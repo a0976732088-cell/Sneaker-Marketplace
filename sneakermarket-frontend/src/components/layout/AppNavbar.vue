@@ -51,10 +51,6 @@
               </span>
             </button>
           </li>
-
-          <li class="nav-item">
-            <RouterLink class="nav-link" to="/notifications"> 通知 </RouterLink>
-          </li>
         </ul>
 
         <ul class="navbar-nav ms-auto">
@@ -99,7 +95,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import axios from "axios";
 // 🎯 Import 彈窗元件
@@ -121,25 +117,50 @@ const toggleNotice = () => {
 
 const fetchNotifications = async () => {
   try {
-    const res = await axios.get("/api/notifications/my");
-    notifications.value = res.data || [];
+    const res = await axios.get("/api/notification/noticeList");
+    // 加上 Array.isArray 檢查，防止被回傳的 404 HTML 弄壞陣列
+    if (Array.isArray(res.data)) {
+      notifications.value = res.data;
+    } else {
+      notifications.value = [];
+    }
   } catch (err) {
     console.error("取得通知失敗", err);
+    notifications.value = [];
   }
 };
 
 const handleMarkAsRead = async (id) => {
   try {
-    await axios.patch(`/api/notifications/${id}/read`);
+    // 呼叫後端更新資料庫 is_read = 1 與 read_at
+    await axios.put(`/api/notification/read/${id}`);
+    
+    // 更新前端狀態（紅點數量會自動減少）
     const target = notifications.value.find((n) => n.notificationId === id);
-    if (target) target.isRead = true;
+    if (target) {
+      target.isRead = true;
+    }
   } catch (err) {
-    console.error("已讀更新失敗", err);
+    console.error("更新已讀狀態失敗", err);
   }
 };
 
+let timer = null;
 onMounted(() => {
   fetchNotifications();
+  // 🎯 每 5 秒自動向後端拉取最新通知
+  timer = setInterval(() => {
+    fetchNotifications();
+  }, 15000);
+
+  // 當使用者切回這個頁面時，立即重新整理通知
+  window.addEventListener("focus", fetchNotifications);
+});
+
+onUnmounted(() => {
+  // 元件銷毀時清除定時器
+  if (timer) clearInterval(timer);
+  window.removeEventListener("focus", fetchNotifications);
 });
 
 // 取得目前所在的 Router 資訊

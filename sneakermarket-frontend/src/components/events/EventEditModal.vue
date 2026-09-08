@@ -1,11 +1,6 @@
-<!-- 編輯活動彈窗 -->
+<!-- components/calendar/EventEditModal.vue -->
 <template>
-  <div
-    class="modal fade show d-block"
-    tabindex="-1"
-    style="background-color: rgba(0, 0, 0, 0.5)"
-    @click.self="$emit('close')"
-  >
+  <div ref="modalRef" class="modal fade" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content shadow-lg border-0 rounded-4">
         <div class="modal-header">
@@ -15,7 +10,7 @@
           <button
             type="button"
             class="btn-close"
-            @click="$emit('close')"
+            @click="closeModal"
           ></button>
         </div>
         <div class="modal-body p-4">
@@ -128,7 +123,7 @@
               <button
                 type="button"
                 class="btn btn-outline-secondary"
-                @click="$emit('close')"
+                @click="closeModal"
               >
                 取消
               </button>
@@ -144,7 +139,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, onUnmounted } from "vue";
+import { Modal } from "bootstrap";
 import { updateEvent } from "@/api/events";
 
 const props = defineProps({
@@ -152,6 +148,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["close", "success"]);
+
+const modalRef = ref(null);
+let modalInstance = null;
 
 const loading = ref(false);
 const photoPreview = ref(null);
@@ -176,8 +175,12 @@ const formatForDateTimeInput = (dateStr) => {
   const d = new Date(dateStr);
   const pad = (num) => String(num).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours(),
+    d.getHours()
   )}:${pad(d.getMinutes())}`;
+};
+
+const handleHidden = () => {
+  emit("close");
 };
 
 onMounted(() => {
@@ -187,6 +190,22 @@ onMounted(() => {
     startAt: formatForDateTimeInput(props.event.startAt),
     endAt: formatForDateTimeInput(props.event.endAt),
   });
+
+  if (modalRef.value) {
+    const el = modalRef.value;
+    modalInstance = new Modal(el);
+    el.addEventListener("hidden.bs.modal", handleHidden);
+    modalInstance.show();
+  }
+});
+
+onUnmounted(() => {
+  if (modalRef.value) {
+    modalRef.value.removeEventListener("hidden.bs.modal", handleHidden);
+  }
+  if (modalInstance) {
+    modalInstance.dispose();
+  }
 });
 
 const handleFileChange = (event) => {
@@ -201,13 +220,19 @@ const handleFileChange = (event) => {
   };
 };
 
+const closeModal = () => {
+  if (modalInstance) {
+    modalInstance.hide();
+  }
+};
+
 const submitUpdate = async () => {
   loading.value = true;
   try {
     await updateEvent(editForm.eventId, editForm);
     alert("更新成功！");
     emit("success");
-    emit("close");
+    closeModal();
   } catch (error) {
     console.error("更新失敗", error);
     alert("更新失敗，請檢查伺服器狀態。");

@@ -44,6 +44,12 @@ public class Notification {
     @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;
 
+    @Column(name = "is_sent", nullable = false)
+    private Boolean isSent = false; // 新增：是否已點擊發送
+
+    @Column(name = "sent_at")
+    private LocalDateTime sentAt; // 新增：發送時間
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

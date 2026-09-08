@@ -5,6 +5,7 @@ import com.project.sneakermarket.notification.dto.NotificationDTO;
 import com.project.sneakermarket.notification.entity.Notification;
 import com.project.sneakermarket.notification.repository.NotificationRepository;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -114,5 +115,35 @@ public class NotificationService {
         Pageable pageable = PageRequest.of(page, size, Sort.Direction.DESC, "createdAt");
         return notificationRepo.findAll(spec, pageable);
     }
+
+    // 發送通知邏輯
+    @Transactional
+    public void sendNotification(Long notificationId) {
+        Notification notification = notificationRepo.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("找不到該筆通知，ID: " + notificationId));
+
+        notification.setIsSent(true);
+        notification.setSentAt(LocalDateTime.now());
+
+        notificationRepo.save(notification);
+    }
+
+    // 取得已發送通知
+    public List<Notification> getSentNotifications() {
+        return notificationRepo.findByIsSentTrueOrderByCreatedAtDesc();
+    }
+
+    @Transactional
+    public void markAsRead(Long notificationId) {
+        Notification notification = notificationRepo.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("找不到該筆通知，ID: " + notificationId));
+
+        if (!notification.getIsRead()) {
+            notification.setIsRead(true);
+            notification.setReadAt(LocalDateTime.now());
+            notificationRepo.save(notification);
+        }
+    }
 }
+
 

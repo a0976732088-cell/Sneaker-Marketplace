@@ -1,83 +1,76 @@
-<!-- 月曆網格 (含當日預覽) -->
- <template>
-  <div class="month-view">
-    <!-- 星期標頭 -->
-    <div class="weekdays">
-      <div v-for="day in weekDaysList" :key="day">{{ day }}</div>
+<!-- components/calendar/CalendarMonthView.vue -->
+<template>
+  <div class="month-grid-wrapper">
+    <!-- 1. 星期標頭（嚴格 7 欄） -->
+    <div class="weekdays-grid">
+      <div v-for="day in weekDaysList" :key="day" class="weekday-cell">
+        {{ day }}
+      </div>
     </div>
 
-    <!-- 日期網格 -->
-    <div class="days">
+    <!-- 2. 日期網格（嚴格 7 欄） -->
+    <div class="days-grid">
+      <!-- 月初前面的空白格 -->
       <div
         v-for="b in firstDayOffset"
-        :key="'b-' + b"
-        class="day empty"
+        :key="'blank-' + b"
+        class="day-cell empty"
       ></div>
+
+      <!-- 當月實際日期格 -->
       <div
         v-for="day in daysInMonth"
         :key="day"
-        class="day"
+        class="day-cell"
         :class="{
           today: isToday(day),
-          selected: isSelected(day),
-          'has-event': getEventsForDay(day).length > 0,
+          selected: isSelected(day)
         }"
-        @click="selectDate(day)"
+        @click="onDateClick(day)"
       >
-        <span class="day-num">{{ day }}</span>
-        <div class="event-dots" v-if="getEventsForDay(day).length">
-          <span
-            v-for="evt in getEventsForDay(day)"
-            :key="evt.id"
-            class="dot"
-            :style="{ backgroundColor: evt.color }"
-          ></span>
+        <div class="day-header">
+          <span class="day-number">{{ day }}</span>
         </div>
-      </div>
-    </div>
 
-    <!-- 點擊特定日期的當日預覽區塊 -->
-    <div class="day-events-preview" v-if="selectedDate">
-      <h3>{{ selectedDateFormatted }} 的活動</h3>
-      <div v-if="selectedDayEvents.length === 0" class="no-events">
-        今日無排定活動
-      </div>
-      <div
-        v-for="evt in selectedDayEvents"
-        :key="evt.id"
-        class="event-card cursor-pointer"
-        :style="{ borderLeftColor: evt.color }"
-        @click="$emit('open-detail', evt)"
-      >
-        <div class="event-time">{{ evt.time }}</div>
-        <div class="event-title">{{ evt.title }}</div>
+        <!-- 格子內的活動標籤 -->
+        <div class="cell-events">
+          <div
+            v-for="evt in getEventsForDay(day).slice(0, 2)"
+            :key="evt.id"
+            class="event-pill"
+            :style="{
+              backgroundColor: evt.color + '15',
+              color: evt.color,
+              borderColor: evt.color + '30'
+            }"
+            @click.stop="$emit('open-detail', evt)"
+          >
+            <span class="pill-dot" :style="{ backgroundColor: evt.color }"></span>
+            <span class="pill-title">{{ evt.title }}</span>
+          </div>
+
+          <div v-if="getEventsForDay(day).length > 2" class="more-count">
+            +{{ getEventsForDay(day).length - 2 }} 個活動
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { computed } from "vue";
 
 const props = defineProps({
-  events: {
-    type: Array,
-    default: () => [],
-  },
-  currentYear: {
-    type: Number,
-    required: true,
-  },
-  currentMonth: {
-    type: Number,
-    required: true,
-  },
+  events: { type: Array, default: () => [] },
+  currentYear: { type: Number, required: true },
+  currentMonth: { type: Number, required: true },
+  selectedDate: { type: Date, default: null },
 });
 
-defineEmits(["open-detail"]);
+const emit = defineEmits(["open-detail", "select-date"]);
 
-const weekDaysList = ["日", "一", "二", "三", "四", "五", "六"];
-const selectedDate = ref(new Date());
+const weekDaysList = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const firstDayOffset = computed(() =>
   new Date(props.currentYear, props.currentMonth, 1).getDay()
@@ -108,108 +101,146 @@ const isToday = (day) => {
 };
 
 const isSelected = (day) => {
-  if (!selectedDate.value) return false;
+  if (!props.selectedDate) return false;
   return (
-    day === selectedDate.value.getDate() &&
-    props.currentMonth === selectedDate.value.getMonth() &&
-    props.currentYear === selectedDate.value.getFullYear()
+    day === props.selectedDate.getDate() &&
+    props.currentMonth === props.selectedDate.getMonth() &&
+    props.currentYear === props.selectedDate.getFullYear()
   );
 };
 
-const selectDate = (day) => {
-  selectedDate.value = new Date(props.currentYear, props.currentMonth, day);
+const onDateClick = (day) => {
+  const d = new Date(props.currentYear, props.currentMonth, day);
+  emit("select-date", d);
 };
-
-const selectedDateFormatted = computed(() => {
-  if (!selectedDate.value) return "";
-  return `${selectedDate.value.getMonth() + 1} 月 ${selectedDate.value.getDate()} 日`;
-});
-
-const selectedDayEvents = computed(() => {
-  if (!selectedDate.value) return [];
-  return getEventsForDay(selectedDate.value.getDate());
-});
 </script>
 
 <style scoped>
-/* ---------------- 月曆視圖 ---------------- */
-.weekdays {
+.month-grid-wrapper {
+  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 🎯 關鍵修復 1：星期列強制均分 7 欄 */
+.weekdays-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
   text-align: center;
-  color: #64748b;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 12px 12px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #94a3b8;
+  margin-bottom: 12px;
 }
 
-.days {
+.weekday-cell {
+  padding: 4px 0;
+}
+
+/* 🎯 關鍵修復 2：日期列強制均分 7 欄，禁止橫向自動擴充 */
+.days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  padding: 4px 12px 12px;
-  gap: 4px;
+  gap: 8px;
+  width: 100%;
 }
 
-.day {
-  height: 52px;
+/* 日期卡片 */
+.day-cell {
+  min-height: 96px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 12px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  cursor: pointer;
-  position: relative;
-  font-size: 14px;
+  box-sizing: border-box;
+  /* 確保內容不撐開格子 */
+  min-width: 0; 
 }
 
-.day:hover:not(.empty) {
-  background-color: #e2e8f0;
+.day-cell:hover:not(.empty) {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
-.day.today {
-  color: #ee5b05;
-  font-weight: bold;
+.day-cell.today {
+  border-color: #818cf8;
+  background: #f5f3ff;
 }
 
-.day.selected {
-  background-color: #6366f1 !important;
-  color: #fff !important;
+.day-cell.today .day-number {
+  color: #4f46e5;
+  font-weight: 800;
 }
 
-.event-dots {
-  display: flex;
-  gap: 3px;
-  margin-top: 2px;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.day-events-preview {
-  padding: 16px 24px 24px;
-  border-top: 1px solid #e2e8f0;
+.day-cell.selected {
+  outline: 2px solid #4f46e5;
   background: #ffffff;
 }
 
-.event-card {
-  background: #f8fafc;
-  padding: 10px 14px;
-  border-radius: 8px;
-  border-left: 30px solid #6366f1;
-  margin-bottom: 8px;
+.day-header {
+  margin-bottom: 6px;
 }
 
-.cursor-pointer {
-  cursor: pointer;
+.day-number {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
 }
 
-.no-events {
+/* 🎯 關鍵修復 3：膠囊標籤文字長度防爆 */
+.cell-events {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.event-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 600;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.pill-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pill-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.more-count {
+  font-size: 10px;
   color: #94a3b8;
-  font-size: 16px;
-  text-align: center;
-  padding: 24px 0;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* 空白格保持高度但不顯示背景 */
+.day-cell.empty {
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: default;
 }
 </style>

@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RestController
 public class NotificationController {
@@ -69,5 +70,35 @@ public class NotificationController {
                 pageSize
         );
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/api/notification/send/{id}")
+    public ResponseEntity<?> sendNotification(@PathVariable("id") Long notificationId) {
+        try {
+            notificationService.sendNotification(notificationId);
+            return ResponseEntity.ok("通知發送成功！");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("發送失敗：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 前台： NotificationDrawer 撈取目前所有已發送通知
+     */
+    @GetMapping("/api/notification/noticeList")
+    public ResponseEntity<List<Notification>> getUserNotifications() {
+        // 撈出已發送的通知清單
+        List<Notification> list = notificationService.getSentNotifications();
+        return ResponseEntity.ok(list);
+    }
+
+    @PutMapping("/api/notification/read/{id}")
+    public ResponseEntity<?> markAsRead(@PathVariable("id") Long notificationId) {
+        try {
+            notificationService.markAsRead(notificationId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("標示已讀失敗：" + e.getMessage());
+        }
     }
 }

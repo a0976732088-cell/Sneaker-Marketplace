@@ -1,13 +1,15 @@
-頂部標題、年月切換、視圖按鈕
+<!-- components/calendar/CalendarHeader.vue -->
 <template>
-  <div class="calendar-header">
-    <div class="nav-group">
-      <button class="icon-btn" @click="$emit('change-month', -1)">&lt;</button>
-      <h2>{{ currentYear }} 年 {{ currentMonth + 1 }} 月</h2>
-      <button class="icon-btn" @click="$emit('change-month', 1)">&gt;</button>
+  <div class="calendar-header-container">
+    <div class="date-selector">
+      <span class="month-title">{{ currentYear }} 年 {{ currentMonth + 1 }} 月</span>
+      <div class="btn-group ms-2">
+        <button class="nav-arrow-btn" @click="$emit('change-month', -1)">‹</button>
+        <button class="nav-arrow-btn" @click="$emit('change-month', 1)">›</button>
+      </div>
     </div>
 
-    <div class="view-switch">
+    <div class="view-pill-toggle">
       <button
         :class="{ active: currentView === 'month' }"
         @click="$emit('update:currentView', 'month')"
@@ -26,76 +28,74 @@
 
 <script setup>
 defineProps({
-  currentYear: {
-    type: Number,
-    required: true,
-  },
-  currentMonth: {
-    type: Number,
-    required: true,
-  },
-  currentView: {
-    type: String,
-    required: true,
-  },
+  currentYear: { type: Number, required: true },
+  currentMonth: { type: Number, required: true },
+  currentView: { type: String, required: true },
 });
 
 defineEmits(["change-month", "update:currentView"]);
 </script>
 
 <style scoped>
-.calendar-header {
+.calendar-header-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
-  background: #1e293b;
-  color: #fff;
+  padding: 16px 24px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.nav-group {
+.date-selector {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-.nav-group h2 {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0;
+.month-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.icon-btn {
-  background: rgba(255, 255, 255, 0.15);
+.nav-arrow-btn {
+  background: #f1f5f9;
   border: none;
-  color: #fff;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 8px;
+  color: #475569;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: background 0.15s;
 }
+.nav-arrow-btn:hover { background: #e2e8f0; }
 
-.view-switch {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 4px;
-  border-radius: 12px;
+.view-pill-toggle {
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 10px;
   display: flex;
+  gap: 2px;
 }
 
-.view-switch button {
+.view-pill-toggle button {
   background: transparent;
   border: none;
-  color: #94a3b8;
-  padding: 6px 16px;
-  font-size: 14px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
   border-radius: 8px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.view-switch button.active {
-  background: #6366f1;
-  color: #ffffff;
-  font-weight: 600;
+.view-pill-toggle button.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 </style>
-
