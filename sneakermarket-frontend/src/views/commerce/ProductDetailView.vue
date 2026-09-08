@@ -1,12 +1,13 @@
 <script setup>
 import { useRoute } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import httpClient from '@/service/httpClient'
 
 const route = useRoute()
 const product = ref(null)
 const loading = ref(true)
 const errorMessage = ref('')
+const selectedVariantId = ref(null)
 
 onMounted(async () => {
   try {
@@ -18,6 +19,16 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+const selectedVariant = computed(() => {
+  for (const v of product.value.variants) {
+    if (v.variantId === selectedVariantId.value) {
+      return v
+    }
+  }
+  return null
+})
+
 </script>
 <template>
   <section>
@@ -39,11 +50,19 @@ onMounted(async () => {
 
       <!-- 規格的 v-for -->
        <h2 class="h5 mt-4">規格</h2>
-        <ul class="list-group">
-        <li v-for="(v, index) in product.variants" :key="index" class="list-group-item">
-            {{ v.size }} / {{ v.color }} — NT$ {{ v.price }}（庫存：{{ v.stock }}）
-        </li>
-</ul>
+        <select v-model="selectedVariantId">
+          <option :value="null">請選擇規格</option>
+          <option v-for="v in product.variants" :key="v.variantId" :value="v.variantId">
+            {{ v.size }} / {{ v.color }}
+          </option>
+        </select>
+
+        <p v-if="selectedVariant"> 
+          NT$ {{ selectedVariant.price }}（庫存：{{ selectedVariant.stock }}） 
+        </p>
+        <p v-else class="text-secondary fst-italic">  
+          請先選擇規格  
+        </p>
     </div>
   </section>
 </template>
