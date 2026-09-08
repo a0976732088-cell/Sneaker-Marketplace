@@ -342,7 +342,7 @@
 
                 <input
                   v-model="form.startAt"
-                  type="datetime-local"
+                  type="datetime-local" title="台北時間（UTC+8）"
                   class="form-control"
                   required
                   :disabled="!editable || auctionStatus === 'ACTIVE'"
@@ -359,7 +359,7 @@
 
                 <input
                   v-model="form.endAt"
-                  type="datetime-local"
+                  type="datetime-local" title="台北時間（UTC+8）"
                   class="form-control"
                   required
                   :disabled="!editable"
@@ -394,6 +394,8 @@
 </template>
 
 <script setup>
+import { parseAuctionTime } from "@/utils/auctionTime";
+import { getAuctionOptions, requireAuctionSession, handleAuctionAccessError } from "@/service/auctionService";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -404,7 +406,8 @@ const route = useRoute();
 const router = useRouter();
 
 // 資料載入狀態
-const loading = ref(false);
+const loading = ref(true);
+const canManage = ref(false);
 
 // 是否正在送出修改 Request
 const submitting = ref(false);
@@ -430,28 +433,8 @@ const isOwner = ref(false);
  */
 const originalStartAt = ref("");
 
-/*
- * TODO：跨模組整合後，
- * 改成商城模組正式品牌 API。
- */
-const brands = [
-  { id: 1, name: "Nike" },
-  { id: 2, name: "Jordan" },
-  { id: 3, name: "adidas" },
-  { id: 4, name: "New Balance" },
-  { id: 5, name: "Vans" },
-];
-
-/*
- * TODO：跨模組整合後，
- * 改成商城模組正式分類 API。
- */
-const categories = [
-  { id: 1, name: "籃球鞋" },
-  { id: 2, name: "慢跑鞋" },
-  { id: 3, name: "休閒鞋" },
-  { id: 4, name: "滑板鞋" },
-];
+const brands = ref([]);
+const categories = ref([]);
 
 // 編輯表單
 const form = reactive({
@@ -488,7 +471,7 @@ const form = reactive({
  */
 const editable = computed(() => {
   // 不是刊登者本人，不提供編輯操作
-  if (!isOwner.value) {
+  if (!isOwner.value || !canManage.value) {
     return false;
   }
 
@@ -567,7 +550,9 @@ function fillForm(auction) {
   form.startAt = toDateTimeLocal(auction.startAt);
   form.endAt = toDateTimeLocal(auction.endAt);
 
-  auctionStatus.value = auction.status;
+  canManage.value = auction.canManage;
+  auctionStatus.value = auction.hasStarted && auction.status === "SCHEDULED"
+    ? "ACTIVE" : auction.status;
   bidCount.value = auction.bidCount;
   isOwner.value = auction.isOwner;
 
@@ -589,7 +574,12 @@ async function loadAuction() {
   try {
     const auctionId = route.params.id;
 
-    const response = await getAuctionDetail(auctionId);
+    await requireAuctionSession();
+    const [response, optionsResponse] = await Promise.all([
+      getAuctionDetail(auctionId), getAuctionOptions(),
+    ]);
+    brands.value = optionsResponse.data.data.brands;
+    categories.value = optionsResponse.data.data.categories;
 
     const auction = response.data.data;
 
@@ -612,6 +602,7 @@ async function loadAuction() {
 
     fillForm(auction);
   } catch (error) {
+    if (await handleAuctionAccessError(error, router)) return;
     console.error("取得競標編輯資料失敗：", error);
 
     if (error.response?.status === 404) {
@@ -638,12 +629,12 @@ function validateForm() {
 
   const startAt =
     auctionStatus.value === "ACTIVE"
-      ? new Date(originalStartAt.value)
-      : new Date(form.startAt);
+      ? parseAuctionTime(originalStartAt.value)
+      : parseAuctionTime(form.startAt);
 
-  const endAt = new Date(form.endAt);
+  const endAt = parseAuctionTime(form.endAt);
 
-  if (endAt <= startAt) {
+  if (!Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime()) || endAt <= startAt) {
     errorMessage.value = "競標結束時間必須晚於開始時間";
 
     return false;
@@ -664,7 +655,7 @@ function validateForm() {
 async function submitUpdate() {
   errorMessage.value = "";
 
-  if (!editable.value) {
+  if (!editable.value || submitting.value) {
     return;
   }
 
@@ -698,6 +689,7 @@ async function submitUpdate() {
       },
     });
   } catch (error) {
+    if (await handleAuctionAccessError(error, router)) return;
     console.error("修改競標失敗：", error);
 
     /*

@@ -22,10 +22,10 @@ public record AuctionDetailResponse(
         // 競標商品 ID
         Long auctionProductId,
 
-        // 商品品牌 ID，正式品牌名稱待商城模組整合
+        // 商品品牌 ID
         Long brandId,
 
-        // 商品分類 ID，正式分類名稱待商城模組整合
+        // 商品分類 ID
         Long categoryId,
 
         // 商品名稱
@@ -101,7 +101,12 @@ public record AuctionDetailResponse(
         LocalDateTime createdAt,
 
         // 目前瀏覽者是否為此競標的賣家本人
-        Boolean isOwner
+        Boolean isOwner,
+        String brandName,
+        String categoryName,
+        // 以台北現在時間判定，不依賴尚未執行的狀態排程。
+        Boolean canManage,
+        Boolean hasStarted
 
 ) {
 }

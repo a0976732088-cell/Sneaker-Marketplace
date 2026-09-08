@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import com.project.sneakermarket.auction.entity.Auction;
 import com.project.sneakermarket.auction.entity.AuctionProduct;
 import com.project.sneakermarket.auction.entity.AuctionBid;
+import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.common.exception.BusinessException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 
@@ -42,6 +43,8 @@ public class AuctionQueryService {
             "bidCount"
     );
 
+    private final AuctionReferenceService referenceService;
+    private final AuctionTime auctionTime;
     private final AuctionRepository auctionRepository;
     private final AuctionProductRepository auctionProductRepository;
     private final AuctionBidRepository auctionBidRepository;
@@ -63,11 +66,13 @@ public class AuctionQueryService {
         Map<Long, AuctionProduct> productMap =
                 getProductMap(auctions);
 
+        AuctionOptionsResponse options = referenceService.getOptions();
+
         // 將 Auction 與 AuctionProduct 組合成前端需要的 DTO
         return auctions.stream()
                 .map(auction -> toSummaryResponse(
                         auction,
-                        productMap.get(auction.getAuctionProductId())
+                        productMap.get(auction.getAuctionProductId()), options
                 ))
                 .toList();
     }
@@ -102,13 +107,14 @@ public class AuctionQueryService {
         Map<Long, AuctionProduct> productMap =
                 getProductMap(auctions);
 
+        AuctionOptionsResponse options = referenceService.getOptions();
         List<AuctionSummaryResponse> items =
                 auctions.stream()
                         .map(auction -> toSummaryResponse(
                                 auction,
                                 productMap.get(
                                         auction.getAuctionProductId()
-                                )
+                                ), options
                         ))
                         .toList();
 
@@ -217,6 +223,14 @@ public class AuctionQueryService {
                         : auction.getCurrentPrice()
                         .add(auction.getMinIncrement());
 
+        AuctionOptionsResponse options = referenceService.getOptions();
+        var now = auctionTime.now();
+        boolean hasStarted = !auction.getStartAt().isAfter(now);
+        boolean canManage = isOwner && auction.getBidCount() == 0
+                && auction.getEndAt().isAfter(now)
+                && (auction.getStatus() == AuctionStatus.SCHEDULED
+                    || auction.getStatus() == AuctionStatus.ACTIVE);
+
         // 組成詳細頁 Response DTO
         return new AuctionDetailResponse(
                 auction.getAuctionId(),
@@ -247,7 +261,11 @@ public class AuctionQueryService {
                 auction.getStatus(),
                 auction.getBidCount(),
                 auction.getCreatedAt(),
-                isOwner
+                isOwner,
+                lookupName(options.brands(), product.getBrandId()),
+                lookupName(options.categories(), product.getCategoryId()),
+                canManage,
+                hasStarted
         );
     }
 
@@ -337,7 +355,8 @@ public class AuctionQueryService {
      */
     private AuctionSummaryResponse toSummaryResponse(
             Auction auction,
-            AuctionProduct product) {
+            AuctionProduct product,
+            AuctionOptionsResponse options) {
 
         return new AuctionSummaryResponse(
                 auction.getAuctionId(),
@@ -350,8 +369,17 @@ public class AuctionQueryService {
                 auction.getBidCount(),
                 auction.getCreatedAt(),
                 auction.getEndAt(),
-                auction.getStatus()
+                auction.getStatus(),
+                product.getBrandId(),
+                product.getCategoryId(),
+                lookupName(options.brands(), product.getBrandId()),
+                lookupName(options.categories(), product.getCategoryId())
         );
+    }
+
+    private String lookupName(List<AuctionLookupOption> options, Long id) {
+        return options.stream().filter(option -> option.id().equals(id))
+                .map(AuctionLookupOption::name).findFirst().orElse(null);
     }
 
     /**

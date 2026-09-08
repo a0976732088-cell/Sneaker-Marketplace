@@ -41,6 +41,8 @@ public class AuctionCommandService {
     private final AuctionProductImageRepository auctionProductImageRepository;
     private final AuctionRepository auctionRepository;
     private final ImageStorageService imageStorageService;
+    private final AuctionReferenceService referenceService;
+    private final AuctionTime auctionTime;
 
     /**
      * 建立一場新的競標。
@@ -57,10 +59,11 @@ public class AuctionCommandService {
             List<MultipartFile> images) {
 
         validateSellerId(sellerId);
+        referenceService.validateProductReferences(request.brandId(), request.categoryId());
         validateAuctionTime(request);
         validateImages(images);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = auctionTime.now();
 
         /*
          * 紀錄本次已成功寫入檔案系統的圖片。
@@ -158,8 +161,6 @@ public class AuctionCommandService {
 
         validateSellerId(sellerId);
 
-        LocalDateTime now = LocalDateTime.now();
-
         /*
          * 編輯與未來的出價功能都鎖定同一筆 Auction。
          *
@@ -206,8 +207,15 @@ public class AuctionCommandService {
             );
         }
 
-        AuctionStatus currentStatus =
-                auction.getStatus();
+        LocalDateTime now = auctionTime.now();
+        if (!auction.getEndAt().isAfter(now)) {
+            throw new BusinessException("競標已到截止時間，無法修改");
+        }
+        AuctionStatus currentStatus = auction.getStatus();
+        // 排程尚未更新狀態時，開始時間仍是最終依據。
+        if (currentStatus == AuctionStatus.SCHEDULED && !auction.getStartAt().isAfter(now)) {
+            currentStatus = AuctionStatus.ACTIVE;
+        }
 
         /*
          * 已經結束、取消或下架的競標
@@ -285,6 +293,10 @@ public class AuctionCommandService {
          * 依目前定案規則保留原本 brand/category，
          * 其他商品資訊仍可修改。
          */
+        referenceService.validateProductReferences(
+                currentStatus == AuctionStatus.SCHEDULED ? request.brandId() : product.getBrandId(),
+                currentStatus == AuctionStatus.SCHEDULED ? request.categoryId() : product.getCategoryId());
+        auction.setStatus(currentStatus);
         if (currentStatus == AuctionStatus.SCHEDULED) {
             product.setBrandId(
                     request.brandId()
@@ -524,6 +536,14 @@ public class AuctionCommandService {
             );
         }
 
+        if (auction.getStatus() != AuctionStatus.SCHEDULED
+                && auction.getStatus() != AuctionStatus.ACTIVE) {
+            throw new BusinessException("目前競標狀態不允許取消");
+        }
+        if (!auction.getEndAt().isAfter(auctionTime.now())) {
+            throw new BusinessException("競標已到截止時間，無法取消");
+        }
+
         /*
          * 不實際 DELETE。
          *
@@ -535,7 +555,7 @@ public class AuctionCommandService {
         );
 
         auction.setUpdatedAt(
-                LocalDateTime.now()
+                auctionTime.now()
         );
 
         /*
@@ -717,12 +737,7 @@ public class AuctionCommandService {
      * 此處仍保留 Service 最後一道資料防線。
      */
     private void validateSellerId(Long sellerId) {
-
-        if (sellerId == null || sellerId <= 0) {
-            throw new BusinessException(
-                    "會員身分資料不正確"
-            );
-        }
+        referenceService.requireActiveMember(sellerId);
     }
 
     /**
@@ -744,7 +759,7 @@ public class AuctionCommandService {
          * 就已經過期的競標。
          */
         if (!request.endAt()
-                .isAfter(LocalDateTime.now())) {
+                .isAfter(auctionTime.now())) {
 
             throw new BusinessException(
                     "競標結束時間必須晚於目前時間"

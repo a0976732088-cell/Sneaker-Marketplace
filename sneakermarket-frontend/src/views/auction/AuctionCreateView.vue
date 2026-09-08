@@ -7,7 +7,8 @@
       {{ errorMessage }}
     </div>
 
-    <form @submit.prevent="submitAuction">
+    <p v-if="!ready && !errorMessage">正在確認登入與載入選項...</p>
+    <form v-if="ready" @submit.prevent="submitAuction">
       <!-- 商品基本資料 -->
       <div class="card mb-4">
         <div class="card-header">商品基本資料</div>
@@ -331,7 +332,7 @@
 
               <input
                 v-model="form.startAt"
-                type="datetime-local"
+                type="datetime-local" title="台北時間（UTC+8）"
                 class="form-control"
                 required
               />
@@ -343,7 +344,7 @@
 
               <input
                 v-model="form.endAt"
-                type="datetime-local"
+                type="datetime-local" title="台北時間（UTC+8）"
                 class="form-control"
                 required
               />
@@ -372,7 +373,9 @@
 </template>
 
 <script setup>
-import { reactive, ref } from "vue";
+import { parseAuctionTime } from "@/utils/auctionTime";
+import { getAuctionOptions, requireAuctionSession, handleAuctionAccessError } from "@/service/auctionService";
+import { onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { createAuction } from "@/service/auctionService";
@@ -382,6 +385,7 @@ const router = useRouter();
 
 // 是否正在送出建立競標 Request
 const submitting = ref(false);
+const ready = ref(false);
 
 // 頁面錯誤訊息
 const errorMessage = ref("");
@@ -389,31 +393,8 @@ const errorMessage = ref("");
 // 使用者目前選擇的圖片
 const images = ref([]);
 
-/*
- * TODO：跨模組整合後，
- * 改成由商城模組正式品牌 API 取得。
- *
- * 目前依一般商城 SQL Seed Data 暫時提供開發選項。
- * 不應把這組 ID 視為永久正式契約。
- */
-const brands = [
-  { id: 1, name: "Nike" },
-  { id: 2, name: "Jordan" },
-  { id: 3, name: "adidas" },
-  { id: 4, name: "New Balance" },
-  { id: 5, name: "Vans" },
-];
-
-/*
- * TODO：跨模組整合後，
- * 改成由商城模組正式分類 API 取得。
- */
-const categories = [
-  { id: 1, name: "籃球鞋" },
-  { id: 2, name: "慢跑鞋" },
-  { id: 3, name: "休閒鞋" },
-  { id: 4, name: "滑板鞋" },
-];
+const brands = ref([]);
+const categories = ref([]);
 
 // 建立競標表單
 const form = reactive({
@@ -485,16 +466,20 @@ function validateForm() {
     return false;
   }
 
-  const startAt = new Date(form.startAt);
+  const startAt = parseAuctionTime(form.startAt);
 
-  const endAt = new Date(form.endAt);
+  const endAt = parseAuctionTime(form.endAt);
 
-  if (endAt <= startAt) {
+  if (!Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime()) || endAt <= startAt) {
     errorMessage.value = "競標結束時間必須晚於開始時間";
 
     return false;
   }
 
+  if (endAt <= new Date()) {
+    errorMessage.value = "競標結束時間必須晚於目前時間";
+    return false;
+  }
   return true;
 }
 
@@ -502,6 +487,7 @@ function validateForm() {
  * 提交建立競標表單。
  */
 async function submitAuction() {
+  if (!ready.value || submitting.value) return;
   errorMessage.value = "";
 
   if (!validateForm()) {
@@ -529,6 +515,7 @@ async function submitAuction() {
       },
     });
   } catch (error) {
+    if (await handleAuctionAccessError(error, router)) return;
     console.error("建立競標失敗：", error);
 
     /*
@@ -541,4 +528,20 @@ async function submitAuction() {
     submitting.value = false;
   }
 }
+onMounted(async () => {
+  try {
+    await requireAuctionSession();
+    const response = await getAuctionOptions();
+    brands.value = response.data.data.brands;
+    categories.value = response.data.data.categories;
+    if (!brands.value.length || !categories.value.length) {
+      errorMessage.value = "品牌或分類尚未建立，目前無法刊登競標。";
+      return;
+    }
+    ready.value = true;
+  } catch (error) {
+    if (await handleAuctionAccessError(error, router)) return;
+    errorMessage.value = "無法載入競標選項，請重新整理後再試。";
+  }
+});
 </script>

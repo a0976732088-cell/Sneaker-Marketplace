@@ -73,6 +73,7 @@
         <div v-else class="text-muted">目前沒有商品圖片。</div>
       </div>
 
+      <p>品牌：{{ auction.brandName ?? "品牌資料未提供" }} ／ 分類：{{ auction.categoryName ?? "分類資料未提供" }}</p>
       <!-- 商品資訊 -->
       <div class="card mb-4">
         <div class="card-header">商品資訊</div>
@@ -217,10 +218,12 @@
 </template>
 
 <script setup>
+import { parseAuctionTime, formatAuctionTime } from "@/utils/auctionTime";
 import { computed, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import {
+  handleAuctionAccessError,
   cancelAuction,
   getAuctionDetail,
   getBidHistory,
@@ -228,6 +231,7 @@ import {
 
 // 取得目前路由資訊
 const route = useRoute();
+const router = useRouter();
 
 // 競標詳細資料
 const auction = ref(null);
@@ -285,7 +289,7 @@ async function loadAuctionDetail() {
  * 最終權限與 bidCount 判斷仍由後端重新確認。
  */
 const canOwnerManageAuction = computed(() => {
-  if (!auction.value?.isOwner) {
+  if (!auction.value?.canManage || parseAuctionTime(auction.value.endAt) <= new Date()) {
     return false;
   }
 
@@ -309,6 +313,8 @@ const ownerManageMessage = computed(() => {
   if (auction.value.bidCount > 0) {
     return "此競標已有出價紀錄，無法再修改或自行取消。";
   }
+
+  if (parseAuctionTime(auction.value.endAt) <= new Date()) return "此競標已到截止時間，無法修改或取消。";
 
   const statusMessageMap = {
     SOLD: "此競標已成交，無法再修改或取消。",
@@ -351,6 +357,7 @@ async function handleCancelAuction() {
      */
     await loadAuctionDetail();
   } catch (error) {
+    if (await handleAuctionAccessError(error, router)) return;
     console.error("取消競標失敗：", error);
 
     /*
@@ -397,19 +404,7 @@ function formatCondition(condition) {
 /**
  * 將時間轉成前端顯示格式。
  */
-function formatDateTime(dateTime) {
-  if (!dateTime) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(dateTime));
-}
+const formatDateTime = formatAuctionTime;
 
 /**
  * 將 Boolean 轉成較容易閱讀的中文。

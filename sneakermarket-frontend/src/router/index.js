@@ -58,11 +58,6 @@ const routes = [
     component: () => import("@/views/calendar/EventManageView.vue"),
   },
   {
-    path: "/notifications",
-    name: "notification",
-    component: () => import("@/views/notification/NotificationHomeView.vue"),
-  },
-  {
     path: "/auctions",
     name: "auction",
     component: () => import("@/views/auction/AuctionListView.vue"),
