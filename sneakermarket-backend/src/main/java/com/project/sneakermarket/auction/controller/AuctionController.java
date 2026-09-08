@@ -19,12 +19,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.project.sneakermarket.auction.dto.AuctionCreateRequest;
 import com.project.sneakermarket.auction.dto.AuctionDetailResponse;
+import com.project.sneakermarket.auction.dto.AuctionOptionsResponse;
 import com.project.sneakermarket.auction.dto.AuctionSearchCriteria;
 import com.project.sneakermarket.auction.dto.AuctionSummaryResponse;
 import com.project.sneakermarket.auction.dto.BidHistoryResponse;
 import com.project.sneakermarket.auction.dto.PageData;
 import com.project.sneakermarket.auction.service.AuctionCommandService;
 import com.project.sneakermarket.auction.service.AuctionQueryService;
+import com.project.sneakermarket.auction.service.AuctionReferenceService;
 import com.project.sneakermarket.auction.service.AuctionSessionMemberResolver;
 import com.project.sneakermarket.common.response.ApiResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -32,7 +34,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import com.project.sneakermarket.auction.dto.AuctionUpdateRequest;
 
-import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -64,6 +66,46 @@ public class AuctionController {
      * Controller 不需要跟著修改。
      */
     private final AuctionSessionMemberResolver sessionMemberResolver;
+
+    // 只透過競標整合入口唯讀取得品牌、分類與會員有效性
+    private final AuctionReferenceService auctionReferenceService;
+
+    /**
+     * 查詢建立與編輯競標所需的品牌、分類選項。
+     *
+     * API：
+     * GET /api/auctions/options
+     *
+     * @return 由共用主資料唯讀組成的競標選項
+     */
+    @GetMapping("/options")
+    public ApiResponse<AuctionOptionsResponse> getAuctionOptions() {
+        return ApiResponse.ok(
+                "查詢競標選項成功",
+                auctionReferenceService.getOptions()
+        );
+    }
+
+    /**
+     * 驗證目前瀏覽器是否具有可用的會員 Session。
+     *
+     * API：
+     * GET /api/auctions/session
+     *
+     * 此端點不公開會員資料，只回報 Session 是否有效。
+     *
+     * @param httpRequest 目前瀏覽器的 HTTP request
+     * @return 驗證成功時 data 為 null
+     */
+    @GetMapping("/session")
+    public ApiResponse<Void> validateAuctionSession(HttpServletRequest httpRequest) {
+        sessionMemberResolver.resolveMemberId(httpRequest.getSession(false));
+
+        return ApiResponse.ok(
+                "競標會員 Session 有效",
+                null
+        );
+    }
 
     /**
      * 查詢競標列表。
@@ -116,7 +158,7 @@ public class AuctionController {
      *
      * @param request 建立競標資料
      * @param images 商品圖片
-     * @param session 目前瀏覽器的 HttpSession
+     * @param httpRequest 目前瀏覽器的 HTTP request
      * @return 新建立的 auctionId
      */
     @PostMapping
@@ -131,7 +173,7 @@ public class AuctionController {
             )
             List<MultipartFile> images,
 
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
 
         /*
          * 正式設計：
@@ -142,7 +184,7 @@ public class AuctionController {
          * Resolver 可依 local 設定暫時使用 fallback memberId。
          */
         Long sellerId =
-                sessionMemberResolver.resolveMemberId(session);
+                sessionMemberResolver.resolveMemberId(httpRequest.getSession(false));
 
         // 呼叫競標寫入 Service 建立商品、圖片與競標
         Long auctionId =
@@ -182,7 +224,7 @@ public class AuctionController {
      *
      * @param auctionId 要修改的競標 ID
      * @param request 修改資料
-     * @param session 目前瀏覽器的 HttpSession
+     * @param httpRequest 目前瀏覽器的 HTTP request
      * @return 修改結果
      */
     @PutMapping("/{auctionId}")
@@ -193,11 +235,11 @@ public class AuctionController {
             @RequestBody
             AuctionUpdateRequest request,
 
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
 
         // 從目前登入 Session 取得會員 ID
         Long sellerId =
-                sessionMemberResolver.resolveMemberId(session);
+                sessionMemberResolver.resolveMemberId(httpRequest.getSession(false));
 
         // 修改規則與 Transaction 統一由 Command Service 處理
         auctionCommandService.updateAuction(
@@ -244,13 +286,13 @@ public class AuctionController {
      * 但不公開 sellerId。
      *
      * @param auctionId 競標 ID
-     * @param session 目前瀏覽器 Session
+     * @param httpRequest 目前瀏覽器的 HTTP request
      * @return 競標詳細資料
      */
     @GetMapping("/{auctionId}")
     public ApiResponse<AuctionDetailResponse> getAuctionDetail(
             @PathVariable Long auctionId,
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
 
         /*
          * 詳細頁是公開 API，
@@ -261,7 +303,7 @@ public class AuctionController {
          */
         Long currentMemberId =
                 sessionMemberResolver
-                        .resolveMemberIdOrNull(session);
+                        .resolveMemberIdOrNull(httpRequest.getSession(false));
 
         // 呼叫 Service 組合競標、商品、圖片與擁有者資訊
         AuctionDetailResponse auction =
@@ -289,20 +331,20 @@ public class AuctionController {
      * 而是將競標狀態改為 CANCELLED。
      *
      * @param auctionId 要取消的競標 ID
-     * @param session 目前瀏覽器的 HttpSession
+     * @param httpRequest 目前瀏覽器的 HTTP request
      * @return 取消結果
      */
     @DeleteMapping("/{auctionId}")
     public ApiResponse<Void> cancelAuction(
             @PathVariable Long auctionId,
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
 
         /*
          * sellerId 不接受前端指定，
          * 仍沿用建立競標時的 Session Resolver。
          */
         Long sellerId =
-                sessionMemberResolver.resolveMemberId(session);
+                sessionMemberResolver.resolveMemberId(httpRequest.getSession(false));
 
         // 商業規則與資料修改交由 Command Service
         auctionCommandService.cancelAuction(
