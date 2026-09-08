@@ -14,4 +14,5 @@ public class ProductVariantResponse {
     private String color;
     private BigDecimal price;
     private Integer stock;
+    private Long variantId;
 }

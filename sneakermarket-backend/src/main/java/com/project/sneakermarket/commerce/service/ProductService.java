@@ -74,7 +74,7 @@ public class ProductService {
                 .collect(Collectors.toList());
 
         List<ProductVariantResponse> variantResponses = variants.stream()
-                .map(v -> new ProductVariantResponse(v.getSize(), v.getColor(), v.getPrice(), v.getStock()))
+                .map(v -> new ProductVariantResponse(v.getSize(), v.getColor(), v.getPrice(), v.getStock(),v.getVariantId()))
                 .collect(Collectors.toList());
 
         return new ProductDetailResponse(

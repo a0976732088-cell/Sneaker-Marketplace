@@ -17,6 +17,7 @@ public class CartController {
     // 查看購物車
     @GetMapping("/api/cart")
     public List<CartItemResponse> getCart(@RequestParam Long memberId) {
+
         return cartService.getCart(memberId);
     }
 
