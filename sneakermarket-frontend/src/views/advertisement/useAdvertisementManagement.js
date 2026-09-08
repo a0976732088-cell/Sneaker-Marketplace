@@ -14,6 +14,11 @@ export function useAdvertisementManagement() {
   const placement = ref("全部版位");
   const showCreate = ref(false);
   const editingAdId = ref(null);
+  const editingAdStatus = ref(null);
+  const minimumStartAt = ref(null);
+  const isEditingInactive = computed(
+    () => editingAdStatus.value === "INACTIVE",
+  );
   const isEditing = computed(() => editingAdId.value !== null);
   const toast = ref("");
 
@@ -110,6 +115,12 @@ export function useAdvertisementManagement() {
     return startTime < endTime ? "" : "開始時間必須早於結束時間";
   });
 
+  function getCurrentMinute() {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    return now;
+  }
+
   function validateAdvertisementTime() {
     if (!timeError.value) return true;
 
@@ -205,7 +216,7 @@ export function useAdvertisementManagement() {
       type: typeLabels[ad.adType] || ad.adType,
       place: placementLabels[ad.adPlacement] || ad.adPlacement,
       status: statusLabels[ad.adStatus] || ad.adStatus,
-
+      adStatus: ad.adStatus,
       adType: ad.adType,
       adPlacement: ad.adPlacement,
       startAt: ad.startAt,
@@ -231,12 +242,15 @@ export function useAdvertisementManagement() {
   function closeAdvertisementDrawer() {
     showCreate.value = false;
     editingAdId.value = null;
+    editingAdStatus.value = null;
     resetForm();
   }
 
   function openCreateDrawer() {
     resetForm();
     editingAdId.value = null;
+    editingAdStatus.value = null;
+    minimumStartAt.value = getCurrentMinute();
     showCreate.value = true;
   }
 
@@ -249,6 +263,8 @@ export function useAdvertisementManagement() {
 
   function openEditDrawer(ad) {
     editingAdId.value = ad.id;
+    editingAdStatus.value = ad.adStatus;
+    minimumStartAt.value = getCurrentMinute();
 
     Object.assign(form, {
       createdBy: 1,
@@ -460,6 +476,8 @@ export function useAdvertisementManagement() {
     form,
     timeError,
     isEditing,
+    minimumStartAt,
+    isEditingInactive,
     notify,
     toggle,
     closeAdvertisementDrawer,

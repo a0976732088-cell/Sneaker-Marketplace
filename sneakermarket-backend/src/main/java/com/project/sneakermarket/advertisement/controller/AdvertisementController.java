@@ -80,4 +80,16 @@ public class AdvertisementController {
 
         return ResponseEntity.ok(ApiResponse.ok("廣告狀態更新成功",adResponse));
     }
+
+    @GetMapping("/findActive")
+    public ResponseEntity<ApiResponse<List<AdvertisementResponse>>>
+    getPublicActiveAdvertisements() {
+
+        List<AdvertisementResponse> advertisements =
+                adService.getPublicActiveAdvertisements();
+
+        return ResponseEntity.ok(
+                ApiResponse.ok("公開廣告查詢成功", advertisements)
+        );
+    }
 }

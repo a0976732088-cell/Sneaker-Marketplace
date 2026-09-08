@@ -1,6 +1,7 @@
 package com.project.sneakermarket.advertisement.repository;
 
 import com.project.sneakermarket.advertisement.entity.Advertisement;
+import com.project.sneakermarket.advertisement.entity.AdvertisementPlacement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,8 +16,24 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
             AdvertisementStatus adStatus,
             LocalDateTime endAt
     );
+    List<Advertisement> findByAdStatusInAndEndAtBefore(
+            List<AdvertisementStatus> adStatuses,
+            LocalDateTime endAt
+    );
     Page<Advertisement> findByAdStatus(
         AdvertisementStatus adStatus,
         Pageable pageable
+    );
+    List<Advertisement>
+    findByAdStatusAndStartAtLessThanEqualAndEndAtAfterOrderBySortOrderAsc(
+            AdvertisementStatus adStatus,
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    );
+    long countByAdPlacementAndAdStatusAndStartAtLessThanEqualAndEndAtAfter(
+            AdvertisementPlacement adPlacement,
+            AdvertisementStatus adStatus,
+            LocalDateTime startAt,
+            LocalDateTime endAt
     );
 }

@@ -10,6 +10,11 @@ export async function getAllAdvertisements() {
   return response.data;
 }
 
+export async function getPublicActiveAdvertisements() {
+  const response = await httpClient.get("/admin/ads/findActive");
+  return response.data;
+}
+
 export async function deleteAdvertisement(adId) {
   const response = await httpClient.delete(`/admin/ads/delete/${adId}`);
   return response.data;
@@ -32,7 +37,9 @@ export async function getAdvertisementsByPage(pageNumber = 0, adStatus = null) {
 }
 
 export async function updateAdvertisementStatus(adId, adStatus) {
-  const response = await httpClient.put(`/admin/ads/put/${adId}/status`, {adStatus});
+  const response = await httpClient.put(`/admin/ads/put/${adId}/status`, {
+    adStatus,
+  });
 
   return response.data;
 }

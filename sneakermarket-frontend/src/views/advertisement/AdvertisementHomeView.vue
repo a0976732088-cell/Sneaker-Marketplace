@@ -28,6 +28,8 @@ const {
   form,
   timeError,
   isEditing,
+  minimumStartAt,
+  isEditingInactive,
   notify,
   toggle,
   closeAdvertisementDrawer,
@@ -423,6 +425,8 @@ onUnmounted(() => {
               開始時間
               <VueDatePicker
                 v-model="form.startAt"
+                :disabled="isEditingInactive"
+                :min-date="minimumStartAt"
                 model-type="yyyy-MM-dd'T'HH:mm"
                 :locale="zhTW"
                 :teleport="true"
