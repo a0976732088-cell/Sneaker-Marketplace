@@ -1,6 +1,10 @@
 package com.project.sneakermarket.auction.service;
 
+import java.util.List;
+
 import com.project.sneakermarket.auction.controller.AuctionController;
+import com.project.sneakermarket.auction.dto.AuctionLookupOption;
+import com.project.sneakermarket.auction.dto.AuctionOptionsResponse;
 import com.project.sneakermarket.auction.exception.AuctionExceptionHandler;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
 import com.project.sneakermarket.common.exception.ForbiddenException;
@@ -95,6 +99,25 @@ class AuctionAccessTests {
         }
         assertThrows(AuctionUnauthorizedException.class, () -> resolver.resolveMemberId(null));
         verifyNoInteractions(references);
+    }
+
+    @Test
+    void optionsEndpointReturnsSharedReferenceData() throws Exception {
+        when(references.getOptions()).thenReturn(
+                new AuctionOptionsResponse(
+                        List.of(new AuctionLookupOption(7L, "Nike")),
+                        List.of(new AuctionLookupOption(9L, "Sneakers"))));
+
+        var result = mvc.perform(get("/api/auctions/options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.brands[0].id").value(7))
+                .andExpect(jsonPath("$.data.brands[0].name").value("Nike"))
+                .andExpect(jsonPath("$.data.categories[0].id").value(9))
+                .andExpect(jsonPath("$.data.categories[0].name").value("Sneakers"))
+                .andReturn();
+
+        assertNull(result.getRequest().getSession(false));
+        verify(references).getOptions();
     }
 
     @Test

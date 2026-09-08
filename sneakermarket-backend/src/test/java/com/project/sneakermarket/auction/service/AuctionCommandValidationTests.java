@@ -97,6 +97,7 @@ class AuctionCommandValidationTests {
         service.updateAuction(12L, 42L, updateRequest(7L, 9L, now.plusDays(1)));
         assertEquals("Updated shoe", product.getProductName());
         assertEquals(BigDecimal.TEN, auction.getCurrentPrice());
+        assertEquals(AuctionStatus.SCHEDULED, auction.getStatus());
         verify(products).save(product);
         verify(auctions).save(auction);
     }
@@ -108,8 +109,32 @@ class AuctionCommandValidationTests {
         service.updateAuction(12L, 42L, updateRequest(99L, 99L, auction.getStartAt()));
         assertEquals(7L, product.getBrandId());
         assertEquals(9L, product.getCategoryId());
+        assertEquals("Updated shoe", product.getProductName());
+        assertEquals(BigDecimal.TEN, auction.getCurrentPrice());
+        assertEquals(AuctionStatus.ACTIVE, auction.getStatus());
         verify(references).brandExists(7L);
         verify(references, never()).brandExists(99L);
+        verify(products).save(product);
+        verify(auctions).save(auction);
+    }
+
+    @Test
+    void scheduledRowWhoseStartHasPassedUsesActiveRulesWithoutPersistingStatus() {
+        LocalDateTime originalStartAt = now.minusHours(1);
+        auction.setStartAt(originalStartAt);
+
+        service.updateAuction(12L, 42L, updateRequest(99L, 99L, originalStartAt));
+
+        assertEquals(AuctionStatus.SCHEDULED, auction.getStatus());
+        assertEquals(originalStartAt, auction.getStartAt());
+        assertEquals(7L, product.getBrandId());
+        assertEquals(9L, product.getCategoryId());
+        assertEquals("Updated shoe", product.getProductName());
+        assertEquals(BigDecimal.TEN, auction.getCurrentPrice());
+        verify(references).brandExists(7L);
+        verify(references, never()).brandExists(99L);
+        verify(products).save(product);
+        verify(auctions).save(auction);
     }
 
     @Test
@@ -132,6 +157,7 @@ class AuctionCommandValidationTests {
         auction.setStartAt(now.minusHours(1));
         assertThrows(BusinessException.class,
                 () -> service.updateAuction(12L, 42L, updateRequest(7L, 9L, now.plusDays(1))));
+        assertEquals(AuctionStatus.SCHEDULED, auction.getStatus());
         verify(auctions, never()).save(any());
     }
 
