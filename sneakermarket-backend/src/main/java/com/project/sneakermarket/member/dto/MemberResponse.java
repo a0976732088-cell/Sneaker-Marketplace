@@ -23,6 +23,8 @@ public class MemberResponse {
 	
 	private String phone;
 	
+	 private String address;
+	
 	private String role;
 	
 	private LocalDateTime createdAt;
@@ -37,6 +39,8 @@ public class MemberResponse {
 				.account(member.getAccount())
 				.name(member.getName())
 				.email(member.getEmail())
+				.phone(member.getPhone())
+				.address(member.getAddress())
 				.role(member.getRole())
 				.createdAt(member.getCreatedAt())
 				.updatedAt(member.getUpdatedAt())
