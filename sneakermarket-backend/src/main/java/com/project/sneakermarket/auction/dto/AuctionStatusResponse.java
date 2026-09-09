@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 
 /**
- * 競標寫入完成後回傳的最新公開狀態。
+ * 競標最新公開狀態 Response。
  *
  * 不包含賣家、最高出價者等會員識別資訊。
  */

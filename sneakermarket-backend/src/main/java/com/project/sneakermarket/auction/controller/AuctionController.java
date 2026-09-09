@@ -303,6 +303,30 @@ public class AuctionController {
     }
 
     /**
+     * 查詢指定競標的最新公開狀態。
+     *
+     * API：
+     * GET /api/auctions/{auctionId}/status
+     *
+     * 此端點供詳細頁定期同步使用，訪客也可以查詢。
+     *
+     * @param auctionId 競標 ID
+     * @return 競標最新公開狀態
+     */
+    @GetMapping("/{auctionId}/status")
+    public ApiResponse<AuctionStatusResponse> getAuctionStatus(
+            @PathVariable Long auctionId) {
+
+        AuctionStatusResponse response =
+                auctionQueryService.getAuctionStatus(auctionId);
+
+        return ApiResponse.ok(
+                "查詢競標最新狀態成功",
+                response
+        );
+    }
+
+    /**
      * 查詢指定競標的完整詳細資料。
      *
      * 訪客可以瀏覽。

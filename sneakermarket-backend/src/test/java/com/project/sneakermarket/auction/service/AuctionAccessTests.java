@@ -247,6 +247,54 @@ class AuctionAccessTests {
     }
 
     @Test
+    void anonymousCanGetPublicStatusWithoutCreatingSession() throws Exception {
+        when(queries.getAuctionStatus(12L)).thenReturn(new AuctionStatusResponse(
+                12L,
+                new BigDecimal("5500.00"),
+                4,
+                new BigDecimal("6000.00"),
+                AuctionStatus.ACTIVE,
+                LocalDateTime.of(2026, 9, 8, 13, 0),
+                LocalDateTime.of(2026, 9, 8, 12, 0)
+        ));
+
+        var result = mvc.perform(get("/api/auctions/12/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("查詢競標最新狀態成功"))
+                .andExpect(jsonPath("$.data.auctionId").value(12))
+                .andExpect(jsonPath("$.data.currentPrice").value(5500.00))
+                .andExpect(jsonPath("$.data.bidCount").value(4))
+                .andExpect(jsonPath("$.data.nextMinimumBid").value(6000.00))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.endAt").value("2026-09-08T13:00:00"))
+                .andExpect(jsonPath("$.data.updatedAt").value("2026-09-08T12:00:00"))
+                .andExpect(jsonPath("$.data.sellerId").doesNotExist())
+                .andExpect(jsonPath("$.data.highestBidderId").doesNotExist())
+                .andExpect(jsonPath("$.data.bidderId").doesNotExist())
+                .andExpect(jsonPath("$.data.email").doesNotExist())
+                .andExpect(jsonPath("$.data.password").doesNotExist())
+                .andExpect(jsonPath("$.data.jwt").doesNotExist())
+                .andReturn();
+
+        assertNull(result.getRequest().getSession(false));
+        verify(queries).getAuctionStatus(12L);
+        verifyNoInteractions(references);
+    }
+
+    @Test
+    void missingAuctionStatusReturnsNotFound() throws Exception {
+        when(queries.getAuctionStatus(99L))
+                .thenThrow(new ResourceNotFoundException("找不到指定的競標資料"));
+
+        var result = mvc.perform(get("/api/auctions/99/status"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andReturn();
+
+        assertNull(result.getRequest().getSession(false));
+    }
+
+    @Test
     void actualMemberIdIsUsedForCancellation() throws Exception {
         var session = new MockHttpSession();
         session.setAttribute("memberId", 42L);

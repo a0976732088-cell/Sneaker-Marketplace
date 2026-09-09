@@ -26,6 +26,19 @@ export function getAuctionDetail(auctionId) {
 }
 
 /**
+ * 查詢指定競標的最新公開狀態。
+ *
+ * API：
+ * GET /api/auctions/{auctionId}/status
+ *
+ * @param {number|string} auctionId 競標 ID
+ * @returns {Promise} API Response
+ */
+export function getAuctionStatus(auctionId) {
+  return httpClient.get(`/auctions/${auctionId}/status`);
+}
+
+/**
  * 查詢指定競標的公開出價紀錄。
  *
  * API：

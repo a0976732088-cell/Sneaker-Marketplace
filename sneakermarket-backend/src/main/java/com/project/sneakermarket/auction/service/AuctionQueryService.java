@@ -161,6 +161,34 @@ public class AuctionQueryService {
     }
 
     /**
+     * 查詢指定競標的最新公開狀態。
+     *
+     * 使用一般唯讀查詢，不取得寫入鎖，也不推算或改變競標狀態。
+     *
+     * @param auctionId 競標 ID
+     * @return 競標最新公開狀態
+     */
+    public AuctionStatusResponse getAuctionStatus(Long auctionId) {
+
+        Auction auction = auctionRepository.findById(auctionId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "找不到指定的競標資料"
+                        )
+                );
+
+        return new AuctionStatusResponse(
+                auction.getAuctionId(),
+                auction.getCurrentPrice(),
+                auction.getBidCount(),
+                auction.getCurrentPrice().add(auction.getMinIncrement()),
+                auction.getStatus(),
+                auction.getEndAt(),
+                auction.getUpdatedAt()
+        );
+    }
+
+    /**
      * 查詢指定競標的完整詳細資料。
      *
      * 組合競標主資料、競標商品資料與商品圖片，
