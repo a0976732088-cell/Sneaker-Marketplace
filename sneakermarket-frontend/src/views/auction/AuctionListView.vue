@@ -108,7 +108,7 @@
             min="0"
             step="1"
             class="form-control"
-            placeholder="最低價格"
+            placeholder="最低價格（NT$）"
           />
         </div>
 
@@ -119,7 +119,7 @@
             min="0"
             step="1"
             class="form-control"
-            placeholder="最高價格"
+            placeholder="最高價格（NT$）"
           />
         </div>
 
@@ -175,7 +175,7 @@
             商品狀況：{{ formatCondition(auction.condition) }}
           </p>
 
-          <p class="card-text">目前價格：NT$ {{ auction.currentPrice }}</p>
+          <p class="card-text">目前價格：{{ formatTwd(auction.currentPrice) }}</p>
 
           <p class="card-text">出價次數：{{ auction.bidCount }}</p>
 
@@ -238,6 +238,7 @@
 
 <script setup>
 import { parseAuctionTime, formatAuctionTime } from "@/utils/auctionTime";
+import { formatTwd } from "@/utils/auctionMoney";
 import { onMounted, onUnmounted, ref } from "vue";
 import { getAuctions, getAuctionOptions } from "@/service/auctionService";
 

@@ -223,13 +223,13 @@
 
               <!-- 運費 -->
               <div class="col-md-6">
-                <label class="form-label"> 運費 </label>
+                <label class="form-label"> 運費（NT$） </label>
 
                 <input
                   v-model.number="form.shippingFee"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="1"
                   class="form-control"
                   required
                   :disabled="!editable"
@@ -308,13 +308,13 @@
             <div class="row g-3">
               <!-- 起標價 -->
               <div class="col-md-6">
-                <label class="form-label"> 起標價 </label>
+                <label class="form-label"> 起標價（NT$） </label>
 
                 <input
                   v-model.number="form.startPrice"
                   type="number"
-                  min="0.01"
-                  step="0.01"
+                  min="1"
+                  step="1"
                   class="form-control"
                   required
                   :disabled="!editable"
@@ -323,13 +323,13 @@
 
               <!-- 最低加價 -->
               <div class="col-md-6">
-                <label class="form-label"> 最低加價 </label>
+                <label class="form-label"> 最低加價（NT$） </label>
 
                 <input
                   v-model.number="form.minIncrement"
                   type="number"
-                  min="0.01"
-                  step="0.01"
+                  min="1"
+                  step="1"
                   class="form-control"
                   required
                   :disabled="!editable"

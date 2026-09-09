@@ -21,9 +21,12 @@ import com.project.sneakermarket.auction.dto.AuctionCreateRequest;
 import com.project.sneakermarket.auction.dto.AuctionDetailResponse;
 import com.project.sneakermarket.auction.dto.AuctionOptionsResponse;
 import com.project.sneakermarket.auction.dto.AuctionSearchCriteria;
+import com.project.sneakermarket.auction.dto.AuctionStatusResponse;
 import com.project.sneakermarket.auction.dto.AuctionSummaryResponse;
+import com.project.sneakermarket.auction.dto.BidCreateRequest;
 import com.project.sneakermarket.auction.dto.BidHistoryResponse;
 import com.project.sneakermarket.auction.dto.PageData;
+import com.project.sneakermarket.auction.service.AuctionBidService;
 import com.project.sneakermarket.auction.service.AuctionCommandService;
 import com.project.sneakermarket.auction.service.AuctionQueryService;
 import com.project.sneakermarket.auction.service.AuctionReferenceService;
@@ -55,15 +58,12 @@ public class AuctionController {
     // 處理建立、修改、取消等競標寫入操作
     private final AuctionCommandService auctionCommandService;
 
+    // 出價交易與悲觀鎖控制由專責 Service 處理
+    private final AuctionBidService auctionBidService;
+
     /*
-     * 【臨時開發整合層】
-     *
-     * 目前會員模組 Session 契約尚未完成，
-     * 因此先透過 AuctionSessionMemberResolver 取得 memberId。
-     *
-     * 未來會員模組合板後，
-     * Session Key / Session Value 型別只需修改 Resolver，
-     * Controller 不需要跟著修改。
+     * 所有競標寫入 API 共用正式 Session resolver。
+     * Resolver 只接受 Long memberId，並確認會員存在且尚未刪除；不提供 fallback。
      */
     private final AuctionSessionMemberResolver sessionMemberResolver;
 
@@ -176,12 +176,8 @@ public class AuctionController {
             HttpServletRequest httpRequest) {
 
         /*
-         * 正式設計：
          * sellerId 不接受前端傳入，
-         * 必須從目前登入會員的 Session 取得。
-         *
-         * 目前會員模組尚未合板時，
-         * Resolver 可依 local 設定暫時使用 fallback memberId。
+         * 必須從目前登入會員的有效 Session 取得。
          */
         Long sellerId =
                 sessionMemberResolver.resolveMemberId(httpRequest.getSession(false));
@@ -276,6 +272,34 @@ public class AuctionController {
                 "查詢競標出價紀錄成功",
                 bids
         );
+    }
+
+    /**
+     * 對指定的進行中競標出價。
+     *
+     * bidderId 一律由目前登入 Session 取得，Request 不接受會員身分。
+     *
+     * @param auctionId 競標 ID
+     * @param request 出價金額
+     * @param httpRequest 目前瀏覽器的 HTTP request
+     * @return 出價成功後的最新競標狀態
+     */
+    @PostMapping("/{auctionId}/bids")
+    public ApiResponse<AuctionStatusResponse> placeBid(
+            @PathVariable Long auctionId,
+            @Valid @RequestBody BidCreateRequest request,
+            HttpServletRequest httpRequest) {
+
+        Long bidderId = sessionMemberResolver
+                .resolveMemberId(httpRequest.getSession(false));
+
+        AuctionStatusResponse response = auctionBidService.placeBid(
+                auctionId,
+                bidderId,
+                request
+        );
+
+        return ApiResponse.ok("出價成功", response);
     }
 
     /**

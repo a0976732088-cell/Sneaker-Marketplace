@@ -217,11 +217,8 @@ public class AuctionQueryService {
                 .toList();
 
         // 由後端統一計算下一次最低可出價金額
-        var nextMinimumBid =
-                auction.getBidCount() == 0
-                        ? auction.getStartPrice()
-                        : auction.getCurrentPrice()
-                        .add(auction.getMinIncrement());
+        var nextMinimumBid = auction.getCurrentPrice()
+                .add(auction.getMinIncrement());
 
         AuctionOptionsResponse options = referenceService.getOptions();
         var now = auctionTime.now();

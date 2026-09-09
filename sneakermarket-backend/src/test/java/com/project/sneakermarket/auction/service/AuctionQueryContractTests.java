@@ -34,6 +34,8 @@ class AuctionQueryContractTests {
         auction.setStatus(AuctionStatus.SCHEDULED);
         auction.setBidCount(0);
         auction.setStartPrice(BigDecimal.TEN);
+        auction.setCurrentPrice(BigDecimal.TEN);
+        auction.setMinIncrement(new BigDecimal("5"));
         var product = new AuctionProduct();
         product.setAuctionProductId(3L);
         product.setSellerId(42L);
@@ -56,6 +58,23 @@ class AuctionQueryContractTests {
         assertTrue(result.canManage());
         // 查詢不能擅自寫入競標狀態。
         assertEquals(AuctionStatus.SCHEDULED, auction.getStatus());
+    }
+
+    @Test
+    void detailWithoutBidsUsesCurrentPricePlusIncrementAsNextMinimum() {
+        var result = query.getAuctionDetail(12L, null);
+
+        assertEquals(0, new BigDecimal("15").compareTo(result.nextMinimumBid()));
+    }
+
+    @Test
+    void detailWithBidUsesCurrentPricePlusIncrementAsNextMinimum() {
+        auction.setCurrentPrice(new BigDecimal("15"));
+        auction.setBidCount(1);
+
+        var result = query.getAuctionDetail(12L, null);
+
+        assertEquals(0, new BigDecimal("20").compareTo(result.nextMinimumBid()));
     }
 
     @Test

@@ -112,13 +112,13 @@
         <div class="card-header">競標資訊</div>
 
         <div class="card-body">
-          <p>起標價： NT$ {{ auction.startPrice }}</p>
+          <p>起標價：{{ formatTwd(auction.startPrice) }}</p>
 
-          <p>目前價格： NT$ {{ auction.currentPrice }}</p>
+          <p>目前價格：{{ formatTwd(auction.currentPrice) }}</p>
 
-          <p>最低加價： NT$ {{ auction.minIncrement }}</p>
+          <p>最低加價：{{ formatTwd(auction.minIncrement) }}</p>
 
-          <p>下一次最低出價： NT$ {{ auction.nextMinimumBid }}</p>
+          <p>下一次最低出價：{{ formatTwd(auction.nextMinimumBid) }}</p>
 
           <p>
             出價次數：
@@ -142,6 +142,78 @@
         </div>
       </div>
 
+      <!-- 出價操作 -->
+      <div class="card mb-4">
+        <div class="card-header">我要出價</div>
+
+        <div class="card-body">
+          <p class="mb-2">目前價格：<strong>{{ formatTwd(auction.currentPrice) }}</strong></p>
+
+          <p class="mb-2">最低加價：<strong>{{ formatTwd(auction.minIncrement) }}</strong></p>
+
+          <p class="mb-3">
+            目前最低可出價：
+            <strong>{{ formatTwd(auction.nextMinimumBid) }}</strong>
+          </p>
+
+          <div v-if="auction.isOwner" class="alert alert-secondary mb-0">
+            賣家不可對自己的競標出價。
+          </div>
+
+          <form v-else @submit.prevent="handlePlaceBid">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="!canPlaceBid || submittingBid || isCandidateAtMinimum"
+                aria-label="減少一個最低加價級距"
+                @click="decreaseCandidateBid"
+              >
+                −
+              </button>
+
+              <strong class="fs-4" aria-live="polite">
+                {{ formatTwd(candidateBid) }}
+              </strong>
+
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="!canPlaceBid || submittingBid"
+                aria-label="增加一個最低加價級距"
+                @click="increaseCandidateBid"
+              >
+                +
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              class="btn btn-success"
+              :disabled="!canPlaceBid || submittingBid"
+            >
+              {{
+                submittingBid
+                  ? "出價中..."
+                  : `確認出價 ${formatTwd(candidateBid)}`
+              }}
+            </button>
+
+            <div v-if="!canPlaceBid" class="text-muted mt-2">
+              {{ bidAvailabilityMessage }}
+            </div>
+
+            <div v-if="bidSuccessMessage" class="alert alert-success mt-3 mb-0">
+              {{ bidSuccessMessage }}
+            </div>
+
+            <div v-if="bidErrorMessage" class="alert alert-danger mt-3 mb-0">
+              {{ bidErrorMessage }}
+            </div>
+          </form>
+        </div>
+      </div>
+
       <!-- 交易資訊 -->
       <div class="card mb-4">
         <div class="card-header">交易資訊</div>
@@ -152,7 +224,7 @@
             {{ auction.shippingMethod }}
           </p>
 
-          <p>運費： NT$ {{ auction.shippingFee }}</p>
+          <p>運費：{{ formatTwd(auction.shippingFee) }}</p>
 
           <p>
             付款方式：
@@ -202,7 +274,7 @@
                     {{ bid.maskedBidder }}
                   </td>
 
-                  <td>NT$ {{ bid.bidAmount }}</td>
+                  <td>{{ formatTwd(bid.bidAmount) }}</td>
 
                   <td>
                     {{ formatDateTime(bid.createdAt) }}
@@ -219,6 +291,7 @@
 
 <script setup>
 import { parseAuctionTime, formatAuctionTime } from "@/utils/auctionTime";
+import { formatTwd } from "@/utils/auctionMoney";
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -227,6 +300,7 @@ import {
   cancelAuction,
   getAuctionDetail,
   getBidHistory,
+  placeBid,
 } from "@/service/auctionService";
 
 // 取得目前路由資訊
@@ -248,6 +322,12 @@ const errorMessage = ref("");
 // 是否正在執行取消競標
 const cancelling = ref(false);
 
+// 出價表單狀態
+const candidateBid = ref(null);
+const submittingBid = ref(false);
+const bidSuccessMessage = ref("");
+const bidErrorMessage = ref("");
+
 /**
  * 讀取競標詳細資料與出價紀錄。
  */
@@ -268,6 +348,7 @@ async function loadAuctionDetail() {
 
     auction.value = detailResponse.data.data;
     bids.value = bidsResponse.data.data;
+    candidateBid.value = Number(auction.value.nextMinimumBid);
   } catch (error) {
     console.error("取得競標詳細資料失敗：", error);
 
@@ -301,6 +382,69 @@ const canOwnerManageAuction = computed(() => {
     auction.value.status === "SCHEDULED" || auction.value.status === "ACTIVE"
   );
 });
+
+/**
+ * 前端只改善操作體驗，最終狀態、時間與價格仍由後端鎖定資料後判定。
+ */
+const canPlaceBid = computed(() => {
+  if (!auction.value || auction.value.isOwner) {
+    return false;
+  }
+
+  return (
+    auction.value.status === "ACTIVE" &&
+    parseAuctionTime(auction.value.startAt) <= new Date() &&
+    parseAuctionTime(auction.value.endAt) > new Date()
+  );
+});
+
+const bidAvailabilityMessage = computed(() => {
+  if (!auction.value) {
+    return "";
+  }
+
+  if (auction.value.status !== "ACTIVE") {
+    return "目前競標狀態不允許出價。";
+  }
+
+  if (parseAuctionTime(auction.value.startAt) > new Date()) {
+    return "競標尚未開始。";
+  }
+
+  if (parseAuctionTime(auction.value.endAt) <= new Date()) {
+    return "競標已截止。";
+  }
+
+  return "目前無法出價。";
+});
+
+const isCandidateAtMinimum = computed(() => {
+  if (!auction.value || !Number.isFinite(candidateBid.value)) {
+    return true;
+  }
+
+  return candidateBid.value <= Number(auction.value.nextMinimumBid);
+});
+
+function increaseCandidateBid() {
+  if (!auction.value || submittingBid.value) {
+    return;
+  }
+
+  candidateBid.value += Number(auction.value.minIncrement);
+}
+
+function decreaseCandidateBid() {
+  if (!auction.value || submittingBid.value || isCandidateAtMinimum.value) {
+    return;
+  }
+
+  const minimumBid = Number(auction.value.nextMinimumBid);
+  candidateBid.value = Math.max(
+    minimumBid,
+    candidateBid.value - Number(auction.value.minIncrement),
+  );
+}
 
 /**
  * 本人競標目前不能修改／取消時的提示。
@@ -368,6 +512,53 @@ async function handleCancelAuction() {
       error.response?.data?.message ?? "取消競標失敗，請稍後再試";
   } finally {
     cancelling.value = false;
+  }
+}
+
+/**
+ * 送出一筆出價，成功後套用後端最新狀態並重新取得出價紀錄。
+ */
+async function handlePlaceBid() {
+  if (!auction.value || !canPlaceBid.value || submittingBid.value) {
+    return;
+  }
+
+  bidSuccessMessage.value = "";
+  bidErrorMessage.value = "";
+
+  const submittedBid = candidateBid.value;
+
+  if (!Number.isFinite(submittedBid)) {
+    bidErrorMessage.value = "無法取得目前可出價金額，請重新整理頁面。";
+    return;
+  }
+
+  submittingBid.value = true;
+
+  try {
+    const response = await placeBid(auction.value.auctionId, {
+      bidAmount: submittedBid,
+    });
+
+    const latestStatus = response.data.data;
+    Object.assign(auction.value, latestStatus);
+    candidateBid.value = Number(latestStatus.nextMinimumBid);
+    bidSuccessMessage.value = `已成功出價 ${formatTwd(submittedBid)}`;
+
+    try {
+      const bidsResponse = await getBidHistory(auction.value.auctionId);
+      bids.value = bidsResponse.data.data;
+    } catch (historyError) {
+      console.error("重新取得出價紀錄失敗：", historyError);
+      bidErrorMessage.value = "出價已成功，但暫時無法更新出價紀錄。";
+    }
+  } catch (error) {
+    if (await handleAuctionAccessError(error, router)) return;
+    console.error("出價失敗：", error);
+    bidErrorMessage.value =
+      error.response?.data?.message ?? "出價失敗，請稍後再試";
+  } finally {
+    submittingBid.value = false;
   }
 }
 

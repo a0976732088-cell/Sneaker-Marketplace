@@ -39,6 +39,21 @@ export function getBidHistory(auctionId) {
 }
 
 /**
+ * 對指定競標出價。
+ *
+ * bidderId 由後端 Session 取得，payload 只包含 bidAmount。
+ *
+ * @param {number|string} auctionId 競標 ID
+ * @param {{ bidAmount: string|number }} payload 出價金額
+ * @returns {Promise} API Response
+ */
+export function placeBid(auctionId, payload) {
+  return httpClient.post(`/auctions/${auctionId}/bids`, {
+    bidAmount: payload.bidAmount,
+  });
+}
+
+/**
  * 建立新的競標。
  *
  * API：
