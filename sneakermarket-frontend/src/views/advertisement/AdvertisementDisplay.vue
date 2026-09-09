@@ -86,31 +86,47 @@ function selectBanner(index) {
   restartBannerTimer();
 }
 
-async function loadAdvertisements() {
-  loading.value = true;
-  errorMessage.value = "";
+async function loadAdvertisements(silent = false) {
+  if (!silent) {
+    loading.value = true;
+    errorMessage.value = "";
+  }
 
   try {
     const result = await getPublicActiveAdvertisements();
     ads.value = result.data || [];
+    errorMessage.value = "";
+    if (bannerIndex.value >= bannerAds.value.length) {
+      bannerIndex.value = 0;
+    }
   } catch (error) {
     console.error(error);
-    errorMessage.value = "廣告讀取失敗";
+    if (!silent) {
+      errorMessage.value = "廣告讀取失敗";
+    }
   } finally {
-    loading.value = false;
+    if (!silent) {
+      loading.value = false;
+    }
   }
 }
-
+let advertisementRefreshTimer = null;
 onMounted(async () => {
-  // 先等待後端廣告資料讀取完成
   await loadAdvertisements();
-
-  // 資料載入完成後，開始第一次三秒倒數
   restartBannerTimer();
+
+  advertisementRefreshTimer = window.setInterval(async () => {
+    await loadAdvertisements(true);
+    restartBannerTimer();
+  }, 60000);
 });
 onUnmounted(() => {
   if (bannerTimer !== null) {
     window.clearTimeout(bannerTimer);
+  }
+
+  if (advertisementRefreshTimer !== null) {
+    window.clearInterval(advertisementRefreshTimer);
   }
 });
 </script>

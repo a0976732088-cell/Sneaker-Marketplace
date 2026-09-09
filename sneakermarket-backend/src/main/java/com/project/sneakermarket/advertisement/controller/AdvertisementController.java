@@ -1,5 +1,6 @@
 package com.project.sneakermarket.advertisement.controller;
 
+import com.project.sneakermarket.advertisement.dto.AdvertisementDeliveryStatus;
 import com.project.sneakermarket.advertisement.dto.AdvertisementResponse;
 import com.project.sneakermarket.advertisement.dto.CreateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementRequest;
@@ -63,10 +64,12 @@ public class AdvertisementController {
     @GetMapping("/findPage")
     public ResponseEntity<ApiResponse<Page<AdvertisementResponse>>> findAdByPage(
             @RequestParam(defaultValue = "0") Integer pageNumber,
-            @RequestParam(required = false) AdvertisementStatus adStatus){
+            @RequestParam(required = false) AdvertisementStatus adStatus,
+            @RequestParam(required = false)
+            AdvertisementDeliveryStatus deliveryStatus){
 
         Page<AdvertisementResponse> result =
-                adService.findAdByPage(pageNumber, adStatus);
+                adService.findAdByPage(pageNumber, adStatus, deliveryStatus);
 
         return ResponseEntity.ok(
                 ApiResponse.ok("廣告查詢成功", result)

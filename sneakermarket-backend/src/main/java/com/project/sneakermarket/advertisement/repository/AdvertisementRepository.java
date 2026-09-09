@@ -12,10 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AdvertisementRepository extends JpaRepository<Advertisement, Long> {
-    List<Advertisement> findByAdStatusAndEndAtBefore(
-            AdvertisementStatus adStatus,
-            LocalDateTime endAt
-    );
+
     List<Advertisement> findByAdStatusInAndEndAtBefore(
             List<AdvertisementStatus> adStatuses,
             LocalDateTime endAt
@@ -35,5 +32,17 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
             AdvertisementStatus adStatus,
             LocalDateTime startAt,
             LocalDateTime endAt
+    );
+    Page<Advertisement> findByAdStatusAndStartAtAfter(
+            AdvertisementStatus adStatus,
+            LocalDateTime startAt,
+            Pageable pageable
+    );
+
+    Page<Advertisement> findByAdStatusAndStartAtLessThanEqualAndEndAtAfter(
+            AdvertisementStatus adStatus,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            Pageable pageable
     );
 }

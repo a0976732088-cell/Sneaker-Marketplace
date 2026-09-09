@@ -8,17 +8,14 @@ import {
 } from "@/service/advertisementService";
 
 export function useAdvertisementManagement() {
-  const tabs = ["全部廣告", "進行中", "草稿", "已停用", "已結束"];
+  const tabs = ["全部廣告", "已排程", "進行中", "草稿", "暫停／取消", "已結束"];
   const activeTab = ref("全部廣告");
   const keyword = ref("");
   const placement = ref("全部版位");
   const showCreate = ref(false);
   const editingAdId = ref(null);
-  const editingAdStatus = ref(null);
   const minimumStartAt = ref(null);
-  const isEditingInactive = computed(
-    () => editingAdStatus.value === "INACTIVE",
-  );
+  const isStartAtLocked = ref(false);
   const isEditing = computed(() => editingAdId.value !== null);
   const toast = ref("");
 
@@ -32,8 +29,6 @@ export function useAdvertisementManagement() {
   const totalPages = ref(0);
   // 後端回傳的廣告總筆數
   const totalElements = ref(0);
-  // 保留「全部廣告」的總數，避免切換狀態後徽章變成該狀態的筆數。
-  const allAdvertisementsCount = ref(0);
   // 後端目前固定每頁顯示 5 筆
   const pageSize = ref(5);
 
@@ -61,24 +56,47 @@ export function useAdvertisementManagement() {
     POPUP: "首頁彈窗",
     SMALL_BLOCK: "商品頁側欄",
   };
-  const statusLabels = {
-    DRAFT: "草稿",
-    ACTIVE: "進行中",
-    INACTIVE: "已停用",
-    EXPIRED: "已結束",
-  };
+  function resolveDisplayStatus(ad) {
+    if (ad.adStatus === "DRAFT") return "草稿";
+    if (ad.adStatus === "INACTIVE") {
+      const now = Date.now();
+      const startAt = new Date(ad.startAt).getTime();
+
+      return now < startAt ? "已取消排程" : "已暫停";
+    }
+    if (ad.adStatus === "EXPIRED") return "已結束";
+
+    if (ad.adStatus === "ACTIVE") {
+      const now = Date.now();
+      const startAt = new Date(ad.startAt).getTime();
+      const endAt = new Date(ad.endAt).getTime();
+
+      if (now < startAt) return "已排程";
+      if (now >= endAt) return "已結束";
+
+      return "進行中";
+    }
+
+    return ad.adStatus;
+  }
 
   // 將畫面頁籤轉成後端 AdvertisementStatus；全部廣告不帶狀態參數。
   const tabStatusValues = {
-    進行中: "ACTIVE",
     草稿: "DRAFT",
-    已停用: "INACTIVE",
+    "暫停／取消": "INACTIVE",
     已結束: "EXPIRED",
   };
+  const tabDeliveryStatusValues = {
+    已排程: "SCHEDULED",
+    進行中: "RUNNING",
+  };
+
   const selectedAdStatus = computed(
     () => tabStatusValues[activeTab.value] || null,
   );
-
+  const selectedDeliveryStatus = computed(
+    () => tabDeliveryStatusValues[activeTab.value] || null,
+  );
   const filteredAds = computed(() =>
     ads.value.filter((ad) => {
       const term = keyword.value.trim().toLowerCase();
@@ -159,9 +177,9 @@ export function useAdvertisementManagement() {
   async function toggle(ad) {
     // 畫面顯示「進行中」時，按下按鈕就改成停用；
     // 草稿或已停用時，按下按鈕就改成上架。
-    const nextStatus = ad.status === "進行中" ? "INACTIVE" : "ACTIVE";
+    const nextStatus = ad.adStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
 
-    const actionName = nextStatus === "ACTIVE" ? "上架" : "停用";
+    const actionName = nextStatus === "ACTIVE" ? "發布/排程" : "停用";
 
     try {
       // 1. 先讓後端真正更新資料庫狀態。
@@ -215,7 +233,7 @@ export function useAdvertisementManagement() {
 
       type: typeLabels[ad.adType] || ad.adType,
       place: placementLabels[ad.adPlacement] || ad.adPlacement,
-      status: statusLabels[ad.adStatus] || ad.adStatus,
+      status: resolveDisplayStatus(ad),
       adStatus: ad.adStatus,
       adType: ad.adType,
       adPlacement: ad.adPlacement,
@@ -235,21 +253,20 @@ export function useAdvertisementManagement() {
       views: "—",
       clicks: "—",
       ctr: "—",
-      color: "blue",
     };
   }
 
   function closeAdvertisementDrawer() {
     showCreate.value = false;
     editingAdId.value = null;
-    editingAdStatus.value = null;
+    isStartAtLocked.value = false;
     resetForm();
   }
 
   function openCreateDrawer() {
     resetForm();
     editingAdId.value = null;
-    editingAdStatus.value = null;
+    isStartAtLocked.value = false;
     minimumStartAt.value = getCurrentMinute();
     showCreate.value = true;
   }
@@ -263,8 +280,14 @@ export function useAdvertisementManagement() {
 
   function openEditDrawer(ad) {
     editingAdId.value = ad.id;
-    editingAdStatus.value = ad.adStatus;
     minimumStartAt.value = getCurrentMinute();
+
+    const originalStartAt = ad.startAt ? new Date(ad.startAt).getTime() : null;
+
+    isStartAtLocked.value =
+      ad.adStatus === "INACTIVE" &&
+      originalStartAt !== null &&
+      originalStartAt <= Date.now();
 
     Object.assign(form, {
       createdBy: 1,
@@ -330,6 +353,7 @@ export function useAdvertisementManagement() {
       const result = await getAdvertisementsByPage(
         pageNumber,
         selectedAdStatus.value,
+        selectedDeliveryStatus.value,
       );
       const pageData = result.data;
 
@@ -361,10 +385,6 @@ export function useAdvertisementManagement() {
       totalElements.value = pageData.totalElements;
       pageSize.value = pageData.size;
 
-      // 只有查詢全部廣告時，才更新頁籤旁的全部筆數。
-      if (selectedAdStatus.value === null) {
-        allAdvertisementsCount.value = pageData.totalElements;
-      }
     } catch (error) {
       console.error("分頁查詢廣告失敗", error);
 
@@ -401,11 +421,6 @@ export function useAdvertisementManagement() {
 
     try {
       const result = await deleteAdvertisement(ad.id);
-
-      allAdvertisementsCount.value = Math.max(
-        0,
-        allAdvertisementsCount.value - 1,
-      );
 
       // 若刪除目前頁面最後一筆，回到上一頁，避免停在空白頁面。
       const targetPage =
@@ -461,14 +476,11 @@ export function useAdvertisementManagement() {
     placement,
     showCreate,
     toast,
-    ads,
     loadingAds,
     loadError,
     currentPage,
     totalPages,
     totalElements,
-    allAdvertisementsCount,
-    pageSize,
     pageNumbers,
     firstItemNumber,
     lastItemNumber,
@@ -477,8 +489,7 @@ export function useAdvertisementManagement() {
     timeError,
     isEditing,
     minimumStartAt,
-    isEditingInactive,
-    notify,
+    isStartAtLocked,
     toggle,
     closeAdvertisementDrawer,
     openCreateDrawer,

@@ -14,13 +14,11 @@ const {
   placement,
   showCreate,
   toast,
-  ads,
   loadingAds,
   loadError,
   currentPage,
   totalPages,
   totalElements,
-  allAdvertisementsCount,
   pageNumbers,
   firstItemNumber,
   lastItemNumber,
@@ -29,8 +27,7 @@ const {
   timeError,
   isEditing,
   minimumStartAt,
-  isEditingInactive,
-  notify,
+  isStartAtLocked,
   toggle,
   closeAdvertisementDrawer,
   openCreateDrawer,
@@ -114,9 +111,6 @@ onUnmounted(() => {
             @click="activeTab = tab"
           >
             {{ tab }}
-            <!-- <span v-if="tab === '全部廣告'">{{
-              allAdvertisementsCount
-            }}</span> -->
           </button>
         </div>
         <div class="filter-row">
@@ -236,7 +230,7 @@ onUnmounted(() => {
                   <td>
                     <div class="row-actions">
                       <button
-                        v-if="['草稿', '已停用'].includes(ad.status)"
+                        v-if="['DRAFT', 'INACTIVE'].includes(ad.adStatus)"
                         title="編輯"
                         @click="openEditDrawer(ad)"
                       >
@@ -244,15 +238,19 @@ onUnmounted(() => {
                       </button>
                       <!--草稿與已停用顯示上架按鈕，進行中顯示停用按鈕，已結束不允許操作，所以不顯示按鈕。-->
                       <button
-                        v-if="['進行中', '草稿', '已停用'].includes(ad.status)"
+                        v-if="
+                          ['ACTIVE', 'DRAFT', 'INACTIVE'].includes(ad.adStatus)
+                        "
                         type="button"
-                        :title="ad.status === '進行中' ? '停用' : '上架'"
+                        :title="ad.adStatus === 'ACTIVE' ? '停用' : '發布/排程'"
                         @click="toggle(ad)"
                       >
-                        {{ ad.status === "進行中" ? "Ⅱ" : "▶" }}
+                        {{ ad.adStatus === "ACTIVE" ? "Ⅱ" : "▶" }}
                       </button>
                       <button
-                        v-if="ad.status !== '已結束'"
+                        v-if="
+                          ['DRAFT', 'INACTIVE'].includes(ad.adStatus)
+                        "
                         title="刪除"
                         @click="handleDeleteAdvertisement(ad)"
                       >
@@ -425,7 +423,7 @@ onUnmounted(() => {
               開始時間
               <VueDatePicker
                 v-model="form.startAt"
-                :disabled="isEditingInactive"
+                :disabled="isStartAtLocked"
                 :min-date="minimumStartAt"
                 model-type="yyyy-MM-dd'T'HH:mm"
                 :locale="zhTW"

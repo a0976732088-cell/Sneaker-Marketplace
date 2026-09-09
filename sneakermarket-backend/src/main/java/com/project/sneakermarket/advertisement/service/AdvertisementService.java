@@ -1,5 +1,6 @@
 package com.project.sneakermarket.advertisement.service;
 
+import com.project.sneakermarket.advertisement.dto.AdvertisementDeliveryStatus;
 import com.project.sneakermarket.advertisement.dto.AdvertisementResponse;
 import com.project.sneakermarket.advertisement.dto.CreateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementRequest;
@@ -107,9 +108,23 @@ public class AdvertisementService {
                         new ResourceNotFoundException("找不到指定的廣告")
                 );
 
-        ensureAdvertisementIsNotExpired(advertisement);
+        ensureAdvertisementCanBeDeleted(advertisement);
 
         adRepo.delete(advertisement);
+    }
+
+    private void ensureAdvertisementCanBeDeleted(
+            Advertisement advertisement
+    ) {
+        AdvertisementStatus status =
+                advertisement.getAdStatus();
+
+        if (status != AdvertisementStatus.DRAFT
+                && status != AdvertisementStatus.INACTIVE) {
+            throw new BusinessException(
+                    "只有草稿、已取消排程或已暫停的廣告可以刪除"
+            );
+        }
     }
 
     private void ensureAdvertisementIsNotExpired(Advertisement advertisement) {
@@ -132,12 +147,30 @@ public class AdvertisementService {
             validateDraftStartAtNotInPast(request.getStartAt());
         }
 
-        if (advertisement.getAdStatus() == AdvertisementStatus.INACTIVE
-                && !Objects.equals(
+        boolean startAtChanged = !Objects.equals(
                 advertisement.getStartAt(),
                 request.getStartAt()
-        )) {
-            throw new BusinessException("已停用的廣告不可修改開始時間");
+        );
+
+        if (advertisement.getAdStatus() == AdvertisementStatus.INACTIVE
+                && startAtChanged) {
+
+            LocalDateTime now =
+                    LocalDateTime.now(ZoneId.of("Asia/Taipei"));
+
+            LocalDateTime originalStartAt =
+                    advertisement.getStartAt();
+
+            // 原本的開始時間已經到達，代表廣告曾經開始投放。
+            if (originalStartAt != null
+                    && !now.isBefore(originalStartAt)) {
+                throw new BusinessException(
+                        "已開始投放的廣告不可修改開始時間"
+                );
+            }
+
+            // 尚未開始的已取消排程廣告，可以重新安排未來時間。
+            validateDraftStartAtNotInPast(request.getStartAt());
         }
 
         advertisement.setAdName(request.getAdName());
@@ -158,17 +191,35 @@ public class AdvertisementService {
         return adRepo.save(advertisement);
     }
 
-    public Page<AdvertisementResponse> findAdByPage(Integer pageNumber, AdvertisementStatus adStatus){
+    public Page<AdvertisementResponse> findAdByPage(Integer pageNumber,
+                                                    AdvertisementStatus adStatus,
+                                                    AdvertisementDeliveryStatus deliveryStatus){
         Pageable page = PageRequest.of(pageNumber,5, Sort.Direction.DESC, "createdAt");
 
         Page<Advertisement> result;
 
-        if(adStatus == null){
-            result = adRepo.findAll(page);
-        }else{
-            result = adRepo.findByAdStatus(adStatus, page);
-        }
+        LocalDateTime now =
+                LocalDateTime.now(ZoneId.of("Asia/Taipei"));
 
+        if (deliveryStatus == AdvertisementDeliveryStatus.SCHEDULED) {
+            result = adRepo.findByAdStatusAndStartAtAfter(
+                    AdvertisementStatus.ACTIVE,
+                    now,
+                    page
+            );
+        } else if (deliveryStatus == AdvertisementDeliveryStatus.RUNNING) {
+            result =
+                    adRepo.findByAdStatusAndStartAtLessThanEqualAndEndAtAfter(
+                            AdvertisementStatus.ACTIVE,
+                            now,
+                            now,
+                            page
+                    );
+        } else if (adStatus != null) {
+            result = adRepo.findByAdStatus(adStatus, page);
+        } else {
+            result = adRepo.findAll(page);
+        }
 
         return result.map(this::toResponse);
     }
@@ -255,11 +306,6 @@ public class AdvertisementService {
             throw new BusinessException("上架前必須設定開始與結束時間");
         }
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Taipei"));
-
-
-        if (now.isBefore(ad.getStartAt())) {
-            throw new BusinessException("尚未到開始時間，請先編輯開始時間");
-        }
 
         if (!now.isBefore(ad.getEndAt())) {
             throw new BusinessException("廣告已超過結束時間");
