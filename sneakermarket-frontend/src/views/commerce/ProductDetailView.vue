@@ -29,6 +29,19 @@ const selectedVariant = computed(() => {
   return null
 })
 
+async function addToCart() {
+  try {
+    await httpClient.post('/cart/items', {
+      memberId: 1,
+      variantId: selectedVariant.value.variantId,
+      quantity: 1,
+    })
+    alert('已加入購物車')
+  } catch (error) {
+    alert('加入購物車失敗')
+  }
+}
+
 </script>
 <template>
   <section>
@@ -63,6 +76,8 @@ const selectedVariant = computed(() => {
         <p v-else class="text-secondary fst-italic">  
           請先選擇規格  
         </p>
+
+        <button :disabled="!selectedVariant || selectedVariant.stock === 0" @click="addToCart">加入購物車</button>
     </div>
   </section>
 </template>
