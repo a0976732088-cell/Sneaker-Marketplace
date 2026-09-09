@@ -13,12 +13,15 @@ main
 ```
 
 ### main
+
 只保留已整合、可展示的穩定版本。
 
 ### develop
+
 五個模組進行整合測試的共同分支。
 
-### feature/*
+### feature/\*
+
 各模組正式開發分支。開發前從最新 `develop` 建立或同步。
 
 ## 2. 開發流程
@@ -64,6 +67,7 @@ chore(frontend): update dependencies
 下列檔案較容易造成多人衝突，修改前應先通知：
 
 ### Frontend
+
 - `package.json`
 - `package-lock.json`
 - `vite.config.js`
@@ -71,12 +75,14 @@ chore(frontend): update dependencies
 - 共用 Layout / Navbar / 全域 CSS
 
 ### Backend
+
 - `pom.xml`
 - `application*.properties`
 - Security / CORS 共用設定
 - `common/**`
 
 ### Database / Docs
+
 - 共用資料表 Schema
 - API Contract
 - 資料表責任表
@@ -86,6 +92,7 @@ chore(frontend): update dependencies
 資料表正式進入多人開發後：
 
 - 不任意刪除、改名共用欄位。
-- 需新增 migration SQL。
-- 同步 Java Entity 與資料庫文件。
+- local 開發環境以 Hibernate Entity Mapping 與 ddl-auto=update 維護 Schema。
+- 新增或修改資料表結構時，必須同步 Java Entity 與資料庫文件。
 - 高風險變更（刪除／改名／型別／PK／FK）先由團隊確認。
+- 未來若改採 migration/validate 管理，再統一使用 migration SQL。
