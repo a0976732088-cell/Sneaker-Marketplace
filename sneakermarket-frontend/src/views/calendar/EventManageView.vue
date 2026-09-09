@@ -29,6 +29,13 @@
       >
         查詢通知
       </button>
+
+      <button
+        :class="['btn', activeTab === 'NotificationLog' ? 'btn-primary' : 'btn-outline-primary', 'ms-2']"
+        @click="activeTab = 'NotificationLog'"
+      >
+        通知發送紀錄
+      </button>
     </div>
 
     <!-- 1. 新增活動表單 -->
@@ -58,6 +65,9 @@
     <!-- 4. 通知管理與查詢區塊 -->
     <NotificationManager v-if="activeTab === 'NotificationManager'" />
 
+    <!-- 5. 通知管理與查詢區塊 -->
+    <NotificationLog v-if="activeTab === 'NotificationLog'" />
+
     <!-- 詳細資料彈窗 -->
     <EventDetailModal
       v-if="showDetailModal"
@@ -86,6 +96,7 @@ import EventDetailModal from "@/components/events/EventDetailModal.vue";
 import EventEditModal from "@/components/events/EventEditModal.vue";
 import NotificationManager from "@/components/notification/NotificationManager.vue";
 import NotificationCreateForm from "@/components/notification/NotificationCreateForm.vue";
+import NotificationLog from "@/components/notification/NotificationLog.vue";
 
 const activeTab = ref(localStorage.getItem("event_active_tab") || "search");
 

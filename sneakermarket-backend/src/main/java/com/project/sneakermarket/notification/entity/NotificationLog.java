@@ -36,4 +36,11 @@ public class NotificationLog {
 
     @Column(name = "event_id", nullable = false)
     private Long eventId; //[cite: 10]
+
+    @PrePersist
+    public void onCreate() {
+        if(this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+    }
 }
