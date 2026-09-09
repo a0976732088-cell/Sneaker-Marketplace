@@ -25,7 +25,7 @@
             class="event-image-container mb-4 overflow-hidden rounded-3 shadow-sm"
           >
             <img
-              :src="`/api/calendar/event/${event?.eventId}/photo?t=${timestamp}`"
+              :src="`http://localhost:8080/api/calendar/event/${event?.id || event?.eventId}/photo?t=${timestamp}`"
               class="img-fluid w-100 object-fit-cover"
               style="max-height: 350px"
               alt="Event Image"

@@ -3,6 +3,8 @@ package com.project.sneakermarket.notification.service;
 
 import com.project.sneakermarket.notification.dto.NotificationDTO;
 import com.project.sneakermarket.notification.entity.Notification;
+import com.project.sneakermarket.notification.entity.NotificationLog;
+import com.project.sneakermarket.notification.repository.NotificationLogRepository;
 import com.project.sneakermarket.notification.repository.NotificationRepository;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
@@ -25,6 +27,7 @@ import java.util.Optional;
 public class NotificationService {
 
     private final NotificationRepository notificationRepo;
+    private final NotificationLogRepository notificationLogRepo;
 
     public Notification createNotice(NotificationDTO dto) {
         Notification notice = new Notification();
@@ -119,13 +122,29 @@ public class NotificationService {
     // 發送通知邏輯
     @Transactional
     public void sendNotification(Long notificationId) {
+        // A. 撈取原通知
         Notification notification = notificationRepo.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("找不到該筆通知，ID: " + notificationId));
 
+        // B. 更新 Notification 發送狀態
         notification.setIsSent(true);
         notification.setSentAt(LocalDateTime.now());
-
         notificationRepo.save(notification);
+
+        // C. 新增 NotificationLog 紀錄
+        NotificationLog log = new NotificationLog();
+        log.setSendType("ALL"); // 發送對象暫定為所有人 (全體)
+        log.setTitle(notification.getTitle());
+        log.setTargetType(notification.getTargetType() != null ? notification.getTargetType() : "SYSTEM");
+
+        // 如果 targetId 為空，可給預設值 0L，避免 DB Not Null 限制
+        log.setEventId(notification.getTargetId() != null ? notification.getTargetId() : 0L);
+
+        // 假設發送人數暫時填 1 或 預設全體人數（待會員系統整合）
+        log.setTotalSent(1);
+
+        // 寫入 Log 資料庫
+        notificationLogRepo.save(log);
     }
 
     // 取得已發送通知

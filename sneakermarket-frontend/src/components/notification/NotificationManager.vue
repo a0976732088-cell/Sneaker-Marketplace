@@ -58,7 +58,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in notificationList" :key="item.notificationId">
+          <tr v-for="item in notificationLogList" :key="item.notificationId">
             <td>{{ item.notificationId }}</td>
             <td class="fw-bold text-dark">{{ item.title }}</td>
             <td>
@@ -78,7 +78,7 @@
               </div>
             </td>
           </tr>
-          <tr v-if="notificationList.length === 0">
+          <tr v-if="notificationLogList.length === 0">
             <td colspan="6" class="text-center py-4 text-muted">目前查無通知資料</td>
           </tr>
         </tbody>
@@ -136,7 +136,7 @@ const searchParams = ref({
 });
 const currentPage = ref(1);
 const totalPages = ref(1);
-const notificationList = ref([]);
+const notificationLogList = ref([]);
 
 // Modal 控制狀態
 const showDetailModal = ref(false);
@@ -175,7 +175,7 @@ const fetchNotifications = async (page = 1) => {
     }
 
     const res = await axios.get('/api/notification/notificationPage', { params });
-    notificationList.value = res.data.content || [];
+    notificationLogList.value = res.data.content || [];
     totalPages.value = res.data.totalPages || 1;
     currentPage.value = page;
   } catch (err) {
