@@ -1,10 +1,14 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import httpClient from '@/service/httpClient'
- 
+import { useRouter } from 'vue-router'
+
+
 const loading = ref(true)
 const errorMessage = ref('')
 const cartItems = ref([])
+const router = useRouter()
+
 const totalPrice = computed(() => {
   let total = 0
   for (const item of cartItems.value) {
@@ -64,7 +68,7 @@ async function deleteItem(item) {
     alert('刪除失敗')
   }
 }
- 
+
 function increaseQuantity(item) {
   if (item.quantity >= item.stock) return
   item.quantity++
@@ -79,7 +83,7 @@ function decreaseQuantity(item) {
   item.quantity--
   updateQuantity(item)
 }
- 
+
 onMounted(() => {
   fetchCart()
 })
@@ -144,7 +148,7 @@ onMounted(() => {
         <span>總計</span>
         <span class="fw-bold">NT$ {{ grandTotal }}</span>
       </div>
-      <button class="btn btn-dark w-100">結帳</button>
+      <button class="btn btn-dark w-100" :disabled="totalPrice===0" @click="router.push('/checkout')">結帳</button>
     </div>
   </div>
 </div>
