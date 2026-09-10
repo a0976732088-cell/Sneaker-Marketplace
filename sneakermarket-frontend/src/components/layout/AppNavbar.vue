@@ -117,17 +117,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
-
-/* ================================
-   Axios
-================================ */
-
-import axios from "axios";
-
-/* ================================
-   通知元件
-================================ */
-
+import httpClient from "@/service/httpClient";// 🎯 Import 彈窗元件
 import NotificationDrawer from "@/components/notification/NotificationDrawer.vue";
 
 /* ================================
@@ -215,7 +205,7 @@ const toggleNotice = () => {
 
 const fetchNotifications = async () => {
   try {
-    const res = await axios.get("/api/notification/noticeList");
+    const res = await httpClient.get("/notification/noticeList");
     // 加上 Array.isArray 檢查，防止被回傳的 404 HTML 弄壞陣列
     if (Array.isArray(res.data)) {
       notifications.value = res.data;
@@ -231,8 +221,8 @@ const fetchNotifications = async () => {
 const handleMarkAsRead = async (id) => {
   try {
     // 呼叫後端更新資料庫 is_read = 1 與 read_at
-    await axios.put(`/api/notification/read/${id}`);
-
+    await httpClient.put(`/notification/read/${id}`);
+    
     // 更新前端狀態（紅點數量會自動減少）
     const target = notifications.value.find((n) => n.notificationId === id);
 

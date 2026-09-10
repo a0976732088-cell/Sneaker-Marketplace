@@ -107,7 +107,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import axios from 'axios';
+import httpClient from '@/service/httpClient';
 
 const currentPage = ref(1);
 const totalPages = ref(1);
@@ -138,7 +138,7 @@ const fetchLogs = async (page = 1) => {
       params.sendType = searchParams.value.sendType.trim();
     }
 
-    const res = await axios.get('/api/notificationLog/searchlogs', { params });
+    const res = await httpClient.get('/notificationLog/searchlogs', { params });
     notificationLogList.value = res.data.content || [];
     totalPages.value = res.data.totalPages || 1;
     currentPage.value = page;

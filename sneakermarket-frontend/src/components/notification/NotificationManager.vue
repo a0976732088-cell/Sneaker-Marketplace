@@ -23,24 +23,37 @@
         <select v-model="searchParams.notificationType" class="form-select">
           <option value="">全部類型</option>
           <option value="EVENT_REMINDER">活動提醒 (EVENT_REMINDER)</option>
-          <option value="ORDER_CREATED">訂單通知 (ORDER_CREATED)</option>
-          <option value="SYSTEM_ANNOUNCEMENT">系統公告 (SYSTEM_ANNOUNCEMENT)</option>
+          <option value="SYSTEM_NOTICE">系統公告 (SYSTEM_NOTICE)</option>
+          <option value="ORDER_UPDATE">訂單更新 (ORDER_UPDATE)</option>
+          <option value="PROMOTION">促銷優惠 (PROMOTION)</option>
         </select>
       </div>
 
       <div class="col-md-3">
         <label class="form-label small text-muted">開始時間起</label>
-        <input v-model="searchParams.startDate" type="datetime-local" class="form-control" />
+        <input
+          v-model="searchParams.startDate"
+          type="datetime-local"
+          class="form-control"
+        />
       </div>
 
       <div class="col-md-3">
         <label class="form-label small text-muted">結束時間止</label>
-        <input v-model="searchParams.endDate" type="datetime-local" class="form-control" />
+        <input
+          v-model="searchParams.endDate"
+          type="datetime-local"
+          class="form-control"
+        />
       </div>
 
       <div class="col-12 text-end">
-        <button class="btn btn-outline-secondary me-2" @click="handleReset">重設</button>
-        <button class="btn btn-primary px-4" @click="fetchNotifications(1)">查詢</button>
+        <button class="btn btn-outline-secondary me-2" @click="handleReset">
+          重設
+        </button>
+        <button class="btn btn-primary px-4" @click="fetchNotifications(1)">
+          查詢
+        </button>
       </div>
     </div>
 
@@ -62,24 +75,50 @@
             <td>{{ item.notificationId }}</td>
             <td class="fw-bold text-dark">{{ item.title }}</td>
             <td>
-              <span class="badge bg-info text-dark">{{ item.notificationType }}</span>
+              <span class="badge bg-info text-dark">{{
+                item.notificationType
+              }}</span>
             </td>
             <td>
-              <span class="badge bg-secondary">{{ item.targetType || '通用' }}</span>
+              <span class="badge bg-secondary">{{
+                item.targetType || "通用"
+              }}</span>
             </td>
             <td>{{ formatDate(item.createdAt) }}</td>
             <td class="text-center">
               <div class="btn-group btn-group-sm">
                 <!-- 補回「查看」按鈕 -->
-                <button class="btn btn-outline-info" @click="openDetailModal(item)">查看</button>
-                <button class="btn btn-outline-primary" @click="openEditModal(item)">編輯</button>
-                <button class="btn btn-outline-success" @click="handleSendNotice(item)">發送</button>
-                <button class="btn btn-outline-danger" @click="handleDelete(item.notificationId)">刪除</button>
+                <button
+                  class="btn btn-outline-info"
+                  @click="openDetailModal(item)"
+                >
+                  查看
+                </button>
+                <button
+                  class="btn btn-outline-primary"
+                  @click="openEditModal(item)"
+                >
+                  編輯
+                </button>
+                <button
+                  class="btn btn-outline-success"
+                  @click="handleSendNotice(item)"
+                >
+                  發送
+                </button>
+                <button
+                  class="btn btn-outline-danger"
+                  @click="handleDelete(item.notificationId)"
+                >
+                  刪除
+                </button>
               </div>
             </td>
           </tr>
           <tr v-if="notificationLogList.length === 0">
-            <td colspan="6" class="text-center py-4 text-muted">目前查無通知資料</td>
+            <td colspan="6" class="text-center py-4 text-muted">
+              目前查無通知資料
+            </td>
           </tr>
         </tbody>
       </table>
@@ -89,17 +128,31 @@
     <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-3">
       <ul class="pagination">
         <li :class="['page-item', currentPage === 1 ? 'disabled' : '']">
-          <button class="page-link" @click="fetchNotifications(currentPage - 1)">上一頁</button>
+          <button
+            class="page-link"
+            @click="fetchNotifications(currentPage - 1)"
+          >
+            上一頁
+          </button>
         </li>
         <li
           v-for="page in totalPages"
           :key="page"
           :class="['page-item', currentPage === page ? 'active' : '']"
         >
-          <button class="page-link" @click="fetchNotifications(page)">{{ page }}</button>
+          <button class="page-link" @click="fetchNotifications(page)">
+            {{ page }}
+          </button>
         </li>
-        <li :class="['page-item', currentPage === totalPages ? 'disabled' : '']">
-          <button class="page-link" @click="fetchNotifications(currentPage + 1)">下一頁</button>
+        <li
+          :class="['page-item', currentPage === totalPages ? 'disabled' : '']"
+        >
+          <button
+            class="page-link"
+            @click="fetchNotifications(currentPage + 1)"
+          >
+            下一頁
+          </button>
         </li>
       </ul>
     </nav>
@@ -122,17 +175,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import axios from 'axios';
-import NotificationDetailModal from './NotificationDetailModal.vue';
-import NotificationEditModal from './NotificationEditModal.vue';
+import { ref, onMounted } from "vue";
+import httpClient from "@/service/httpClient";
+import NotificationDetailModal from "./NotificationDetailModal.vue";
+import NotificationEditModal from "./NotificationEditModal.vue";
 
 // 查詢條件與分頁狀態
 const searchParams = ref({
-  title: '',
-  notificationType: '',
-  startDate: '',
-  endDate: ''
+  title: "",
+  notificationType: "",
+  startDate: "",
+  endDate: "",
 });
 const currentPage = ref(1);
 const totalPages = ref(1);
@@ -150,7 +203,9 @@ onMounted(() => {
 // 時間格式處理 helper
 const formatToIsoDateTime = (dateTimeLocalStr) => {
   if (!dateTimeLocalStr) return null;
-  return dateTimeLocalStr.length === 16 ? `${dateTimeLocalStr}:00` : dateTimeLocalStr;
+  return dateTimeLocalStr.length === 16
+    ? `${dateTimeLocalStr}:00`
+    : dateTimeLocalStr;
 };
 
 // 撈取資料 API
@@ -158,7 +213,7 @@ const fetchNotifications = async (page = 1) => {
   try {
     const params = {
       pageNumber: page,
-      pageSize: 10
+      pageSize: 10,
     };
 
     if (searchParams.value.title?.trim()) {
@@ -174,18 +229,25 @@ const fetchNotifications = async (page = 1) => {
       params.endCreatedAt = formatToIsoDateTime(searchParams.value.endDate);
     }
 
-    const res = await axios.get('/api/notification/notificationPage', { params });
+    const res = await httpClient.get("/notification/notificationPage", {
+      params,
+    });
     notificationLogList.value = res.data.content || [];
     totalPages.value = res.data.totalPages || 1;
     currentPage.value = page;
   } catch (err) {
-    console.error('查詢失敗', err);
+    console.error("查詢失敗", err);
   }
 };
 
 // 重設查詢
 const handleReset = () => {
-  searchParams.value = { title: '', notificationType: '', startDate: '', endDate: '' };
+  searchParams.value = {
+    title: "",
+    notificationType: "",
+    startDate: "",
+    endDate: "",
+  };
   fetchNotifications(1);
 };
 
@@ -213,34 +275,34 @@ const handleSendNotice = async (item) => {
 
   try {
     // 改為呼叫發送通知 API
-    await axios.post(`/api/notification/send/${item.notificationId}`);
-    alert('發送推播成功！');
+    await httpClient.post(`/notification/send/${item.notificationId}`);
+    alert("發送推播成功！");
     fetchNotifications(currentPage.value);
   } catch (err) {
-    console.error('發送失敗', err);
-    alert('發送失敗，請稍後再試。');
+    console.error("發送失敗", err);
+    alert("發送失敗，請稍後再試。");
   }
 };
 
 // 點擊「刪除」按鈕
 const handleDelete = async (id) => {
-  if (!confirm('確定要刪除這筆通知紀錄嗎？')) return;
+  if (!confirm("確定要刪除這筆通知紀錄嗎？")) return;
 
   try {
-    await axios.delete('/api/notification/notificationDelete', {
-      params: { notificationId: id }
+    await httpClient.delete("/notification/notificationDelete", {
+      params: { notificationId: id },
     });
-    alert('刪除成功');
+    alert("刪除成功");
     fetchNotifications(currentPage.value);
   } catch (err) {
-    console.error('刪除失敗', err);
-    alert('刪除失敗');
+    console.error("刪除失敗", err);
+    alert("刪除失敗");
   }
 };
 
 // 時間格式化
 const formatDate = (dateStr) => {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleString('zh-TW', { hour12: false });
+  if (!dateStr) return "-";
+  return new Date(dateStr).toLocaleString("zh-TW", { hour12: false });
 };
 </script>
