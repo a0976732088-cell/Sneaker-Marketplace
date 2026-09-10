@@ -30,7 +30,7 @@ import com.project.sneakermarket.member.entity.Member;
  * finally 僅刪除此方法成功建立的專屬測試 DB，絕不 DROP 使用者 DB 或 table。
  */
 @SpringBootTest(properties = {
-        "auction.lifecycle.enabled=false",
+        "auction.lifecycle.enabled=false", "auction.order.enabled=false",
         "spring.jpa.hibernate.ddl-auto=update"
 })
 class AuctionHibernateSchemaTests {
@@ -97,6 +97,7 @@ class AuctionHibernateSchemaTests {
                     transaction.commit();
                 }
                 resultId = result.getResultId();
+                persistScalarOrder(factory, auctionId, winnerId);
                 assertNotNull(resultId);
                 assertEquals(winnerId, jdbc.queryForObject(
                         "SELECT winner_id FROM dbo.auction_results WHERE result_id = ?", Long.class, resultId));
@@ -124,10 +125,13 @@ class AuctionHibernateSchemaTests {
                         + " result_status = 'UNSOLD' WHERE result_id = ?", resultId);
             }
 
-            // 再次 update 不重建 table、不丟掉既有 Result，索引不重複。
+            // 再次 update 不重建 table、不丟掉既有 Result / Order，索引不重複。
             try (SessionFactory factory = updateSchema(isolated)) {
                 assertSchema(jdbc);
                 assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM dbo.auction_results", Integer.class));
+                assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM dbo.auction_orders", Integer.class));
+                assertEquals("收件快照", jdbc.queryForObject(
+                        "SELECT receiver_name FROM dbo.auction_orders WHERE order_number = 'AO-schema'", String.class));
                 try (var session = factory.openSession()) {
                     AuctionResult persisted = session.find(AuctionResult.class, resultId);
                     assertEquals(AuctionResultStatus.UNSOLD, persisted.getResultStatus());
@@ -146,6 +150,7 @@ class AuctionHibernateSchemaTests {
         Configuration configuration = new Configuration()
                 .addAnnotatedClass(Auction.class)
                 .addAnnotatedClass(AuctionResult.class)
+                .addAnnotatedClass(com.project.sneakermarket.auction.entity.AuctionOrder.class)
                 .addAnnotatedClass(Member.class);
         configuration.getProperties().put("hibernate.connection.datasource", isolated);
         configuration.setProperty("hibernate.hbm2ddl.auto", "update");
@@ -157,6 +162,7 @@ class AuctionHibernateSchemaTests {
     }
 
     private void assertSchema(JdbcTemplate jdbc) {
+        assertOrderSchema(jdbc);
         assertEquals(1, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID('dbo.auction_results')", Integer.class));
         assertEquals(1, jdbc.queryForObject("""
@@ -226,4 +232,127 @@ class AuctionHibernateSchemaTests {
                 WHERE object_id = OBJECT_ID('dbo.auction_results') AND name = 'winner_id'
                 """, Integer.class));
     }
-}
+
+    private void assertOrderSchema(JdbcTemplate jdbc) {
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID('dbo.auction_orders')", Integer.class));
+        assertEquals(List.of("auction_order_id"), jdbc.queryForList("""
+                SELECT c.name FROM sys.indexes i
+                JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+                JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                WHERE i.object_id = OBJECT_ID('dbo.auction_orders') AND i.is_primary_key = 1
+                  AND ic.key_ordinal > 0 ORDER BY ic.key_ordinal
+                """, String.class));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT is_identity FROM sys.columns
+                WHERE object_id = OBJECT_ID('dbo.auction_orders') AND name = 'auction_order_id'
+                """, Integer.class));
+        for (String column : List.of("auction_id", "order_number")) {
+            assertEquals(1, jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM sys.indexes i
+                    WHERE i.object_id = OBJECT_ID('dbo.auction_orders') AND i.is_unique = 1
+                      AND i.is_disabled = 0 AND i.has_filter = 0
+                      AND (SELECT COUNT(*) FROM sys.index_columns ic WHERE ic.object_id = i.object_id
+                           AND ic.index_id = i.index_id AND ic.key_ordinal > 0) = 1
+                      AND EXISTS (SELECT 1 FROM sys.index_columns ic JOIN sys.columns c
+                                  ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                                  WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id
+                                    AND ic.key_ordinal = 1 AND c.name = ?)
+                    """, Integer.class, column));
+        }
+        for (String[] fk : List.of(
+                new String[]{"FK_auction_orders_auctions", "auction_id", "auctions", "auction_id"},
+                new String[]{"FK_auction_orders_buyer", "buyer_id", "members", "member_id"},
+                new String[]{"FK_auction_orders_seller", "seller_id", "members", "member_id"})) {
+            assertEquals(1, jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM sys.foreign_keys fk
+                    JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
+                    JOIN sys.columns pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id
+                    JOIN sys.columns rc ON rc.object_id = fkc.referenced_object_id AND rc.column_id = fkc.referenced_column_id
+                    WHERE fk.parent_object_id = OBJECT_ID('dbo.auction_orders') AND fk.name = ?
+                      AND pc.name = ? AND OBJECT_NAME(fk.referenced_object_id) = ? AND rc.name = ?
+                      AND fk.is_disabled = 0 AND fk.is_not_trusted = 0
+                    """, Integer.class, (Object[]) fk));
+        }
+        for (String owner : List.of("buyer", "seller")) {
+            assertEquals(List.of(owner + "_id", "created_at"), jdbc.queryForList("""
+                    SELECT c.name FROM sys.indexes i
+                    JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+                    JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                    WHERE i.object_id = OBJECT_ID('dbo.auction_orders') AND i.name = ? AND i.is_disabled = 0
+                      AND ic.key_ordinal > 0 ORDER BY ic.key_ordinal
+                    """, String.class, "IX_auction_orders_" + owner + "_created_at"));
+        }
+        var states = java.util.Map.of(
+                "payment_status", List.of("PENDING", "PAID", "FAILED"),
+                "shipping_status", List.of("NOT_SHIPPED", "SHIPPED", "DELIVERED"),
+                "order_status", List.of("PENDING_PAYMENT", "PAID", "SHIPPED", "COMPLETED", "CANCELLED"));
+        states.forEach((column, values) -> {
+            String definition = jdbc.queryForObject("""
+                    SELECT definition FROM sys.check_constraints
+                    WHERE parent_object_id = OBJECT_ID('dbo.auction_orders') AND name = ?
+                      AND is_disabled = 0 AND is_not_trusted = 0
+                    """, String.class, "CK_auction_orders_" + column);
+            assertNotNull(definition);
+            assertTrue(definition.contains(column));
+            var actual = new java.util.HashSet<String>();
+            var matcher = java.util.regex.Pattern.compile("'([^']*)'").matcher(definition);
+            while (matcher.find()) actual.add(matcher.group(1));
+            assertEquals(new java.util.HashSet<>(values), actual);
+        });
+        var strings = java.util.Map.of(
+                "order_number", 40, "payment_method", 50,
+                "payment_status", 20, "shipping_status", 20, "order_status", 30,
+                "receiver_name", 50, "receiver_phone", 20, "shipping_address", 300);
+        strings.forEach((column, length) -> assertEquals("nvarchar:" + length * 2, jdbc.queryForObject("""
+                SELECT CONCAT(TYPE_NAME(user_type_id), ':', max_length) FROM sys.columns
+                WHERE object_id = OBJECT_ID('dbo.auction_orders') AND name = ?
+                """, String.class, column)));
+        for (String column : List.of("auction_order_id", "auction_id", "buyer_id", "seller_id")) {
+            assertEquals("bigint", jdbc.queryForObject("""
+                    SELECT TYPE_NAME(user_type_id) FROM sys.columns
+                    WHERE object_id = OBJECT_ID('dbo.auction_orders') AND name = ?
+                    """, String.class, column));
+        }
+        assertEquals("decimal:12:2", jdbc.queryForObject("""
+                SELECT CONCAT(TYPE_NAME(user_type_id), ':', precision, ':', scale) FROM sys.columns
+                WHERE object_id = OBJECT_ID('dbo.auction_orders') AND name = 'final_price'
+                """, String.class));
+        for (String column : List.of("created_at", "updated_at", "paid_at", "shipped_at", "completed_at")) {
+            assertEquals("datetime2:0", jdbc.queryForObject("""
+                    SELECT CONCAT(TYPE_NAME(user_type_id), ':', scale) FROM sys.columns
+                    WHERE object_id = OBJECT_ID('dbo.auction_orders') AND name = ?
+                    """, String.class, column));
+        }
+        assertEquals(List.of("completed_at", "paid_at", "shipped_at"), jdbc.queryForList("""
+                SELECT name FROM sys.columns
+                WHERE object_id = OBJECT_ID('dbo.auction_orders') AND is_nullable = 1 ORDER BY name
+                """, String.class));
+        assertEquals(18, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.auction_orders')
+                """, Integer.class));
+    }
+
+    private void persistScalarOrder(SessionFactory factory, long auctionId, long memberId) {
+        var order = new com.project.sneakermarket.auction.entity.AuctionOrder();
+        order.setOrderNumber("AO-schema");
+        order.setAuctionId(auctionId);
+        order.setBuyerId(memberId);
+        order.setSellerId(memberId);
+        order.setFinalPrice(new BigDecimal("5500.00"));
+        order.setPaymentMethod("轉帳");
+        order.setPaymentStatus(com.project.sneakermarket.auction.entity.AuctionPaymentStatus.PENDING);
+        order.setShippingStatus(com.project.sneakermarket.auction.entity.AuctionShippingStatus.NOT_SHIPPED);
+        order.setOrderStatus(com.project.sneakermarket.auction.entity.AuctionOrderStatus.PENDING_PAYMENT);
+        order.setReceiverName("收件快照");
+        order.setReceiverPhone("0900000000");
+        order.setShippingAddress("台北市測試地址");
+        order.setCreatedAt(LocalDateTime.of(2026, 9, 10, 12, 0));
+        order.setUpdatedAt(order.getCreatedAt());
+        try (var session = factory.openSession()) {
+            var transaction = session.beginTransaction();
+            session.persist(order);
+            transaction.commit();
+        }
+        assertNotNull(order.getAuctionOrderId());
+    }}
