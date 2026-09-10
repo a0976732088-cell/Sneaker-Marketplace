@@ -28,13 +28,27 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class AdvertisementService {
 
+    private static final String ADVERTISEMENT_IMAGE_URL_PREFIX =
+            "/uploads/advertisements/";
+
     private final AdvertisementRepository adRepo;
+
+    private void validateAdvertisementImageUrl(String imageUrl) {
+        if (imageUrl == null
+                || !imageUrl.startsWith(ADVERTISEMENT_IMAGE_URL_PREFIX)) {
+            throw new BusinessException(
+                    "廣告圖片必須使用本機上傳的圖片"
+            );
+        }
+    }
 
     public Advertisement insertAdvertisement(CreateAdvertisementRequest request) {
         Advertisement advertisement = new Advertisement();
 
         validateAdvertisementTime(request.getStartAt(), request.getEndAt());
         validateDraftStartAtNotInPast(request.getStartAt());
+        validateAdvertisementImageUrl(request.getImageUrl());
+
         advertisement.setCreatedBy(request.getCreatedBy());
         advertisement.setAdName(request.getAdName());
         advertisement.setImageUrl(request.getImageUrl());
@@ -142,6 +156,7 @@ public class AdvertisementService {
         ensureAdvertisementIsEditable(advertisement);
 
         validateAdvertisementTime(request.getStartAt(), request.getEndAt());
+        validateAdvertisementImageUrl(request.getImageUrl());
 
         if (advertisement.getAdStatus() ==AdvertisementStatus.DRAFT){
             validateDraftStartAtNotInPast(request.getStartAt());

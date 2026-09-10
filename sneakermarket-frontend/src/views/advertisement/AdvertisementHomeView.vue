@@ -6,6 +6,7 @@ import { zhTW } from "date-fns/locale";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { faTrash, faPencil } from "@fortawesome/free-solid-svg-icons";
 import { useAdvertisementManagement } from "./useAdvertisementManagement";
+import { resolveAdvertisementImageUrl } from "@/service/advertisementService";
 
 const {
   tabs,
@@ -14,6 +15,7 @@ const {
   placement,
   showCreate,
   toast,
+  toastType,
   loadingAds,
   loadError,
   currentPage,
@@ -24,8 +26,9 @@ const {
   lastItemNumber,
   filteredAds,
   form,
-  timeError,
   isEditing,
+  isUploadingImage,
+  handleImageUpload,
   minimumStartAt,
   isStartAtLocked,
   toggle,
@@ -195,7 +198,7 @@ onUnmounted(() => {
                         <img
                           v-if="ad.imageUrl && !ad.imageLoadFailed"
                           class="ad-thumbnail-image"
-                          :src="ad.imageUrl"
+                          :src="resolveAdvertisementImageUrl(ad.imageUrl)"
                           :alt="ad.name"
                           loading="lazy"
                           @error="ad.imageLoadFailed = true"
@@ -248,9 +251,7 @@ onUnmounted(() => {
                         {{ ad.adStatus === "ACTIVE" ? "Ⅱ" : "▶" }}
                       </button>
                       <button
-                        v-if="
-                          ['DRAFT', 'INACTIVE'].includes(ad.adStatus)
-                        "
+                        v-if="['DRAFT', 'INACTIVE'].includes(ad.adStatus)"
                         title="刪除"
                         @click="handleDeleteAdvertisement(ad)"
                       >
@@ -370,13 +371,43 @@ onUnmounted(() => {
               </select></label
             >
           </div>
-          <label
-            >圖片網址<input
-              v-model="form.imageUrl"
-              required
-              type="url"
-              placeholder="https://example.com/banner.jpg"
-          /></label>
+          <div class="image-upload-field">
+            <span class="image-upload-label">圖片上傳</span>
+
+            <input
+              id="advertisement-image-upload"
+              class="image-upload-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              :disabled="isUploadingImage"
+              @change="handleImageUpload"
+            />
+
+            <label
+              for="advertisement-image-upload"
+              class="image-upload-control"
+              :class="{
+                'is-uploading': isUploadingImage,
+                'is-uploaded': form.imageUrl && !isUploadingImage,
+              }"
+            >
+              <span class="image-upload-icon">
+                {{ isUploadingImage ? "…" : form.imageUrl ? "✓" : "↑" }}
+              </span>
+
+              <span class="image-upload-copy">
+                <strong>
+                  {{
+                    isUploadingImage
+                      ? "圖片上傳中"
+                      : form.imageUrl
+                        ? "圖片已上傳，可點擊更換"
+                        : "選擇廣告圖片"
+                  }}
+                </strong>
+              </span>
+            </label>
+          </div>
           <div class="form-grid">
             <label>
               導向類型
@@ -450,23 +481,47 @@ onUnmounted(() => {
               />
             </label>
           </div>
-          <p v-if="timeError" class="form-error" role="alert">
-            {{ timeError }}
-          </p>
         </div>
+
+        <Transition name="toast">
+          <div
+            v-if="toast"
+            class="form-notice"
+            :class="toastType"
+            role="status"
+          >
+            {{ toastType === "success" ? "✓" : "!" }} {{ toast }}
+          </div>
+        </Transition>
+
         <footer>
           <button type="button" @click="closeAdvertisementDrawer">取消</button>
-          <button class="submit">
-            {{ isEditing ? "儲存修改" : "建立草稿" }}
+          <button
+            class="submit"
+            type="submit"
+            :disabled="isUploadingImage || !form.imageUrl"
+          >
+            {{
+              isUploadingImage
+                ? "圖片上傳中…"
+                : isEditing
+                  ? "儲存修改"
+                  : "建立草稿"
+            }}
           </button>
         </footer>
       </form>
     </div>
-    <Transition name="toast"
-      ><div v-if="toast" class="admin-toast" role="status">
-        ✓ {{ toast }}
-      </div></Transition
-    >
+    <Transition name="toast">
+      <div
+        v-if="toast && !showCreate"
+        class="admin-toast"
+        :class="toastType"
+        role="status"
+      >
+        {{ toastType === "success" ? "✓" : "!" }} {{ toast }}
+      </div>
+    </Transition>
   </section>
 </template>
 

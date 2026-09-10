@@ -1,7 +1,7 @@
 /* 整個預覽頁 */
 .advertisement-preview {
   position: relative;
-  min-height: 600px;
+  /* min-height: 600px; 保留就是底下有一大空白*/
 }
 
 /* ==================== */

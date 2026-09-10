@@ -83,6 +83,11 @@ const routes = [
     component: () => import("@/views/admin/AdminHomeView.vue"),
   },
   {
+    path: "/ads/storefront",
+    name: "advertisement-storefront",
+    component: () => import("@/views/advertisement/StorefrontHomeView.vue"),
+  },
+  {
     path: "/ads/preview",
     name: "advertisement-preview",
     component: () =>

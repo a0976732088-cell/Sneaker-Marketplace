@@ -5,6 +5,7 @@ import {
   getAdvertisementsByPage,
   updateAdvertisement,
   updateAdvertisementStatus,
+  uploadAdvertisementImage,
 } from "@/service/advertisementService";
 
 export function useAdvertisementManagement() {
@@ -18,6 +19,9 @@ export function useAdvertisementManagement() {
   const isStartAtLocked = ref(false);
   const isEditing = computed(() => editingAdId.value !== null);
   const toast = ref("");
+  const toastType = ref("success");
+  let toastTimer = null;
+  const isUploadingImage = ref(false);
 
   const ads = ref([]);
   const loadingAds = ref(false);
@@ -142,8 +146,32 @@ export function useAdvertisementManagement() {
   function validateAdvertisementTime() {
     if (!timeError.value) return true;
 
-    notify(timeError.value);
+    notify(timeError.value, "error");
     return false;
+  }
+
+  async function handleImageUpload(event) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    isUploadingImage.value = true;
+
+    try {
+      const result = await uploadAdvertisementImage(file);
+
+      form.imageUrl = result.data;
+      notify("圖片上傳成功");
+    } catch (error) {
+      console.error("圖片上傳失敗", error);
+
+      notify(
+        error.response?.data?.message || "圖片上傳失敗，請確認圖片格式與大小",
+        "error",
+      );
+    } finally {
+      isUploadingImage.value = false;
+    }
   }
 
   function resetForm() {
@@ -163,14 +191,15 @@ export function useAdvertisementManagement() {
     });
   }
 
-  function notify(message) {
-    let timer = null;
+  function notify(message, type = "success") {
     toast.value = message;
+    toastType.value = type;
 
-    if (timer) clearTimeout(timer);
+    if (toastTimer !== null) clearTimeout(toastTimer);
 
-    timer = window.setTimeout(() => {
+    toastTimer = window.setTimeout(() => {
       toast.value = "";
+      toastTimer = null;
     }, 2400);
   }
 
@@ -206,6 +235,7 @@ export function useAdvertisementManagement() {
       notify(
         error.response?.data?.message ||
           `廣告${actionName}失敗，請確認後端與資料庫`,
+        "error",
       );
     }
   }
@@ -335,7 +365,7 @@ export function useAdvertisementManagement() {
       console.log("新增成功");
     } catch (error) {
       console.error("新增失敗");
-      notify(error.response?.data?.message || "請確認後端與資料庫");
+      notify(error.response?.data?.message || "請確認後端與資料庫", "error");
     }
   }
 
@@ -384,7 +414,6 @@ export function useAdvertisementManagement() {
       totalPages.value = pageData.totalPages;
       totalElements.value = pageData.totalElements;
       pageSize.value = pageData.size;
-
     } catch (error) {
       console.error("分頁查詢廣告失敗", error);
 
@@ -431,7 +460,7 @@ export function useAdvertisementManagement() {
       notify(result.message || "廣告刪除成功");
     } catch (error) {
       console.error("刪除廣告失敗", error);
-      notify("廣告刪除失敗，請確認後端與資料庫");
+      notify("廣告刪除失敗，請確認後端與資料庫", "error");
     }
   }
 
@@ -465,7 +494,10 @@ export function useAdvertisementManagement() {
       console.log("修改成功");
     } catch (error) {
       console.error("修改失敗", error);
-      notify(error.response?.data?.message || "廣告修改失敗，請確認輸入資料");
+      notify(
+        error.response?.data?.message || "廣告修改失敗，請確認輸入資料",
+        "error",
+      );
     }
   }
 
@@ -476,6 +508,7 @@ export function useAdvertisementManagement() {
     placement,
     showCreate,
     toast,
+    toastType,
     loadingAds,
     loadError,
     currentPage,
@@ -486,8 +519,9 @@ export function useAdvertisementManagement() {
     lastItemNumber,
     filteredAds,
     form,
-    timeError,
     isEditing,
+    isUploadingImage,
+    handleImageUpload,
     minimumStartAt,
     isStartAtLocked,
     toggle,

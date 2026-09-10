@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { getPublicActiveAdvertisements } from "@/service/advertisementService";
+import {
+  getPublicActiveAdvertisements,
+  resolveAdvertisementImageUrl,
+} from "@/service/advertisementService";
 
 const ads = ref([]);
 const loading = ref(false);
@@ -140,7 +143,10 @@ onUnmounted(() => {
     </div>
     <template v-else>
       <section v-if="currentBanner" class="banner-ad">
-        <img :src="currentBanner.imageUrl" :alt="currentBanner.adName" />
+        <img
+          :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
+          :alt="currentBanner.adName"
+        />
 
         <button
           v-if="bannerAds.length > 1"
@@ -183,7 +189,7 @@ onUnmounted(() => {
         </button>
 
         <img
-          :src="currentSmallBlock.imageUrl"
+          :src="resolveAdvertisementImageUrl(currentSmallBlock.imageUrl)"
           :alt="currentSmallBlock.adName"
         />
       </aside>
@@ -194,7 +200,10 @@ onUnmounted(() => {
             ×
           </button>
 
-          <img :src="currentPopup.imageUrl" :alt="currentPopup.adName" />
+          <img
+            :src="resolveAdvertisementImageUrl(currentPopup.imageUrl)"
+            :alt="currentPopup.adName"
+          />
         </article>
       </div>
     </template>

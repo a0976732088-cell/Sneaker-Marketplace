@@ -1,10 +1,18 @@
 import httpClient from "@/service/httpClient";
 
+export function resolveAdvertisementImageUrl(imageUrl) {
+  if (!imageUrl) return "";
+
+  const apiBaseUrl = httpClient.defaults.baseURL || "";
+  const backendBaseUrl = apiBaseUrl.replace(/\/api\/?$/, "");
+
+  return `${backendBaseUrl}${imageUrl}`;
+}
+
 export async function createAdvertisement(payload) {
   const response = await httpClient.post("/admin/ads/add", payload);
   return response.data;
 }
-
 
 export async function getPublicActiveAdvertisements() {
   const response = await httpClient.get("/admin/ads/findActive");
@@ -41,6 +49,16 @@ export async function updateAdvertisementStatus(adId, adStatus) {
   const response = await httpClient.put(`/admin/ads/put/${adId}/status`, {
     adStatus,
   });
+
+  return response.data;
+}
+
+export async function uploadAdvertisementImage(file) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await httpClient.post("/admin/ads/upload-image", formData);
 
   return response.data;
 }
