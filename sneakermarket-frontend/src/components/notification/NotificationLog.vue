@@ -109,6 +109,7 @@
 import { ref, onMounted } from 'vue';
 import httpClient from '@/service/httpClient';
 
+
 const currentPage = ref(1);
 const totalPages = ref(1);
 const notificationLogList = ref([]);
@@ -137,6 +138,7 @@ const fetchLogs = async (page = 1) => {
     if (searchParams.value.sendType?.trim()) {
       params.sendType = searchParams.value.sendType.trim();
     }
+
 
     const res = await httpClient.get('/notificationLog/searchlogs', { params });
     notificationLogList.value = res.data.content || [];

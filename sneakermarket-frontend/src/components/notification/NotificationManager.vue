@@ -116,9 +116,7 @@
             </td>
           </tr>
           <tr v-if="notificationLogList.length === 0">
-            <td colspan="6" class="text-center py-4 text-muted">
-              目前查無通知資料
-            </td>
+            <td colspan="6" class="text-center py-4 text-muted">目前查無通知資料</td>
           </tr>
         </tbody>
       </table>
@@ -228,6 +226,7 @@ const fetchNotifications = async (page = 1) => {
     if (searchParams.value.endDate) {
       params.endCreatedAt = formatToIsoDateTime(searchParams.value.endDate);
     }
+
 
     const res = await httpClient.get("/notification/notificationPage", {
       params,
