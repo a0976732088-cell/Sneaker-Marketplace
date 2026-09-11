@@ -1,10 +1,12 @@
 <template>
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
     <div class="container">
+      <!-- Logo -->
       <RouterLink class="navbar-brand fw-bold" to="/">
         SneakerMarket
       </RouterLink>
 
+      <!-- 手機版 Navbar 按鈕 -->
       <button
         class="navbar-toggler"
         type="button"
@@ -18,24 +20,31 @@
       </button>
 
       <div id="mainNavbar" class="collapse navbar-collapse">
+        <!-- ================================
+             左側 Navbar
+        ================================= -->
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <!-- 首頁 -->
           <li class="nav-item">
             <RouterLink class="nav-link" to="/"> 首頁 </RouterLink>
           </li>
 
+          <!-- 一般商城 -->
           <li class="nav-item">
             <RouterLink class="nav-link" to="/products"> 一般商城 </RouterLink>
           </li>
 
+          <!-- 競標商城 -->
           <li class="nav-item">
             <RouterLink class="nav-link" to="/auctions"> 競標商城 </RouterLink>
           </li>
 
+          <!-- 行事曆 -->
           <li class="nav-item">
             <RouterLink class="nav-link" to="/calendar"> 行事曆 </RouterLink>
           </li>
 
-          <!-- 🎯 點擊觸發彈窗開關 -->
+          <!-- 通知彈窗 -->
           <li class="nav-item">
             <button
               type="button"
@@ -43,6 +52,7 @@
               @click="toggleNotice"
             >
               通知
+
               <span
                 v-if="unreadCount > 0"
                 class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
@@ -53,21 +63,31 @@
           </li>
         </ul>
 
+        <!-- ================================
+             右側 Navbar
+        ================================= -->
         <ul class="navbar-nav ms-auto">
+          <!-- 購物車 -->
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/cart">購物車</RouterLink>
+            <RouterLink class="nav-link" to="/cart"> 購物車 </RouterLink>
           </li>
+
+          <!-- 會員中心 -->
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/member">會員中心</RouterLink>
+            <RouterLink class="nav-link" to="/member"> 會員中心 </RouterLink>
+          </li>
+
+          <!-- =================================
+               管理後台
+               只有 ROLE_ADMIN 才顯示
+          ================================== -->
+          <li v-if="isAdmin" class="nav-item">
+            <RouterLink class="nav-link" to="/admin"> 管理後台 </RouterLink>
           </li>
 
           <!--
-            只有目前位於競標商城相關頁面時顯示。
-
-            包含：
-            /auctions
-            /auctions/create
-            /auctions/{id}
+            只有目前位於競標商城相關頁面
+            才顯示建立競標
           -->
           <li v-if="isAuctionPage" class="nav-item">
             <RouterLink class="nav-link" to="/auctions/create">
@@ -75,6 +95,7 @@
             </RouterLink>
           </li>
 
+          <!-- 系統測試 -->
           <li class="nav-item">
             <RouterLink class="nav-link" to="/system-check">
               系統測試
@@ -85,7 +106,6 @@
     </div>
   </nav>
 
-  <!-- 🎯 引入獨立的通知彈窗元件 -->
   <NotificationDrawer
     :is-open="isNoticeOpen"
     :notifications="notifications"
@@ -95,13 +115,80 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, watch, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
-import axios from "axios";
-// 🎯 Import 彈窗元件
+import httpClient from "@/service/httpClient";// 🎯 Import 彈窗元件
 import NotificationDrawer from "@/components/notification/NotificationDrawer.vue";
 
+/* ================================
+   Session / 會員資料
+================================ */
+
+import { getCurrentMember } from "@/service/authService";
+
+/* =====================================================
+   Router
+===================================================== */
+
+const route = useRoute();
+
+/* =====================================================
+   目前登入會員
+===================================================== */
+
+const currentMember = ref(null);
+
+/* =====================================================
+   判斷是否為 Admin
+===================================================== */
+
+const isAdmin = computed(() => {
+  return currentMember.value?.role === "ROLE_ADMIN";
+});
+
+/* =====================================================
+   取得目前 Session 登入會員
+===================================================== */
+
+async function loadCurrentMember() {
+  try {
+    const member = await getCurrentMember();
+
+    currentMember.value = member;
+
+    console.log("Navbar 目前登入會員：", currentMember.value);
+
+    console.log("Navbar 目前角色：", currentMember.value?.role);
+
+    console.log("是否為 Admin：", isAdmin.value);
+  } catch (error) {
+    // 沒登入時
+    currentMember.value = null;
+
+    console.log("Navbar：目前沒有登入會員");
+  }
+}
+
+watch(
+  () => route.fullPath,
+
+  async () => {
+    await loadCurrentMember();
+  },
+
+  {
+    // 第一次開啟 Navbar
+    // 也立即執行
+    immediate: true,
+  },
+);
+
+const isAuctionPage = computed(() => {
+  return route.path.startsWith("/auctions");
+});
+
 const isNoticeOpen = ref(false);
+
 const notifications = ref([]);
 
 const unreadCount = computed(() => {
@@ -110,6 +197,7 @@ const unreadCount = computed(() => {
 
 const toggleNotice = () => {
   isNoticeOpen.value = !isNoticeOpen.value;
+
   if (isNoticeOpen.value) {
     fetchNotifications();
   }
@@ -117,7 +205,7 @@ const toggleNotice = () => {
 
 const fetchNotifications = async () => {
   try {
-    const res = await axios.get("/api/notification/noticeList");
+    const res = await httpClient.get("/notification/noticeList");
     // 加上 Array.isArray 檢查，防止被回傳的 404 HTML 弄壞陣列
     if (Array.isArray(res.data)) {
       notifications.value = res.data;
@@ -133,10 +221,11 @@ const fetchNotifications = async () => {
 const handleMarkAsRead = async (id) => {
   try {
     // 呼叫後端更新資料庫 is_read = 1 與 read_at
-    await axios.put(`/api/notification/read/${id}`);
+    await httpClient.put(`/notification/read/${id}`);
     
     // 更新前端狀態（紅點數量會自動減少）
     const target = notifications.value.find((n) => n.notificationId === id);
+
     if (target) {
       target.isRead = true;
     }
@@ -147,6 +236,10 @@ const handleMarkAsRead = async (id) => {
 
 let timer = null;
 onMounted(() => {
+  // Navbar 登入會員由 watch
+  // immediate: true 負責讀取
+
+  // 這裡保留原本通知初始化
   fetchNotifications();
   // 🎯 每 5 秒自動向後端拉取最新通知
   timer = setInterval(() => {
@@ -161,22 +254,5 @@ onUnmounted(() => {
   // 元件銷毀時清除定時器
   if (timer) clearInterval(timer);
   window.removeEventListener("focus", fetchNotifications);
-});
-
-// 取得目前所在的 Router 資訊
-const route = useRoute();
-
-/**
- * 判斷目前是否位於競標商城範圍。
- *
- * 例如：
- * /auctions
- * /auctions/create
- * /auctions/15
- *
- * 都會回傳 true。
- */
-const isAuctionPage = computed(() => {
-  return route.path.startsWith("/auctions");
 });
 </script>

@@ -19,12 +19,17 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.project.sneakermarket.auction.dto.AuctionCreateRequest;
 import com.project.sneakermarket.auction.dto.AuctionDetailResponse;
+import com.project.sneakermarket.auction.dto.AuctionOptionsResponse;
 import com.project.sneakermarket.auction.dto.AuctionSearchCriteria;
+import com.project.sneakermarket.auction.dto.AuctionStatusResponse;
 import com.project.sneakermarket.auction.dto.AuctionSummaryResponse;
+import com.project.sneakermarket.auction.dto.BidCreateRequest;
 import com.project.sneakermarket.auction.dto.BidHistoryResponse;
 import com.project.sneakermarket.auction.dto.PageData;
+import com.project.sneakermarket.auction.service.AuctionBidService;
 import com.project.sneakermarket.auction.service.AuctionCommandService;
 import com.project.sneakermarket.auction.service.AuctionQueryService;
+import com.project.sneakermarket.auction.service.AuctionReferenceService;
 import com.project.sneakermarket.auction.service.AuctionSessionMemberResolver;
 import com.project.sneakermarket.common.response.ApiResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -32,7 +37,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import com.project.sneakermarket.auction.dto.AuctionUpdateRequest;
 
-import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -53,17 +58,54 @@ public class AuctionController {
     // 處理建立、修改、取消等競標寫入操作
     private final AuctionCommandService auctionCommandService;
 
+    // 出價交易與悲觀鎖控制由專責 Service 處理
+    private final AuctionBidService auctionBidService;
+
     /*
-     * 【臨時開發整合層】
-     *
-     * 目前會員模組 Session 契約尚未完成，
-     * 因此先透過 AuctionSessionMemberResolver 取得 memberId。
-     *
-     * 未來會員模組合板後，
-     * Session Key / Session Value 型別只需修改 Resolver，
-     * Controller 不需要跟著修改。
+     * 所有競標寫入 API 共用正式 Session resolver。
+     * Resolver 只接受 Long memberId，並確認會員存在且尚未刪除；不提供 fallback。
      */
     private final AuctionSessionMemberResolver sessionMemberResolver;
+
+    // 只透過競標整合入口唯讀取得品牌、分類與會員有效性
+    private final AuctionReferenceService auctionReferenceService;
+
+    /**
+     * 查詢建立與編輯競標所需的品牌、分類選項。
+     *
+     * API：
+     * GET /api/auctions/options
+     *
+     * @return 由共用主資料唯讀組成的競標選項
+     */
+    @GetMapping("/options")
+    public ApiResponse<AuctionOptionsResponse> getAuctionOptions() {
+        return ApiResponse.ok(
+                "查詢競標選項成功",
+                auctionReferenceService.getOptions()
+        );
+    }
+
+    /**
+     * 驗證目前瀏覽器是否具有可用的會員 Session。
+     *
+     * API：
+     * GET /api/auctions/session
+     *
+     * 此端點不公開會員資料，只回報 Session 是否有效。
+     *
+     * @param httpRequest 目前瀏覽器的 HTTP request
+     * @return 驗證成功時 data 為 null
+     */
+    @GetMapping("/session")
+    public ApiResponse<Void> validateAuctionSession(HttpServletRequest httpRequest) {
+        sessionMemberResolver.resolveMemberId(httpRequest.getSession(false));
+
+        return ApiResponse.ok(
+                "競標會員 Session 有效",
+                null
+        );
+    }
 
     /**
      * 查詢競標列表。
@@ -116,7 +158,7 @@ public class AuctionController {
      *
      * @param request 建立競標資料
      * @param images 商品圖片
-     * @param session 目前瀏覽器的 HttpSession
+     * @param httpRequest 目前瀏覽器的 HTTP request
      * @return 新建立的 auctionId
      */
     @PostMapping
@@ -131,18 +173,14 @@ public class AuctionController {
             )
             List<MultipartFile> images,
 
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
 
         /*
-         * 正式設計：
          * sellerId 不接受前端傳入，
-         * 必須從目前登入會員的 Session 取得。
-         *
-         * 目前會員模組尚未合板時，
-         * Resolver 可依 local 設定暫時使用 fallback memberId。
+         * 必須從目前登入會員的有效 Session 取得。
          */
         Long sellerId =
-                sessionMemberResolver.resolveMemberId(session);
+                sessionMemberResolver.resolveMemberId(httpRequest.getSession(false));
 
         // 呼叫競標寫入 Service 建立商品、圖片與競標
         Long auctionId =
@@ -182,7 +220,7 @@ public class AuctionController {
      *
      * @param auctionId 要修改的競標 ID
      * @param request 修改資料
-     * @param session 目前瀏覽器的 HttpSession
+     * @param httpRequest 目前瀏覽器的 HTTP request
      * @return 修改結果
      */
     @PutMapping("/{auctionId}")
@@ -193,11 +231,11 @@ public class AuctionController {
             @RequestBody
             AuctionUpdateRequest request,
 
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
 
         // 從目前登入 Session 取得會員 ID
         Long sellerId =
-                sessionMemberResolver.resolveMemberId(session);
+                sessionMemberResolver.resolveMemberId(httpRequest.getSession(false));
 
         // 修改規則與 Transaction 統一由 Command Service 處理
         auctionCommandService.updateAuction(
@@ -237,6 +275,58 @@ public class AuctionController {
     }
 
     /**
+     * 對指定的進行中競標出價。
+     *
+     * bidderId 一律由目前登入 Session 取得，Request 不接受會員身分。
+     *
+     * @param auctionId 競標 ID
+     * @param request 出價金額
+     * @param httpRequest 目前瀏覽器的 HTTP request
+     * @return 出價成功後的最新競標狀態
+     */
+    @PostMapping("/{auctionId}/bids")
+    public ApiResponse<AuctionStatusResponse> placeBid(
+            @PathVariable Long auctionId,
+            @Valid @RequestBody BidCreateRequest request,
+            HttpServletRequest httpRequest) {
+
+        Long bidderId = sessionMemberResolver
+                .resolveMemberId(httpRequest.getSession(false));
+
+        AuctionStatusResponse response = auctionBidService.placeBid(
+                auctionId,
+                bidderId,
+                request
+        );
+
+        return ApiResponse.ok("出價成功", response);
+    }
+
+    /**
+     * 查詢指定競標的最新公開狀態。
+     *
+     * API：
+     * GET /api/auctions/{auctionId}/status
+     *
+     * 此端點供詳細頁定期同步使用，訪客也可以查詢。
+     *
+     * @param auctionId 競標 ID
+     * @return 競標最新公開狀態
+     */
+    @GetMapping("/{auctionId}/status")
+    public ApiResponse<AuctionStatusResponse> getAuctionStatus(
+            @PathVariable Long auctionId) {
+
+        AuctionStatusResponse response =
+                auctionQueryService.getAuctionStatus(auctionId);
+
+        return ApiResponse.ok(
+                "查詢競標最新狀態成功",
+                response
+        );
+    }
+
+    /**
      * 查詢指定競標的完整詳細資料。
      *
      * 訪客可以瀏覽。
@@ -244,13 +334,13 @@ public class AuctionController {
      * 但不公開 sellerId。
      *
      * @param auctionId 競標 ID
-     * @param session 目前瀏覽器 Session
+     * @param httpRequest 目前瀏覽器的 HTTP request
      * @return 競標詳細資料
      */
     @GetMapping("/{auctionId}")
     public ApiResponse<AuctionDetailResponse> getAuctionDetail(
             @PathVariable Long auctionId,
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
 
         /*
          * 詳細頁是公開 API，
@@ -261,7 +351,7 @@ public class AuctionController {
          */
         Long currentMemberId =
                 sessionMemberResolver
-                        .resolveMemberIdOrNull(session);
+                        .resolveMemberIdOrNull(httpRequest.getSession(false));
 
         // 呼叫 Service 組合競標、商品、圖片與擁有者資訊
         AuctionDetailResponse auction =
@@ -289,20 +379,20 @@ public class AuctionController {
      * 而是將競標狀態改為 CANCELLED。
      *
      * @param auctionId 要取消的競標 ID
-     * @param session 目前瀏覽器的 HttpSession
+     * @param httpRequest 目前瀏覽器的 HTTP request
      * @return 取消結果
      */
     @DeleteMapping("/{auctionId}")
     public ApiResponse<Void> cancelAuction(
             @PathVariable Long auctionId,
-            HttpSession session) {
+            HttpServletRequest httpRequest) {
 
         /*
          * sellerId 不接受前端指定，
          * 仍沿用建立競標時的 Session Resolver。
          */
         Long sellerId =
-                sessionMemberResolver.resolveMemberId(session);
+                sessionMemberResolver.resolveMemberId(httpRequest.getSession(false));
 
         // 商業規則與資料修改交由 Command Service
         auctionCommandService.cancelAuction(

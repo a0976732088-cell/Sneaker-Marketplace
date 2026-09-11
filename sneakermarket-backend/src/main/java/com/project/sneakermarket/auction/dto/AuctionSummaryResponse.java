@@ -46,7 +46,11 @@ public record AuctionSummaryResponse(
         LocalDateTime endAt,
 
         // 競標目前狀態
-        AuctionStatus status
+        AuctionStatus status,
+        Long brandId,
+        Long categoryId,
+        String brandName,
+        String categoryName
 
 ) {
 }

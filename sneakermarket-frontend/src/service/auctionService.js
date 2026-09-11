@@ -26,6 +26,19 @@ export function getAuctionDetail(auctionId) {
 }
 
 /**
+ * 查詢指定競標的最新公開狀態。
+ *
+ * API：
+ * GET /api/auctions/{auctionId}/status
+ *
+ * @param {number|string} auctionId 競標 ID
+ * @returns {Promise} API Response
+ */
+export function getAuctionStatus(auctionId) {
+  return httpClient.get(`/auctions/${auctionId}/status`);
+}
+
+/**
  * 查詢指定競標的公開出價紀錄。
  *
  * API：
@@ -36,6 +49,21 @@ export function getAuctionDetail(auctionId) {
  */
 export function getBidHistory(auctionId) {
   return httpClient.get(`/auctions/${auctionId}/bids`);
+}
+
+/**
+ * 對指定競標出價。
+ *
+ * bidderId 由後端 Session 取得，payload 只包含 bidAmount。
+ *
+ * @param {number|string} auctionId 競標 ID
+ * @param {{ bidAmount: string|number }} payload 出價金額
+ * @returns {Promise} API Response
+ */
+export function placeBid(auctionId, payload) {
+  return httpClient.post(`/auctions/${auctionId}/bids`, {
+    bidAmount: payload.bidAmount,
+  });
 }
 
 /**
@@ -99,3 +127,26 @@ export const updateAuction = (auctionId, request) => {
 export const cancelAuction = (auctionId) => {
   return httpClient.delete(`/auctions/${auctionId}`);
 };
+
+/** 選項由競標後端唯讀引用共用品牌／分類，沒有 Seed ID 假設。 */
+export function getAuctionOptions() {
+  return httpClient.get("/auctions/options");
+}
+
+/** 與競標寫入使用相同 baseURL 及 Cookie，不複製會員登入。 */
+export function requireAuctionSession() {
+  return httpClient.get("/auctions/session");
+}
+
+/** 僅供競標頁使用，不更動全站路由或共用 HTTP interceptor。 */
+export async function handleAuctionAccessError(error, router) {
+  if (error.response?.status === 401) {
+    await router.replace({ name: "login" });
+    return true;
+  }
+  if (error.response?.status === 403) {
+    await router.replace({ name: "forbidden" });
+    return true;
+  }
+  return false;
+}

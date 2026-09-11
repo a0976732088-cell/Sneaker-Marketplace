@@ -46,6 +46,9 @@ public class Member {
 	@Column(name="phone",nullable = false,  length = 20)
 	private String phone;
 	
+	@Column(name="address",nullable = true,  length = 255)
+	private String address;
+	
 	@Column(name="role",nullable = false,  length = 20)
 	private String role;
 	

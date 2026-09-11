@@ -10,6 +10,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import lombok.Getter;
@@ -24,7 +25,10 @@ import lombok.Setter;
  * 目前最高出價會員與出價次數等資訊。
  */
 @Entity
-@Table(name = "auctions")
+@Table(name = "auctions", indexes = {
+        @Index(name = "IX_auctions_status_start_at", columnList = "status, start_at"),
+        @Index(name = "IX_auctions_status_end_at", columnList = "status, end_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor

@@ -49,6 +49,7 @@ public class MemberService {
                 .name(request.getName())
                 .email(request.getEmail())
                 .phone(request.getPhone())
+                .address(request.getAddress())
                 .role("ROLE_MEMBER")
                 .build();
 
@@ -112,6 +113,9 @@ public class MemberService {
 
         if (request.getPhone() != null) {
             member.setPhone(request.getPhone());
+        }
+        if (request.getAddress() != null) {
+            member.setAddress(request.getAddress());
         }
 
         return MemberResponse.from(member);

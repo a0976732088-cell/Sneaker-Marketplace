@@ -1,5 +1,14 @@
 <template>
   <div class="container py-4">
+    <!-- 背景同步警告獨立於主要頁面狀態，保留已載入的詳細資料。 -->
+    <div
+      v-if="auction && statusSyncMessage"
+      class="alert alert-warning"
+      role="status"
+    >
+      {{ statusSyncMessage }}
+    </div>
+
     <!-- 資料載入中 -->
     <div v-if="loading">載入中...</div>
 
@@ -73,6 +82,7 @@
         <div v-else class="text-muted">目前沒有商品圖片。</div>
       </div>
 
+      <p>品牌：{{ auction.brandName ?? "品牌資料未提供" }} ／ 分類：{{ auction.categoryName ?? "分類資料未提供" }}</p>
       <!-- 商品資訊 -->
       <div class="card mb-4">
         <div class="card-header">商品資訊</div>
@@ -111,13 +121,13 @@
         <div class="card-header">競標資訊</div>
 
         <div class="card-body">
-          <p>起標價： NT$ {{ auction.startPrice }}</p>
+          <p>起標價：{{ formatTwd(auction.startPrice) }}</p>
 
-          <p>目前價格： NT$ {{ auction.currentPrice }}</p>
+          <p>目前價格：{{ formatTwd(auction.currentPrice) }}</p>
 
-          <p>最低加價： NT$ {{ auction.minIncrement }}</p>
+          <p>最低加價：{{ formatTwd(auction.minIncrement) }}</p>
 
-          <p>下一次最低出價： NT$ {{ auction.nextMinimumBid }}</p>
+          <p>下一次最低出價：{{ formatTwd(auction.nextMinimumBid) }}</p>
 
           <p>
             出價次數：
@@ -141,6 +151,78 @@
         </div>
       </div>
 
+      <!-- 出價操作 -->
+      <div class="card mb-4">
+        <div class="card-header">我要出價</div>
+
+        <div class="card-body">
+          <p class="mb-2">目前價格：<strong>{{ formatTwd(auction.currentPrice) }}</strong></p>
+
+          <p class="mb-2">最低加價：<strong>{{ formatTwd(auction.minIncrement) }}</strong></p>
+
+          <p class="mb-3">
+            目前最低可出價：
+            <strong>{{ formatTwd(auction.nextMinimumBid) }}</strong>
+          </p>
+
+          <div v-if="auction.isOwner" class="alert alert-secondary mb-0">
+            賣家不可對自己的競標出價。
+          </div>
+
+          <form v-else @submit.prevent="handlePlaceBid">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="!canPlaceBid || submittingBid || isCandidateAtMinimum"
+                aria-label="減少一個最低加價級距"
+                @click="decreaseCandidateBid"
+              >
+                −
+              </button>
+
+              <strong class="fs-4" aria-live="polite">
+                {{ formatTwd(candidateBid) }}
+              </strong>
+
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="!canPlaceBid || submittingBid"
+                aria-label="增加一個最低加價級距"
+                @click="increaseCandidateBid"
+              >
+                +
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              class="btn btn-success"
+              :disabled="!canPlaceBid || submittingBid"
+            >
+              {{
+                submittingBid
+                  ? "出價中..."
+                  : `確認出價 ${formatTwd(candidateBid)}`
+              }}
+            </button>
+
+            <div v-if="!canPlaceBid" class="text-muted mt-2">
+              {{ bidAvailabilityMessage }}
+            </div>
+
+            <div v-if="bidSuccessMessage" class="alert alert-success mt-3 mb-0">
+              {{ bidSuccessMessage }}
+            </div>
+
+            <div v-if="bidErrorMessage" class="alert alert-danger mt-3 mb-0">
+              {{ bidErrorMessage }}
+            </div>
+          </form>
+        </div>
+      </div>
+
       <!-- 交易資訊 -->
       <div class="card mb-4">
         <div class="card-header">交易資訊</div>
@@ -151,7 +233,7 @@
             {{ auction.shippingMethod }}
           </p>
 
-          <p>運費： NT$ {{ auction.shippingFee }}</p>
+          <p>運費：{{ formatTwd(auction.shippingFee) }}</p>
 
           <p>
             付款方式：
@@ -201,7 +283,7 @@
                     {{ bid.maskedBidder }}
                   </td>
 
-                  <td>NT$ {{ bid.bidAmount }}</td>
+                  <td>{{ formatTwd(bid.bidAmount) }}</td>
 
                   <td>
                     {{ formatDateTime(bid.createdAt) }}
@@ -217,17 +299,31 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { parseAuctionTime, formatAuctionTime } from "@/utils/auctionTime";
+import { formatTwd } from "@/utils/auctionMoney";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 import {
+  handleAuctionAccessError,
   cancelAuction,
   getAuctionDetail,
+  getAuctionStatus,
   getBidHistory,
+  placeBid,
 } from "@/service/auctionService";
+
+const STATUS_POLL_INTERVAL_MS = 12000;
+const TERMINAL_STATUSES = new Set([
+  "SOLD",
+  "UNSOLD",
+  "CANCELLED",
+  "REMOVED",
+]);
 
 // 取得目前路由資訊
 const route = useRoute();
+const router = useRouter();
 
 // 競標詳細資料
 const auction = ref(null);
@@ -243,6 +339,20 @@ const errorMessage = ref("");
 
 // 是否正在執行取消競標
 const cancelling = ref(false);
+
+// 出價表單狀態
+const candidateBid = ref(null);
+const submittingBid = ref(false);
+const bidSuccessMessage = ref("");
+const bidErrorMessage = ref("");
+
+// 背景狀態同步失敗不取代主要頁面錯誤。
+const statusSyncMessage = ref("");
+
+let statusPollingTimerId = null;
+let refreshingStatus = false;
+let bidHistorySyncPending = false;
+let viewUnmounted = false;
 
 /**
  * 讀取競標詳細資料與出價紀錄。
@@ -264,6 +374,9 @@ async function loadAuctionDetail() {
 
     auction.value = detailResponse.data.data;
     bids.value = bidsResponse.data.data;
+    candidateBid.value = Number(auction.value.nextMinimumBid);
+    statusSyncMessage.value = "";
+    bidHistorySyncPending = false;
   } catch (error) {
     console.error("取得競標詳細資料失敗：", error);
 
@@ -279,13 +392,133 @@ async function loadAuctionDetail() {
 }
 
 /**
+ * 避免較早發出的 polling Response 覆蓋剛完成出價後的新狀態。
+ */
+function isOlderStatus(latestStatus) {
+  if (
+    TERMINAL_STATUSES.has(auction.value?.status) &&
+    !TERMINAL_STATUSES.has(latestStatus.status)
+  ) {
+    return true;
+  }
+
+  const latestBidCount = Number(latestStatus.bidCount);
+  const currentBidCount = Number(auction.value?.bidCount);
+
+  if (
+    Number.isFinite(latestBidCount) &&
+    Number.isFinite(currentBidCount) &&
+    latestBidCount < currentBidCount
+  ) {
+    return true;
+  }
+
+  const latestUpdatedAt = parseAuctionTime(latestStatus.updatedAt).getTime();
+  const currentUpdatedAt = parseAuctionTime(auction.value?.updatedAt).getTime();
+
+  return (
+    Number.isFinite(latestUpdatedAt) &&
+    Number.isFinite(currentUpdatedAt) &&
+    latestUpdatedAt < currentUpdatedAt
+  );
+}
+
+/**
+ * 重新取得競標最新狀態；只有出價次數改變時才同步出價紀錄。
+ */
+async function refreshAuctionStatus() {
+  if (!auction.value || refreshingStatus || viewUnmounted) {
+    return;
+  }
+
+  refreshingStatus = true;
+
+  try {
+    const oldBidCount = auction.value.bidCount;
+    const response = await getAuctionStatus(auction.value.auctionId);
+
+    if (viewUnmounted) {
+      return;
+    }
+
+    const latestStatus = response.data.data;
+
+    if (isOlderStatus(latestStatus)) {
+      return;
+    }
+
+    const latestMinimumBid = Number(latestStatus.nextMinimumBid);
+    Object.assign(auction.value, latestStatus);
+
+    if (
+      Number.isFinite(latestMinimumBid) &&
+      (!Number.isFinite(candidateBid.value) ||
+        candidateBid.value < latestMinimumBid)
+    ) {
+      candidateBid.value = latestMinimumBid;
+    }
+
+    statusSyncMessage.value = "";
+
+    if (latestStatus.bidCount !== oldBidCount) {
+      bidHistorySyncPending = true;
+    }
+
+    if (bidHistorySyncPending) {
+      try {
+        const bidsResponse = await getBidHistory(auction.value.auctionId);
+
+        if (!viewUnmounted) {
+          bids.value = bidsResponse.data.data;
+          bidHistorySyncPending = false;
+          bidErrorMessage.value = "";
+        }
+      } catch (historyError) {
+        console.error("同步出價紀錄失敗：", historyError);
+        statusSyncMessage.value =
+          "最新競標狀態已更新，但出價紀錄暫時同步失敗，將自動重試。";
+      }
+    }
+
+    if (
+      TERMINAL_STATUSES.has(latestStatus.status) &&
+      !bidHistorySyncPending
+    ) {
+      stopStatusPolling();
+    }
+  } catch (error) {
+    console.error("同步競標最新狀態失敗：", error);
+    statusSyncMessage.value =
+      "最新競標狀態暫時同步失敗，將自動重試。";
+  } finally {
+    refreshingStatus = false;
+  }
+}
+
+function stopStatusPolling() {
+  if (statusPollingTimerId !== null) {
+    clearInterval(statusPollingTimerId);
+    statusPollingTimerId = null;
+  }
+}
+
+function startStatusPolling() {
+  stopStatusPolling();
+
+  statusPollingTimerId = setInterval(
+    refreshAuctionStatus,
+    STATUS_POLL_INTERVAL_MS,
+  );
+}
+
+/**
  * 判斷目前賣家是否仍可編輯／取消競標。
  *
  * 前端只負責顯示控制；
  * 最終權限與 bidCount 判斷仍由後端重新確認。
  */
 const canOwnerManageAuction = computed(() => {
-  if (!auction.value?.isOwner) {
+  if (!auction.value?.canManage || parseAuctionTime(auction.value.endAt) <= new Date()) {
     return false;
   }
 
@@ -299,6 +532,69 @@ const canOwnerManageAuction = computed(() => {
 });
 
 /**
+ * 前端只改善操作體驗，最終狀態、時間與價格仍由後端鎖定資料後判定。
+ */
+const canPlaceBid = computed(() => {
+  if (!auction.value || auction.value.isOwner) {
+    return false;
+  }
+
+  return (
+    auction.value.status === "ACTIVE" &&
+    parseAuctionTime(auction.value.startAt) <= new Date() &&
+    parseAuctionTime(auction.value.endAt) > new Date()
+  );
+});
+
+const bidAvailabilityMessage = computed(() => {
+  if (!auction.value) {
+    return "";
+  }
+
+  if (auction.value.status !== "ACTIVE") {
+    return "目前競標狀態不允許出價。";
+  }
+
+  if (parseAuctionTime(auction.value.startAt) > new Date()) {
+    return "競標尚未開始。";
+  }
+
+  if (parseAuctionTime(auction.value.endAt) <= new Date()) {
+    return "競標已截止。";
+  }
+
+  return "目前無法出價。";
+});
+
+const isCandidateAtMinimum = computed(() => {
+  if (!auction.value || !Number.isFinite(candidateBid.value)) {
+    return true;
+  }
+
+  return candidateBid.value <= Number(auction.value.nextMinimumBid);
+});
+
+function increaseCandidateBid() {
+  if (!auction.value || submittingBid.value) {
+    return;
+  }
+
+  candidateBid.value += Number(auction.value.minIncrement);
+}
+
+function decreaseCandidateBid() {
+  if (!auction.value || submittingBid.value || isCandidateAtMinimum.value) {
+    return;
+  }
+
+  const minimumBid = Number(auction.value.nextMinimumBid);
+  candidateBid.value = Math.max(
+    minimumBid,
+    candidateBid.value - Number(auction.value.minIncrement),
+  );
+}
+
+/**
  * 本人競標目前不能修改／取消時的提示。
  */
 const ownerManageMessage = computed(() => {
@@ -309,6 +605,8 @@ const ownerManageMessage = computed(() => {
   if (auction.value.bidCount > 0) {
     return "此競標已有出價紀錄，無法再修改或自行取消。";
   }
+
+  if (parseAuctionTime(auction.value.endAt) <= new Date()) return "此競標已到截止時間，無法修改或取消。";
 
   const statusMessageMap = {
     SOLD: "此競標已成交，無法再修改或取消。",
@@ -351,6 +649,7 @@ async function handleCancelAuction() {
      */
     await loadAuctionDetail();
   } catch (error) {
+    if (await handleAuctionAccessError(error, router)) return;
     console.error("取消競標失敗：", error);
 
     /*
@@ -361,6 +660,55 @@ async function handleCancelAuction() {
       error.response?.data?.message ?? "取消競標失敗，請稍後再試";
   } finally {
     cancelling.value = false;
+  }
+}
+
+/**
+ * 送出一筆出價，成功後套用後端最新狀態並重新取得出價紀錄。
+ */
+async function handlePlaceBid() {
+  if (!auction.value || !canPlaceBid.value || submittingBid.value) {
+    return;
+  }
+
+  bidSuccessMessage.value = "";
+  bidErrorMessage.value = "";
+
+  const submittedBid = candidateBid.value;
+
+  if (!Number.isFinite(submittedBid)) {
+    bidErrorMessage.value = "無法取得目前可出價金額，請重新整理頁面。";
+    return;
+  }
+
+  submittingBid.value = true;
+
+  try {
+    const response = await placeBid(auction.value.auctionId, {
+      bidAmount: submittedBid,
+    });
+
+    const latestStatus = response.data.data;
+    Object.assign(auction.value, latestStatus);
+    candidateBid.value = Number(latestStatus.nextMinimumBid);
+    bidSuccessMessage.value = `已成功出價 ${formatTwd(submittedBid)}`;
+
+    try {
+      const bidsResponse = await getBidHistory(auction.value.auctionId);
+      bids.value = bidsResponse.data.data;
+      bidHistorySyncPending = false;
+    } catch (historyError) {
+      console.error("重新取得出價紀錄失敗：", historyError);
+      bidHistorySyncPending = true;
+      bidErrorMessage.value = "出價已成功，但暫時無法更新出價紀錄。";
+    }
+  } catch (error) {
+    if (await handleAuctionAccessError(error, router)) return;
+    console.error("出價失敗：", error);
+    bidErrorMessage.value =
+      error.response?.data?.message ?? "出價失敗，請稍後再試";
+  } finally {
+    submittingBid.value = false;
   }
 }
 
@@ -397,19 +745,7 @@ function formatCondition(condition) {
 /**
  * 將時間轉成前端顯示格式。
  */
-function formatDateTime(dateTime) {
-  if (!dateTime) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(dateTime));
-}
+const formatDateTime = formatAuctionTime;
 
 /**
  * 將 Boolean 轉成較容易閱讀的中文。
@@ -418,9 +754,22 @@ function formatBoolean(value) {
   return value ? "是" : "否";
 }
 
-// 頁面載入後取得資料
-onMounted(() => {
-  loadAuctionDetail();
+// 頁面載入後先取得完整詳細資料，再開始同步最新狀態。
+onMounted(async () => {
+  await loadAuctionDetail();
+
+  if (
+    !viewUnmounted &&
+    auction.value &&
+    !TERMINAL_STATUSES.has(auction.value.status)
+  ) {
+    startStatusPolling();
+  }
+});
+
+onUnmounted(() => {
+  viewUnmounted = true;
+  stopStatusPolling();
 });
 
 /**

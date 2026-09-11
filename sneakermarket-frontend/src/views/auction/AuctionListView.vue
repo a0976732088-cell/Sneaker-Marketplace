@@ -52,6 +52,19 @@
         </div>
       </div>
 
+      <div class="col-md-2">
+        <select v-model="brandId" class="form-select" aria-label="品牌篩選">
+          <option value="">全部品牌</option>
+          <option v-for="brand in brands" :key="brand.id" :value="brand.id">{{ brand.name }}</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select v-model="categoryId" class="form-select" aria-label="分類篩選">
+          <option value="">全部分類</option>
+          <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+        </select>
+      </div>
+      <p v-if="optionsError" class="text-danger">{{ optionsError }}</p>
       <!-- 競標狀態 -->
       <div class="col-md-2">
         <select v-model="status" class="form-select">
@@ -95,7 +108,7 @@
             min="0"
             step="1"
             class="form-control"
-            placeholder="最低價格"
+            placeholder="最低價格（NT$）"
           />
         </div>
 
@@ -106,7 +119,7 @@
             min="0"
             step="1"
             class="form-control"
-            placeholder="最高價格"
+            placeholder="最高價格（NT$）"
           />
         </div>
 
@@ -153,6 +166,7 @@
             {{ auction.productName }}
           </h5>
 
+          <p class="card-text">品牌：{{ auction.brandName ?? "品牌資料未提供" }} ／ 分類：{{ auction.categoryName ?? "分類資料未提供" }}</p>
           <p class="card-text">型號：{{ auction.model }}</p>
 
           <p class="card-text">尺寸：{{ auction.size }}</p>
@@ -161,7 +175,7 @@
             商品狀況：{{ formatCondition(auction.condition) }}
           </p>
 
-          <p class="card-text">目前價格：NT$ {{ auction.currentPrice }}</p>
+          <p class="card-text">目前價格：{{ formatTwd(auction.currentPrice) }}</p>
 
           <p class="card-text">出價次數：{{ auction.bidCount }}</p>
 
@@ -223,11 +237,18 @@
 </template>
 
 <script setup>
+import { parseAuctionTime, formatAuctionTime } from "@/utils/auctionTime";
+import { formatTwd } from "@/utils/auctionMoney";
 import { onMounted, onUnmounted, ref } from "vue";
-import { getAuctions } from "@/service/auctionService";
+import { getAuctions, getAuctionOptions } from "@/service/auctionService";
 
 // 競標列表資料
 const auctions = ref([]);
+const brands = ref([]);
+const categories = ref([]);
+const brandId = ref("");
+const categoryId = ref("");
+const optionsError = ref("");
 
 // 搜尋關鍵字
 const keyword = ref("");
@@ -283,6 +304,8 @@ async function loadAuctions() {
   try {
     const response = await getAuctions({
       keyword: keyword.value.trim() || undefined,
+      brandId: brandId.value || undefined,
+      categoryId: categoryId.value || undefined,
       status: status.value || undefined,
       condition: condition.value || undefined,
       shoeSize: shoeSize.value || undefined,
@@ -342,19 +365,7 @@ function formatCondition(condition) {
 /**
  * 將後端時間轉成前端顯示格式。
  */
-function formatDateTime(dateTime) {
-  if (!dateTime) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("zh-TW", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(dateTime));
-}
+const formatDateTime = formatAuctionTime;
 
 /**
  * 計算競標剩餘時間。
@@ -369,7 +380,7 @@ function formatRemainingTime(auction) {
     return "-";
   }
 
-  const endTime = new Date(auction.endAt).getTime();
+  const endTime = parseAuctionTime(auction.endAt).getTime();
   const diff = endTime - currentTime.value;
 
   // 前端倒數歸零不代表後端已完成結標
@@ -409,6 +420,8 @@ async function searchAuctions() {
  */
 async function clearFilters() {
   keyword.value = "";
+  brandId.value = "";
+  categoryId.value = "";
   status.value = "";
   condition.value = "";
   shoeSize.value = "";
@@ -441,6 +454,12 @@ async function changePage(page) {
 // 頁面載入完成後自動取得競標列表
 onMounted(() => {
   loadAuctions();
+  getAuctionOptions().then((response) => {
+    brands.value = response.data.data.brands;
+    categories.value = response.data.data.categories;
+  }).catch(() => {
+    optionsError.value = "品牌與分類選項暫時無法載入，仍可使用其他搜尋條件。";
+  });
 
   // 每分鐘更新一次列表上的剩餘時間
   countdownTimer = setInterval(() => {

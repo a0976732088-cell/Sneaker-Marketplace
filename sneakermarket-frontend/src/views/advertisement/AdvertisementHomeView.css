@@ -518,22 +518,22 @@ tbody tr:hover {
   font-size: 8px;
   font-weight: 700;
 }
+.status-badge.已排程 {
+  color: #2563eb;
+  background: #eff6ff;
+}
+.status-badge.已取消排程,
+.status-badge.已暫停 {
+  color: #d97706;
+  background: #fff7ed;
+}
 .status-badge.進行中 {
   color: #168867;
   background: #e8f8f2;
 }
-.status-badge.已排程 {
-  color: #376fd2;
-  background: #edf4ff;
-}
 .status-badge.草稿 {
   color: #687386;
   background: #f0f2f5;
-}
-/* 已停用的廣告使用橘色，和草稿及進行中做出區分 */
-.status-badge.已停用 {
-  color: #b54708;
-  background: #fff4e5;
 }
 .status-badge.已結束 {
   color: #8d94a0;
@@ -892,6 +892,3 @@ td,
 .create-drawer h2 {
   font-size: 29px;
 }
-
-
-

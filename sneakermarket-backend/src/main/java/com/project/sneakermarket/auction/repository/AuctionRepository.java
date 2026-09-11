@@ -1,6 +1,8 @@
 package com.project.sneakermarket.auction.repository;
 
 import java.util.Optional;
+import java.util.List;
+import java.time.LocalDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -44,4 +46,15 @@ public interface AuctionRepository
     Optional<Auction> findByIdForUpdate(
             @Param("auctionId") Long auctionId
     );
+
+    /** 僅投影到期候選 ID；Service 取得 row lock 後仍須重新判斷。 */
+    @Query("""
+            select a.auctionId from Auction a
+            where (a.status = com.project.sneakermarket.auction.entity.AuctionStatus.SCHEDULED
+                   and a.startAt <= :now)
+               or (a.status = com.project.sneakermarket.auction.entity.AuctionStatus.ACTIVE
+                   and a.endAt <= :now)
+            order by a.auctionId
+            """)
+    List<Long> findLifecycleCandidateIds(@Param("now") LocalDateTime now);
 }

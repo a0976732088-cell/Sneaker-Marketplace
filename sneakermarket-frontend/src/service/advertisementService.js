@@ -5,8 +5,9 @@ export async function createAdvertisement(payload) {
   return response.data;
 }
 
-export async function getAllAdvertisements() {
-  const response = await httpClient.get("/admin/ads/findAll");
+
+export async function getPublicActiveAdvertisements() {
+  const response = await httpClient.get("/admin/ads/findActive");
   return response.data;
 }
 
@@ -20,19 +21,26 @@ export async function updateAdvertisement(adId, payload) {
   return response.data;
 }
 
-export async function getAdvertisementsByPage(pageNumber = 0, adStatus = null) {
+export async function getAdvertisementsByPage(
+  pageNumber = 0,
+  adStatus = null,
+  deliveryStatus = null,
+) {
   const response = await httpClient.get("/admin/ads/findPage", {
     // adStatus 沒有值時查詢全部；有值時由後端先篩選狀態，再進行分頁。
     params: {
       pageNumber,
       adStatus: adStatus || undefined,
+      deliveryStatus: deliveryStatus || undefined,
     },
   });
   return response.data;
 }
 
 export async function updateAdvertisementStatus(adId, adStatus) {
-  const response = await httpClient.put(`/admin/ads/put/${adId}/status`, {adStatus});
+  const response = await httpClient.put(`/admin/ads/put/${adId}/status`, {
+    adStatus,
+  });
 
   return response.data;
 }

@@ -41,6 +41,8 @@ public class AuctionCommandService {
     private final AuctionProductImageRepository auctionProductImageRepository;
     private final AuctionRepository auctionRepository;
     private final ImageStorageService imageStorageService;
+    private final AuctionReferenceService referenceService;
+    private final AuctionTime auctionTime;
 
     /**
      * 建立一場新的競標。
@@ -57,10 +59,11 @@ public class AuctionCommandService {
             List<MultipartFile> images) {
 
         validateSellerId(sellerId);
+        referenceService.validateProductReferences(request.brandId(), request.categoryId());
         validateAuctionTime(request);
         validateImages(images);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = auctionTime.now();
 
         /*
          * 紀錄本次已成功寫入檔案系統的圖片。
@@ -158,8 +161,6 @@ public class AuctionCommandService {
 
         validateSellerId(sellerId);
 
-        LocalDateTime now = LocalDateTime.now();
-
         /*
          * 編輯與未來的出價功能都鎖定同一筆 Auction。
          *
@@ -206,17 +207,24 @@ public class AuctionCommandService {
             );
         }
 
-        AuctionStatus currentStatus =
-                auction.getStatus();
+        LocalDateTime now = auctionTime.now();
+        if (!auction.getEndAt().isAfter(now)) {
+            throw new BusinessException("競標已到截止時間，無法修改");
+        }
+        AuctionStatus effectiveStatus = auction.getStatus();
+        // 排程尚未更新狀態時，開始時間仍是本次操作規則的最終依據。
+        if (effectiveStatus == AuctionStatus.SCHEDULED && !auction.getStartAt().isAfter(now)) {
+            effectiveStatus = AuctionStatus.ACTIVE;
+        }
 
         /*
          * 已經結束、取消或下架的競標
          * 不允許再修改。
          */
-        if (currentStatus == AuctionStatus.SOLD
-                || currentStatus == AuctionStatus.UNSOLD
-                || currentStatus == AuctionStatus.CANCELLED
-                || currentStatus == AuctionStatus.REMOVED) {
+        if (effectiveStatus == AuctionStatus.SOLD
+                || effectiveStatus == AuctionStatus.UNSOLD
+                || effectiveStatus == AuctionStatus.CANCELLED
+                || effectiveStatus == AuctionStatus.REMOVED) {
 
             throw new BusinessException(
                     "目前競標狀態不允許修改"
@@ -227,8 +235,8 @@ public class AuctionCommandService {
          * 目前功能 4 正式支援的編輯狀態
          * 只有 SCHEDULED 與 ACTIVE。
          */
-        if (currentStatus != AuctionStatus.SCHEDULED
-                && currentStatus != AuctionStatus.ACTIVE) {
+        if (effectiveStatus != AuctionStatus.SCHEDULED
+                && effectiveStatus != AuctionStatus.ACTIVE) {
 
             throw new BusinessException(
                     "目前競標狀態不允許修改"
@@ -239,7 +247,7 @@ public class AuctionCommandService {
          * ACTIVE 代表競標已經開始，
          * startAt 已經成為歷史事實，因此不可修改。
          */
-        if (currentStatus == AuctionStatus.ACTIVE
+        if (effectiveStatus == AuctionStatus.ACTIVE
                 && !auction.getStartAt()
                 .equals(request.startAt())) {
 
@@ -253,7 +261,7 @@ public class AuctionCommandService {
          * ACTIVE 時則一定沿用原本 startAt。
          */
         LocalDateTime effectiveStartAt =
-                currentStatus == AuctionStatus.SCHEDULED
+                effectiveStatus == AuctionStatus.SCHEDULED
                         ? request.startAt()
                         : auction.getStartAt();
 
@@ -285,7 +293,10 @@ public class AuctionCommandService {
          * 依目前定案規則保留原本 brand/category，
          * 其他商品資訊仍可修改。
          */
-        if (currentStatus == AuctionStatus.SCHEDULED) {
+        referenceService.validateProductReferences(
+                effectiveStatus == AuctionStatus.SCHEDULED ? request.brandId() : product.getBrandId(),
+                effectiveStatus == AuctionStatus.SCHEDULED ? request.categoryId() : product.getCategoryId());
+        if (effectiveStatus == AuctionStatus.SCHEDULED) {
             product.setBrandId(
                     request.brandId()
             );
@@ -377,7 +388,7 @@ public class AuctionCommandService {
          *
          * ACTIVE 則完全保留原本值。
          */
-        if (currentStatus == AuctionStatus.SCHEDULED) {
+        if (effectiveStatus == AuctionStatus.SCHEDULED) {
             auction.setStartAt(
                     request.startAt()
             );
@@ -388,21 +399,10 @@ public class AuctionCommandService {
         );
 
         /*
-         * 如果原本是 SCHEDULED，
-         * 但修改後 startAt 已經到達，
-         * 競標立即轉為 ACTIVE。
-         *
-         * 不允許 ACTIVE 反向變回 SCHEDULED。
+         * effectiveStatus 只供本次編輯的權限與欄位規則判斷。
+         * PUT 不負責持久化 SCHEDULED → ACTIVE；
+         * 正式生命週期轉換留給後續 Scheduler。
          */
-        if (currentStatus == AuctionStatus.SCHEDULED) {
-
-            AuctionStatus newStatus =
-                    request.startAt().isAfter(now)
-                            ? AuctionStatus.SCHEDULED
-                            : AuctionStatus.ACTIVE;
-
-            auction.setStatus(newStatus);
-        }
 
         auction.setUpdatedAt(now);
 
@@ -524,6 +524,14 @@ public class AuctionCommandService {
             );
         }
 
+        if (auction.getStatus() != AuctionStatus.SCHEDULED
+                && auction.getStatus() != AuctionStatus.ACTIVE) {
+            throw new BusinessException("目前競標狀態不允許取消");
+        }
+        if (!auction.getEndAt().isAfter(auctionTime.now())) {
+            throw new BusinessException("競標已到截止時間，無法取消");
+        }
+
         /*
          * 不實際 DELETE。
          *
@@ -535,7 +543,7 @@ public class AuctionCommandService {
         );
 
         auction.setUpdatedAt(
-                LocalDateTime.now()
+                auctionTime.now()
         );
 
         /*
@@ -717,12 +725,7 @@ public class AuctionCommandService {
      * 此處仍保留 Service 最後一道資料防線。
      */
     private void validateSellerId(Long sellerId) {
-
-        if (sellerId == null || sellerId <= 0) {
-            throw new BusinessException(
-                    "會員身分資料不正確"
-            );
-        }
+        referenceService.requireActiveMember(sellerId);
     }
 
     /**
@@ -744,7 +747,7 @@ public class AuctionCommandService {
          * 就已經過期的競標。
          */
         if (!request.endAt()
-                .isAfter(LocalDateTime.now())) {
+                .isAfter(auctionTime.now())) {
 
             throw new BusinessException(
                     "競標結束時間必須晚於目前時間"

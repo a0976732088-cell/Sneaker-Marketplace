@@ -102,7 +102,7 @@
 
 <script setup>
 import { ref, reactive } from "vue";
-import axios from "axios";
+import httpClient from "@/service/httpClient";
 
 const emit = defineEmits(["created"]);
 const loading = ref(false);
@@ -121,7 +121,7 @@ const form = reactive({ ...initialForm });
 const submitForm = async () => {
   loading.value = true;
   try {
-    await axios.post("/api/notification/createNotice", form);
+    await httpClient.post("/notification/createNotice", form);
     alert("新增通知成功！");
     resetForm();
     emit("created");
