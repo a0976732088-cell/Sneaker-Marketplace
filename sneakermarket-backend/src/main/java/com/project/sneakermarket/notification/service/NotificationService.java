@@ -1,6 +1,7 @@
 package com.project.sneakermarket.notification.service;
 
 
+import com.project.sneakermarket.notification.dto.MemberNotificationResponse;
 import com.project.sneakermarket.notification.dto.NotificationDTO;
 import com.project.sneakermarket.notification.entity.Notification;
 import com.project.sneakermarket.notification.entity.NotificationLog;
@@ -14,8 +15,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import com.project.sneakermarket.calendar.entity.CalendarEvent;
 
+import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -153,15 +158,160 @@ public class NotificationService {
     }
 
     @Transactional
-    public void markAsRead(Long notificationId) {
-        Notification notification = notificationRepo.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("找不到該筆通知，ID: " + notificationId));
+    public void markAsRead(
+            Long notificationId,
+            Long memberId
+    ) {
+        Notification notification = notificationRepo
+                .findByNotificationIdAndMemberId(
+                        notificationId,
+                        memberId
+                )
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "找不到通知"
+                ));
 
-        if (!notification.getIsRead()) {
+        if (!Boolean.TRUE.equals(notification.getIsRead())) {
             notification.setIsRead(true);
             notification.setReadAt(LocalDateTime.now());
-            notificationRepo.save(notification);
         }
+    }
+
+    @Transactional
+    public List<MemberNotificationResponse> getMemberNotifications(
+            Long memberId
+    ) {
+        return notificationRepo
+                .findByMemberIdAndIsSentTrueOrderByCreatedAtDesc(memberId)
+                .stream()
+                .map(MemberNotificationResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public void createEventTimeChangedNotifications(
+            CalendarEvent event,
+            LocalDateTime previousStartAt,
+            List<Long> followerMemberIds
+    ) {
+        if (followerMemberIds == null
+                || followerMemberIds.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        DateTimeFormatter formatter =
+                DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm");
+
+        String oldTime = previousStartAt.format(formatter);
+        String newTime = event.getStartAt().format(formatter);
+
+        List<Notification> notifications =
+                followerMemberIds.stream()
+                        .distinct()
+                        .map(memberId -> {
+                            Notification notification =
+                                    new Notification();
+
+                            notification.setMemberId(memberId);
+                            notification.setNotificationType(
+                                    "EVENT_TIME_CHANGED"
+                            );
+
+                            notification.setTitle(
+                                    "活動時間異動：" + event.getTitle()
+                            );
+
+                            notification.setContent(
+                                    "您關注的活動時間已從 "
+                                            + oldTime
+                                            + " 調整為 "
+                                            + newTime
+                                            + "。"
+                            );
+
+                            notification.setTargetType("EVENT");
+                            notification.setTargetId(
+                                    event.getEventId()
+                            );
+                            notification.setTargetUrl(
+                                    event.getTargetUrl()
+                            );
+
+                            notification.setIsRead(false);
+                            notification.setIsSent(true);
+                            notification.setSentAt(now);
+
+                            return notification;
+                        })
+                        .toList();
+
+        notificationRepo.saveAll(notifications);
+    }
+
+    @Transactional
+    public void createEventCancelledNotifications(
+            CalendarEvent event,
+            List<Long> followerMemberIds
+    ) {
+        if (followerMemberIds == null
+                || followerMemberIds.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        DateTimeFormatter formatter =
+                DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm");
+
+        String originalStartTime =
+                event.getStartAt().format(formatter);
+
+        List<Notification> notifications =
+                followerMemberIds.stream()
+                        .distinct()
+                        .map(memberId -> {
+                            Notification notification =
+                                    new Notification();
+
+                            notification.setMemberId(memberId);
+                            notification.setNotificationType(
+                                    "EVENT_CANCELLED"
+                            );
+
+                            notification.setTitle(
+                                    "活動已取消：" + event.getTitle()
+                            );
+
+                            notification.setContent(
+                                    "您關注的活動原訂於 "
+                                            + originalStartTime
+                                            + " 開始，目前已由管理員取消。"
+                            );
+
+                            /*
+                             * 取消後前台不再顯示活動，
+                             * 所以通知只保留 eventId，不提供跳轉。
+                             */
+                            notification.setTargetType(
+                                    "EVENT_CANCELLED"
+                            );
+                            notification.setTargetId(
+                                    event.getEventId()
+                            );
+                            notification.setTargetUrl(null);
+
+                            notification.setIsRead(false);
+                            notification.setIsSent(true);
+                            notification.setSentAt(now);
+
+                            return notification;
+                        })
+                        .toList();
+
+        notificationRepo.saveAll(notifications);
     }
 }
 

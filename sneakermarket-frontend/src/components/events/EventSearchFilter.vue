@@ -31,6 +31,7 @@
           <option value="ACTIVE">啟用</option>
           <option value="INACTIVE">停用</option>
           <option value="DRAFT">草稿</option>
+          <option value="CANCELLED">已取消</option>
         </select>
       </div>
 

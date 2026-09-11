@@ -46,11 +46,14 @@
               編輯
             </button>
             <button
+              v-if="event.status !== 'CANCELLED'"
               class="btn btn-sm btn-outline-danger"
               @click="$emit('delete', event.eventId)"
             >
-              刪除
+              取消活動
             </button>
+
+            <span v-else class="badge bg-danger"> 已取消 </span>
           </td>
         </tr>
 

@@ -1,9 +1,12 @@
 package com.project.sneakermarket.notification.controller;
 
 import com.project.sneakermarket.calendar.dto.CalendarEventDTO;
+import com.project.sneakermarket.notification.dto.MemberNotificationResponse;
 import com.project.sneakermarket.notification.dto.NotificationDTO;
 import com.project.sneakermarket.notification.entity.Notification;
 import com.project.sneakermarket.notification.service.NotificationService;
+import com.project.sneakermarket.notification.service.NotificationSessionMemberResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -19,6 +22,9 @@ public class NotificationController {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private NotificationSessionMemberResolver sessionMemberResolver;
 
     @PostMapping("/api/notification/createNotice")
     public ResponseEntity<Notification>  createNotice(@RequestBody NotificationDTO request){
@@ -86,19 +92,30 @@ public class NotificationController {
      * 前台： NotificationDrawer 撈取目前所有已發送通知
      */
     @GetMapping("/api/notification/noticeList")
-    public ResponseEntity<List<Notification>> getUserNotifications() {
-        // 撈出已發送的通知清單
-        List<Notification> list = notificationService.getSentNotifications();
-        return ResponseEntity.ok(list);
+    public ResponseEntity<List<MemberNotificationResponse>>
+    getUserNotifications(HttpServletRequest request) {
+
+        Long memberId =
+                sessionMemberResolver.requireMemberId(request);
+
+        return ResponseEntity.ok(
+                notificationService.getMemberNotifications(memberId)
+        );
     }
 
     @PutMapping("/api/notification/read/{id}")
-    public ResponseEntity<?> markAsRead(@PathVariable("id") Long notificationId) {
-        try {
-            notificationService.markAsRead(notificationId);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("標示已讀失敗：" + e.getMessage());
-        }
+    public ResponseEntity<Void> markAsRead(
+            @PathVariable("id") Long notificationId,
+            HttpServletRequest request
+    ) {
+        Long memberId =
+                sessionMemberResolver.requireMemberId(request);
+
+        notificationService.markAsRead(
+                notificationId,
+                memberId
+        );
+
+        return ResponseEntity.noContent().build();
     }
 }

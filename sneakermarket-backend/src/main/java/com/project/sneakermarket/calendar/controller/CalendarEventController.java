@@ -41,7 +41,7 @@ public class CalendarEventController {
 
     @DeleteMapping("/api/calendar/eventDelete")
     public ResponseEntity<?> deleteEvent(@RequestParam Long eventId){
-        calendarEventService.deleteEventById(eventId);
+        calendarEventService.cancelEventById(eventId);
         return ResponseEntity.status(HttpStatus.OK).build();
     }
 

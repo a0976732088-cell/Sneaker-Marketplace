@@ -244,7 +244,7 @@ onMounted(() => {
   // 🎯 每 5 秒自動向後端拉取最新通知
   timer = setInterval(() => {
     fetchNotifications();
-  }, 15000);
+  }, 60000);
 
   // 當使用者切回這個頁面時，立即重新整理通知
   window.addEventListener("focus", fetchNotifications);

@@ -2,13 +2,19 @@
 <template>
   <div class="calendar-dashboard-container">
     <!-- 頂部 Header & 導覽列 -->
-    <header class="dashboard-header d-flex justify-content-between align-items-center mb-4">
+    <header
+      class="dashboard-header d-flex justify-content-between align-items-center mb-4"
+    >
       <div>
         <h1 class="h3 fw-bold text-slate-800 mb-1">Morning, User! 👋</h1>
         <p class="text-muted small m-0">這是你本月的排程與活動總覽。</p>
       </div>
       <div class="d-flex align-items-center gap-3">
-        <button type="button" class="btn btn-primary rounded-pill px-4 fw-semibold shadow-sm" @click="goToManage">
+        <button
+          type="button"
+          class="btn btn-primary rounded-pill px-4 fw-semibold shadow-sm"
+          @click="goToManage"
+        >
           後臺管理
         </button>
       </div>
@@ -69,18 +75,39 @@
             @click="openDetailModal(evt)"
           >
             <!-- 頂部彩色條 -->
-            <div class="card-accent-bar" :style="{ backgroundColor: evt.color }"></div>
+            <div
+              class="card-accent-bar"
+              :style="{ backgroundColor: evt.color }"
+            ></div>
 
             <div class="card-content">
-              <div class="time-label">{{ evt.time || '全天' }}</div>
+              <div class="time-label">{{ evt.time || "全天" }}</div>
               <h3 class="event-title">{{ evt.title }}</h3>
-              <p v-if="evt.description" class="event-desc text-truncate">{{ evt.description }}</p>
+              <p v-if="evt.description" class="event-desc text-truncate">
+                {{ evt.description }}
+              </p>
 
               <!-- 底部按鈕/狀態 (選配) -->
-              <div class="card-footer-info" v-if="evt.targetUrl">
-                <a :href="evt.targetUrl" target="_blank" class="link-btn" @click.stop>
+              <div class="card-footer-info">
+                <a
+                  v-if="evt.targetUrl"
+                  :href="evt.targetUrl"
+                  target="_blank"
+                  class="link-btn"
+                  @click.stop
+                >
                   🔗 相關連結
                 </a>
+
+                <button
+                  type="button"
+                  class="follow-btn"
+                  :class="{ followed: isFollowed(evt.id) }"
+                  :disabled="followLoadingIds.has(evt.id)"
+                  @click.stop="toggleFollow(evt)"
+                >
+                  {{ isFollowed(evt.id) ? "✓ 已關注" : "☆ 關注" }}
+                </button>
               </div>
             </div>
           </div>
@@ -99,7 +126,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";
 
@@ -107,6 +134,11 @@ import CalendarHeader from "@/components/calendar/CalendarHeader.vue";
 import CalendarMonthView from "@/components/calendar/CalendarMonthView.vue";
 import CalendarListView from "@/components/calendar/CalendarListView.vue";
 import EventDetailModal from "@/components/events/EventDetailModal.vue";
+import {
+  getMyEventFollows,
+  followEvent,
+  unfollowEvent,
+} from "@/api/calendar";
 
 const router = useRouter();
 const goToManage = () => router.push("/calendar/eventManage");
@@ -120,10 +152,10 @@ const loading = ref(false);
 
 const eventTypeColorMap = {
   RELEASE: "#4f46e5", // Indigo 靛藍
-  SALE: "#f59e0b",    // Amber 琥珀橘
-  EVENT: "#10b981",   // Emerald 翡翠綠
-  NOTICE: "#ef4444",  // Rose 珊瑚紅
-  OTHER: "#64748b",   // Slate 沉穩灰
+  SALE: "#f59e0b", // Amber 琥珀橘
+  EVENT: "#10b981", // Emerald 翡翠綠
+  NOTICE: "#ef4444", // Rose 珊瑚紅
+  OTHER: "#64748b", // Slate 沉穩灰
 };
 
 const currentYear = computed(() => currentDate.value.getFullYear());
@@ -166,21 +198,31 @@ const formatTimeStr = (dateStr) => {
 
 const fetchMonthEvents = async () => {
   loading.value = true;
-  const lastDay = new Date(currentYear.value, currentMonth.value + 1, 0).getDate();
+  const lastDay = new Date(
+    currentYear.value,
+    currentMonth.value + 1,
+    0,
+  ).getDate();
   const startAt = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, "0")}-01T00:00:00`;
   const endAt = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}T23:59:59`;
 
   try {
-    const response = await axios.get("http://localhost:8080/api/calendar/eventPage", {
-      params: { startAt, endAt, pageNumber: 1, pageSize: 100 },
-    });
-    const rawData = response.data.content || response.data.data || response.data || [];
+    const response = await axios.get(
+      "http://localhost:8080/api/calendar/eventPage",
+      {
+        params: { startAt, endAt, pageNumber: 1, pageSize: 100 },
+      },
+    );
+    const rawData =
+      response.data.content || response.data.data || response.data || [];
 
     events.value = rawData
-      .filter((item) => item.status !== "INACTIVE" && item.status !== "DRAFT")
+      .filter((item) => item.status !== "INACTIVE" && item.status !== "DRAFT" && item.status !== "CANCELLED")
       .map((item) => {
         const rawStartAt = item.startAt || "";
-        const datePart = rawStartAt ? rawStartAt.replace(" ", "T").split("T")[0] : "";
+        const datePart = rawStartAt
+          ? rawStartAt.replace(" ", "T").split("T")[0]
+          : "";
         const startTime = item?.startAt ? formatTimeStr(item.startAt) : "";
         const endTime = item?.endAt ? formatTimeStr(item.endAt) : "";
 
@@ -219,6 +261,69 @@ const closeDetailModal = () => {
   showDetailModal.value = false;
   selectedModalEvent.value = null;
 };
+
+const followedEventIds = ref(new Set());
+const followLoadingIds = ref(new Set());
+
+const isFollowed = (eventId) => {
+  return followedEventIds.value.has(eventId);
+};
+
+const loadMyFollows = async () => {
+  try {
+    const response = await getMyEventFollows();
+
+    followedEventIds.value = new Set(
+      response.data.map((follow) => follow.eventId)
+    );
+  } catch (error) {
+    if (error.response?.status === 401) {
+      followedEventIds.value = new Set();
+      return;
+    }
+
+    console.error("讀取活動關注資料失敗", error);
+  }
+};
+
+const toggleFollow = async (event) => {
+  const loadingIds = new Set(followLoadingIds.value);
+  loadingIds.add(event.id);
+  followLoadingIds.value = loadingIds;
+
+  try {
+    const nextIds = new Set(followedEventIds.value);
+
+    if (nextIds.has(event.id)) {
+      await unfollowEvent(event.id);
+      nextIds.delete(event.id);
+    } else {
+      await followEvent(event.id, 60);
+      nextIds.add(event.id);
+    }
+
+    followedEventIds.value = nextIds;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      await router.push({
+        path: "/login",
+        query: { redirect: "/calendar" },
+      });
+
+      return;
+    }
+
+    console.error("更新關注狀態失敗", error);
+  } finally {
+    const loadingIds = new Set(followLoadingIds.value);
+    loadingIds.delete(event.id);
+    followLoadingIds.value = loadingIds;
+  }
+
+  onMounted(() => {
+  loadMyFollows();
+});
+};
 </script>
 
 <style scoped>
@@ -226,10 +331,14 @@ const closeDetailModal = () => {
   max-width: 1280px;
   margin: 0 auto;
   padding: 24px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
 }
 
-.text-slate-800 { color: #1e293b; }
+.text-slate-800 {
+  color: #1e293b;
+}
 
 /* 左右雙欄 Grid Layout */
 .dashboard-grid {
@@ -345,5 +454,7 @@ const closeDetailModal = () => {
   text-decoration: none;
   font-weight: 500;
 }
-.link-btn:hover { text-decoration: underline; }
+.link-btn:hover {
+  text-decoration: underline;
+}
 </style>

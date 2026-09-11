@@ -40,3 +40,23 @@ export const mapEventData = (rawData = []) => {
     };
   });
 };
+
+export const getMyEventFollows = () => {
+  return httpClient.get("/calendar/events/follows/me");
+};
+
+export const followEvent = (
+  eventId,
+  remindBeforeMinutes = 60
+) => {
+  return httpClient.put(
+    `/calendar/events/${eventId}/follow`,
+    { remindBeforeMinutes }
+  );
+};
+
+export const unfollowEvent = (eventId) => {
+  return httpClient.delete(
+    `/calendar/events/${eventId}/follow`
+  );
+};

@@ -53,6 +53,8 @@
                   <option value="ACTIVE">啟用</option>
                   <option value="INACTIVE">停用</option>
                   <option value="DRAFT">草稿</option>
+                  <option value="CANCELLED">取消</option>
+
                 </select>
               </div>
             </div>
@@ -227,10 +229,31 @@ const closeModal = () => {
 };
 
 const submitUpdate = async () => {
+  const isChangingToCancelled =
+    props.event.status !== "CANCELLED" &&
+    editForm.status === "CANCELLED";
+
+  if (isChangingToCancelled) {
+    const confirmed = confirm(
+      "確定要取消這個活動嗎？\n取消後將通知目前的關注會員。"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+  }
+
   loading.value = true;
+
   try {
     await updateEvent(editForm.eventId, editForm);
-    alert("更新成功！");
+
+    alert(
+      isChangingToCancelled
+        ? "活動已取消，關注會員將收到通知。"
+        : "更新成功！"
+    );
+
     emit("success");
     closeModal();
   } catch (error) {

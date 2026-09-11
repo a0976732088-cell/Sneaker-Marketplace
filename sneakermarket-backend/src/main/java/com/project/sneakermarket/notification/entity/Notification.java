@@ -1,5 +1,6 @@
 package com.project.sneakermarket.notification.entity;
 
+import com.project.sneakermarket.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
@@ -17,11 +18,10 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "notification_id", nullable = false)
     private Long notificationId;
-//
+
 //      建立與 Member 的 FK 關聯
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "member_id", nullable = false)
-//    private Long memberId;
+@Column(name = "member_id")
+private Long memberId;
 
     @Column(name = "notification_type", nullable = false, length = 40)
     private String notificationType;

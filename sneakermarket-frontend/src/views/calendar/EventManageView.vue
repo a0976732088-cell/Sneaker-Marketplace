@@ -163,24 +163,23 @@ const openEditModal = (event) => {
 };
 
 const handleDelete = async (eventId) => {
-  if (!confirm(`確定要刪除 ID: ${eventId} 的活動嗎？`)) return;
+  const confirmed = confirm(
+    `確定要取消 ID: ${eventId} 的活動嗎？\n取消後將通知目前的關注會員。`
+  );
+
+  if (!confirmed) {
+    return;
+  }
 
   try {
     await deleteEvent(eventId);
-    alert("刪除成功！");
+
+    alert("活動已取消，關注會員將收到通知。");
+
     fetchEvents(currentPage.value);
   } catch (error) {
-    console.error("刪除失敗", error);
-    alert("刪除失敗！");
+    console.error("取消活動失敗", error);
+    alert("取消活動失敗！");
   }
 };
-
-watch(
-  activeTab,
-  (newTab) => {
-    localStorage.setItem("event_active_tab", newTab);
-    if (newTab === "search") fetchEvents(1);
-  },
-  { immediate: true }
-);
 </script>

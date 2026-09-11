@@ -11,7 +11,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
+import com.project.sneakermarket.calendar.entity.EventFollow;
+import com.project.sneakermarket.calendar.repository.EventFollowRepository;
+import com.project.sneakermarket.notification.service.NotificationService;
 
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+
+import java.util.Objects;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +30,8 @@ import java.util.Optional;
 public class CalendarEventService {
 
     private final CalendarEventRepository calendarEventRepo;
-
+    private final EventFollowRepository eventFollowRepository;
+    private final NotificationService notificationService;
 
     public CalendarEvent createEvent(CalendarEventDTO dto) {
         CalendarEvent event = new CalendarEvent();
@@ -42,30 +51,131 @@ public class CalendarEventService {
         return calendarEventRepo.save(event);
     }
 
-    public void updateEventById(Long eventId, CalendarEventDTO dto) {
-        Optional<CalendarEvent> op = calendarEventRepo.findById(eventId);
+    @Transactional
+    public void updateEventById(
+            Long eventId,
+            CalendarEventDTO dto
+    ) {
+        CalendarEvent calendarEvent =
+                calendarEventRepo.findById(eventId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "找不到活動"
+                                )
+                        );
 
-        if(op.isPresent()) {
-            CalendarEvent calendarEvent = op.get();
-            calendarEvent.setBrandId(dto.getBrandId());
-            calendarEvent.setCreatedBy(dto.getCreatedBy());
-            calendarEvent.setEventType(dto.getEventType());
-            calendarEvent.setTitle(dto.getTitle());
-            calendarEvent.setDescription(dto.getDescription());
-            calendarEvent.setStartAt(dto.getStartAt());
-            calendarEvent.setEndAt(dto.getEndAt());
-            calendarEvent.setTargetUrl(dto.getTargetUrl());
-            calendarEvent.setSourceType(dto.getSourceType());
-            calendarEvent.setSourceId(dto.getSourceId());
-            calendarEvent.setStatus(dto.getStatus());
-            calendarEvent.setPhoto(dto.getPhoto());
+        LocalDateTime previousStartAt =
+                calendarEvent.getStartAt();
 
-            calendarEventRepo.save(calendarEvent);
+        String previousStatus =
+                calendarEvent.getStatus();
+
+        calendarEvent.setBrandId(dto.getBrandId());
+        calendarEvent.setCreatedBy(dto.getCreatedBy());
+        calendarEvent.setEventType(dto.getEventType());
+        calendarEvent.setTitle(dto.getTitle());
+        calendarEvent.setDescription(dto.getDescription());
+        calendarEvent.setStartAt(dto.getStartAt());
+        calendarEvent.setEndAt(dto.getEndAt());
+        calendarEvent.setTargetUrl(dto.getTargetUrl());
+        calendarEvent.setSourceType(dto.getSourceType());
+        calendarEvent.setSourceId(dto.getSourceId());
+        calendarEvent.setStatus(dto.getStatus());
+        calendarEvent.setPhoto(dto.getPhoto());
+
+        boolean startTimeChanged =
+                !Objects.equals(
+                        previousStartAt,
+                        calendarEvent.getStartAt()
+                );
+
+        boolean becameCancelled =
+                !"CANCELLED".equals(previousStatus)
+                        && "CANCELLED".equals(
+                        calendarEvent.getStatus()
+                );
+
+        boolean canNotifyTimeChange =
+                !"DRAFT".equals(calendarEvent.getStatus())
+                        && !"INACTIVE".equals(calendarEvent.getStatus())
+                        && !"CANCELLED".equals(calendarEvent.getStatus());
+
+        calendarEventRepo.save(calendarEvent);
+
+        if (becameCancelled) {
+            List<Long> followerMemberIds =
+                    eventFollowRepository
+                            .findByEventId(eventId)
+                            .stream()
+                            .map(EventFollow::getMemberId)
+                            .distinct()
+                            .toList();
+
+            notificationService
+                    .createEventCancelledNotifications(
+                            calendarEvent,
+                            followerMemberIds
+                    );
+
+            return;
+        }
+
+        if (startTimeChanged && canNotifyTimeChange) {
+            List<Long> followerMemberIds =
+                    eventFollowRepository
+                            .findByEventId(eventId)
+                            .stream()
+                            .map(EventFollow::getMemberId)
+                            .distinct()
+                            .toList();
+
+            notificationService
+                    .createEventTimeChangedNotifications(
+                            calendarEvent,
+                            previousStartAt,
+                            followerMemberIds
+                    );
         }
     }
 
-    public void deleteEventById(Long eventId){
-        calendarEventRepo.deleteById(eventId);
+    @Transactional
+    public void cancelEventById(Long eventId) {
+
+        CalendarEvent event =
+                calendarEventRepo.findById(eventId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "找不到活動"
+                                )
+                        );
+
+        /*
+         * 重複呼叫取消 API 時直接結束，
+         * 避免關注會員收到重複通知。
+         */
+        if ("CANCELLED".equals(event.getStatus())) {
+            return;
+        }
+
+        List<Long> followerMemberIds =
+                eventFollowRepository
+                        .findByEventId(eventId)
+                        .stream()
+                        .map(EventFollow::getMemberId)
+                        .distinct()
+                        .toList();
+
+        event.setStatus("CANCELLED");
+
+        calendarEventRepo.save(event);
+
+        notificationService
+                .createEventCancelledNotifications(
+                        event,
+                        followerMemberIds
+                );
     }
 
     public Page<CalendarEvent> searchEvent(
