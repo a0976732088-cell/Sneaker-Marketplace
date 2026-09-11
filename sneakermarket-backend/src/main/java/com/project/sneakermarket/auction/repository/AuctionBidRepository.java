@@ -3,6 +3,10 @@ package com.project.sneakermarket.auction.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.project.sneakermarket.auction.entity.AuctionBid;
 
@@ -12,6 +16,19 @@ import com.project.sneakermarket.auction.entity.AuctionBid;
  */
 public interface AuctionBidRepository
         extends JpaRepository<AuctionBid, Long> {
+
+    /** 先按競標聚合再由 DB 分頁；count 計算競標數而非出價筆數。 */
+    @Query(value = """
+            select b.auctionId as auctionId, max(b.bidAmount) as myHighestBid,
+                   max(b.createdAt) as lastBidAt
+            from AuctionBid b where b.bidderId = :memberId
+            group by b.auctionId
+            order by max(b.createdAt) desc, b.auctionId desc
+            """, countQuery = """
+            select count(distinct b.auctionId) from AuctionBid b where b.bidderId = :memberId
+            """)
+    Page<AuctionMemberBidSummary> findMemberBidSummaries(
+            @Param("memberId") Long memberId, Pageable pageable);
 
     /**
      * 依競標 ID 查詢成功出價紀錄，

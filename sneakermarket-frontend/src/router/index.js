@@ -76,6 +76,21 @@ const routes = [
     component: () => import("@/views/auction/AuctionCreateView.vue"),
   },
   {
+    path: "/auctions/me/bids",
+    name: "auction-my-bids",
+    component: () => import("@/views/auction/AuctionMyBidsView.vue"),
+  },
+  {
+    path: "/auctions/me/listings",
+    name: "auction-my-listings",
+    component: () => import("@/views/auction/AuctionMyListingsView.vue"),
+  },
+  {
+    path: "/auction-orders",
+    name: "auction-orders",
+    component: () => import("@/views/auction/AuctionOrderListView.vue"),
+  },
+  {
     path: "/auctions/:id",
     name: "auction-detail",
     component: () => import("@/views/auction/AuctionDetailView.vue"),
