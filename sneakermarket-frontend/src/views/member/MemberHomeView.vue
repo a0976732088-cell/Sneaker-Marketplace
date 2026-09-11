@@ -2,219 +2,235 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 
-import { getCurrentMember, logout } from "@/service/authService";
-
-import { updateMember } from "@/service/memberService";
+import { getCurrentMember } from "@/service/authService";
+import {
+  updateMyProfile,
+  changeMyPassword,
+  deleteMyAccount,
+} from "@/service/memberService";
 
 const router = useRouter();
 
-// ========================
-// 會員資料
-// ========================
-
 const member = ref(null);
-
 const loading = ref(true);
-
 const errorMessage = ref("");
-
 const successMessage = ref("");
 
-// ========================
-// 編輯狀態
-// ========================
-
+// =====================================================
+// 個人資料修改
+// =====================================================
 const isEditing = ref(false);
+const savingProfile = ref(false);
 
-const saving = ref(false);
-
-// 編輯中的資料
 const editForm = ref({
+  name: "",
   email: "",
   phone: "",
   address: "",
 });
 
-// ========================
-// 取得目前登入會員
-// ========================
+// =====================================================
+// 密碼修改
+// =====================================================
+const showPasswordForm = ref(false);
+const changingPassword = ref(false);
+
+const passwordForm = ref({
+  currentPassword: "",
+  newPassword: "",
+  confirmPassword: "",
+});
+
+function getApiErrorMessage(error, fallbackMessage) {
+  const data = error.response?.data;
+
+  if (typeof data === "string") {
+    return data;
+  }
+
+  if (data?.message) {
+    return data.message;
+  }
+
+  return fallbackMessage;
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidPhone(phone) {
+  return /^09\d{8}$/.test(phone);
+}
 
 async function loadCurrentMember() {
   loading.value = true;
-
   errorMessage.value = "";
 
   try {
     member.value = await getCurrentMember();
-
     console.log("目前登入會員：", member.value);
   } catch (error) {
     console.error("取得會員資料失敗：", error);
-
-    errorMessage.value = "尚未登入，請先登入";
-
-    router.push("/login");
+    await router.replace("/login");
   } finally {
     loading.value = false;
   }
 }
 
-// ========================
-// 開始編輯
-// ========================
-
 function startEdit() {
   errorMessage.value = "";
-
   successMessage.value = "";
 
-  // 把目前會員資料複製到編輯表單
   editForm.value = {
+    name: member.value?.name || "",
     email: member.value?.email || "",
-
     phone: member.value?.phone || "",
-
     address: member.value?.address || "",
   };
 
   isEditing.value = true;
 }
 
-// ========================
-// 取消編輯
-// ========================
-
 function cancelEdit() {
   isEditing.value = false;
-
   errorMessage.value = "";
-
   successMessage.value = "";
-
-  editForm.value = {
-    email: "",
-    phone: "",
-    address: "",
-  };
 }
-
-// ========================
-// 驗證 Email
-// ========================
-
-function isValidEmail(email) {
-  const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  return pattern.test(email);
-}
-
-// ========================
-// 驗證手機
-// ========================
-
-function isValidPhone(phone) {
-  const pattern = /^09\d{8}$/;
-
-  return pattern.test(phone);
-}
-
-// ========================
-// 儲存會員資料
-// ========================
 
 async function saveMember() {
   errorMessage.value = "";
-
   successMessage.value = "";
 
-  // ------------------------
-  // Email 檢查
-  // ------------------------
+  const cleanName = editForm.value.name.trim();
+  const cleanEmail = editForm.value.email.trim();
+  const cleanPhone = editForm.value.phone.trim();
+  const cleanAddress = editForm.value.address.trim();
 
-  if (!editForm.value.email.trim()) {
+  if (!cleanName) {
+    errorMessage.value = "姓名不可以空白";
+    return;
+  }
+
+  if (!cleanEmail) {
     errorMessage.value = "Email 不可以空白";
-
     return;
   }
 
-  if (!isValidEmail(editForm.value.email.trim())) {
+  if (!isValidEmail(cleanEmail)) {
     errorMessage.value = "Email 格式不正確";
-
     return;
   }
 
-  // ------------------------
-  // 手機檢查
-  // ------------------------
-
-  if (!editForm.value.phone.trim()) {
+  if (!cleanPhone) {
     errorMessage.value = "手機號碼不可以空白";
-
     return;
   }
 
-  if (!isValidPhone(editForm.value.phone.trim())) {
-    errorMessage.value = "手機格式錯誤，例如：0912345678";
-
+  if (!isValidPhone(cleanPhone)) {
+    errorMessage.value = "手機格式錯誤，需為 09 開頭後接 8 個數字";
     return;
   }
 
-  saving.value = true;
+  savingProfile.value = true;
 
   try {
-    const response = await updateMember(member.value.memberId, {
-      email: editForm.value.email.trim(),
-
-      phone: editForm.value.phone.trim(),
-
-      address: editForm.value.address.trim(),
+    const response = await updateMyProfile({
+      name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      address: cleanAddress,
     });
 
-    console.log("修改會員成功：", response.data);
-
-    // axios response.data
-    // 直接更新畫面上的 member
     member.value = response.data;
-
     successMessage.value = "會員資料修改成功";
-
     isEditing.value = false;
   } catch (error) {
     console.error("修改會員失敗：", error);
-
-    // axios 的錯誤通常會在
-    // error.response.data
-    const backendMessage = error.response?.data;
-
-    if (typeof backendMessage === "string") {
-      errorMessage.value = backendMessage;
-    } else {
-      errorMessage.value = "會員資料修改失敗";
-    }
+    errorMessage.value = getApiErrorMessage(error, "會員資料修改失敗");
   } finally {
-    saving.value = false;
+    savingProfile.value = false;
   }
 }
 
-// ========================
-// 登出
-// ========================
+function resetPasswordForm() {
+  passwordForm.value = {
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  };
+}
 
-async function handleLogout() {
+async function handleChangePassword() {
+  errorMessage.value = "";
+  successMessage.value = "";
+
+  if (!passwordForm.value.currentPassword) {
+    errorMessage.value = "請輸入目前密碼";
+    return;
+  }
+
+  if (!passwordForm.value.newPassword) {
+    errorMessage.value = "請輸入新密碼";
+    return;
+  }
+
+  if (passwordForm.value.newPassword.length < 8) {
+    errorMessage.value = "新密碼至少需要 8 碼";
+    return;
+  }
+
+  if (
+    passwordForm.value.newPassword !==
+    passwordForm.value.confirmPassword
+  ) {
+    errorMessage.value = "兩次輸入的新密碼不一致";
+    return;
+  }
+
+  changingPassword.value = true;
+
   try {
-    await logout();
+    await changeMyPassword(passwordForm.value);
 
-    console.log("登出成功");
+    successMessage.value = "密碼修改成功";
+    showPasswordForm.value = false;
+    resetPasswordForm();
   } catch (error) {
-    console.error("登出失敗：", error);
+    console.error("修改密碼失敗：", error);
+    errorMessage.value = getApiErrorMessage(error, "密碼修改失敗");
   } finally {
-    router.push("/login");
+    changingPassword.value = false;
   }
 }
 
-// ========================
-// 頁面載入時
-// ========================
+async function handleDeleteAccount() {
+  errorMessage.value = "";
+  successMessage.value = "";
+
+  if (member.value?.role === "ROLE_ADMIN") {
+    errorMessage.value = "管理員不可刪除自己的管理員帳號";
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `確定要刪除帳號「${member.value?.account}」嗎？\n刪除後將無法復原。`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await deleteMyAccount();
+
+    alert("帳號已刪除");
+    await router.replace("/login");
+  } catch (error) {
+    console.error("刪除帳號失敗：", error);
+    errorMessage.value = getApiErrorMessage(error, "刪除帳號失敗");
+  }
+}
 
 onMounted(() => {
   loadCurrentMember();
@@ -223,259 +239,224 @@ onMounted(() => {
 
 <template>
   <div class="member-page">
-    <!-- Loading -->
     <div v-if="loading" class="loading-area">會員資料載入中...</div>
 
-    <!-- 會員中心 -->
     <template v-else-if="member">
-      <!-- 上方會員資訊 -->
-      <div class="member-topbar">
-        <div></div>
-
-        <div class="member-topbar-right">
-          <span> 您好，{{ member.name }} </span>
-
-          <button class="logout-button" @click="handleLogout">登出</button>
-        </div>
-      </div>
-
-      <!-- 會員功能選單 -->
       <nav class="member-nav">
-        <router-link to="/member"> 個人檔案 </router-link>
-
-        <a href="#" @click.prevent> 訂單 </a>
-
-        <a href="#" @click.prevent> 最愛 </a>
-
-        <a href="#" @click.prevent> 設定 </a>
+        <router-link to="/member">個人檔案</router-link>
+        <a href="#" @click.prevent>訂單</a>
+        <a href="#" @click.prevent>競標</a>
+        <a href="#security" @click.prevent>設定</a>
       </nav>
 
-      <!-- 會員基本資料 -->
       <main class="profile-container">
-        <!-- 頭像 -->
         <div class="avatar">
-          <span>
-            {{ member.name?.charAt(0) || "M" }}
-          </span>
+          <span>{{ member.name?.charAt(0) || "M" }}</span>
         </div>
 
-        <!-- 會員名稱 -->
         <div class="profile-info">
-          <h1>
-            {{ member.name }}
-          </h1>
-
-          <p class="member-account">
-            {{ member.account }}
-          </p>
-
-          <p>自 2026 年 9 月成為 SneakerMarket 會員</p>
+          <h1>{{ member.name }}</h1>
+          <p class="member-account">{{ member.account }}</p>
+          <p>{{ member.email }}</p>
         </div>
       </main>
 
-      <!-- 會員詳細資料 -->
       <section class="profile-detail-section">
         <div class="section-header">
-          <h2>個人檔案</h2>
+          <div>
+            <h2>個人檔案</h2>
+            <p class="section-description">修改姓名與聯絡資料</p>
+          </div>
 
-          <!-- 尚未編輯 -->
           <button v-if="!isEditing" class="edit-button" @click="startEdit">
             編輯
           </button>
 
-          <!-- 編輯中 -->
           <div v-else class="edit-actions">
             <button
               class="cancel-button"
-              :disabled="saving"
+              :disabled="savingProfile"
               @click="cancelEdit"
             >
               取消
             </button>
 
-            <button class="save-button" :disabled="saving" @click="saveMember">
-              {{ saving ? "儲存中..." : "儲存" }}
+            <button
+              class="save-button"
+              :disabled="savingProfile"
+              @click="saveMember"
+            >
+              {{ savingProfile ? "儲存中..." : "儲存" }}
             </button>
           </div>
         </div>
 
-        <!-- 成功訊息 -->
         <div v-if="successMessage" class="message success-message">
           {{ successMessage }}
         </div>
 
-        <!-- 錯誤訊息 -->
         <div v-if="errorMessage" class="message error-message">
           {{ errorMessage }}
         </div>
 
         <div class="profile-details">
-          <!-- 帳號 -->
           <div class="detail-item">
-            <span class="detail-label"> 帳號 </span>
-
-            <span>
-              {{ member.account }}
-            </span>
+            <span class="detail-label">帳號</span>
+            <span>{{ member.account }}</span>
           </div>
 
-          <!-- 姓名 -->
           <div class="detail-item">
-            <span class="detail-label"> 姓名 </span>
-
-            <span>
-              {{ member.name }}
-            </span>
+            <span class="detail-label">姓名</span>
+            <input
+              v-if="isEditing"
+              v-model="editForm.name"
+              type="text"
+              class="edit-input"
+              placeholder="請輸入姓名"
+              :disabled="savingProfile"
+            />
+            <span v-else>{{ member.name }}</span>
           </div>
 
-          <!-- Email -->
           <div class="detail-item">
-            <span class="detail-label"> Email </span>
-
+            <span class="detail-label">Email</span>
             <input
               v-if="isEditing"
               v-model="editForm.email"
               type="email"
               class="edit-input"
               placeholder="請輸入 Email"
-              :disabled="saving"
+              :disabled="savingProfile"
             />
-
-            <span v-else>
-              {{ member.email }}
-            </span>
+            <span v-else>{{ member.email }}</span>
           </div>
 
-          <!-- 手機 -->
           <div class="detail-item">
-            <span class="detail-label"> 手機 </span>
-
+            <span class="detail-label">手機</span>
             <input
               v-if="isEditing"
               v-model="editForm.phone"
               type="tel"
+              maxlength="10"
               class="edit-input"
-              placeholder="例如：0912345678"
-              :disabled="saving"
+              placeholder="0912345678"
+              :disabled="savingProfile"
             />
-
-            <span v-else>
-              {{ member.phone }}
-            </span>
+            <span v-else>{{ member.phone }}</span>
           </div>
 
-          <!-- 地址 -->
           <div class="detail-item">
-            <span class="detail-label"> 地址 </span>
-
+            <span class="detail-label">地址</span>
             <input
               v-if="isEditing"
               v-model="editForm.address"
               type="text"
               class="edit-input"
               placeholder="請輸入地址"
-              autocomplete="street-address"
-              :disabled="saving"
+              :disabled="savingProfile"
             />
-
-            <span v-else>
-              {{ member.address || "尚未填寫" }}
-            </span>
+            <span v-else>{{ member.address || "尚未填寫" }}</span>
           </div>
 
-          <!-- 會員角色 -->
           <div class="detail-item">
-            <span class="detail-label"> 會員角色 </span>
-
-            <span>
-              {{ member.role }}
-            </span>
+            <span class="detail-label">會員角色</span>
+            <span>{{ member.role }}</span>
           </div>
         </div>
       </section>
 
-      <!-- 興趣 -->
-      <section class="interest-section">
-        <div class="section-header">
-          <h2>興趣關注</h2>
+      <section id="security" class="security-section">
+        <div class="security-card">
+          <div class="security-header">
+            <div>
+              <h2>密碼設定</h2>
+              <p>修改密碼前需輸入目前密碼。</p>
+            </div>
 
-          <button class="edit-button" @click.prevent>編輯</button>
+            <button
+              class="outline-button"
+              @click="showPasswordForm = !showPasswordForm"
+            >
+              {{ showPasswordForm ? "收起" : "修改密碼" }}
+            </button>
+          </div>
+
+          <div v-if="showPasswordForm" class="password-form">
+            <div class="form-group">
+              <label>目前密碼</label>
+              <input
+                v-model="passwordForm.currentPassword"
+                type="password"
+                class="edit-input"
+                autocomplete="current-password"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>新密碼</label>
+              <input
+                v-model="passwordForm.newPassword"
+                type="password"
+                class="edit-input"
+                placeholder="至少 8 碼"
+                autocomplete="new-password"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>確認新密碼</label>
+              <input
+                v-model="passwordForm.confirmPassword"
+                type="password"
+                class="edit-input"
+                autocomplete="new-password"
+              />
+            </div>
+
+            <div class="password-actions">
+              <button
+                class="save-button"
+                :disabled="changingPassword"
+                @click="handleChangePassword"
+              >
+                {{ changingPassword ? "修改中..." : "確認修改密碼" }}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="interest-menu">
-          <span class="active"> 全部 </span>
+        <div class="security-card danger-card">
+          <div class="security-header">
+            <div>
+              <h2>刪除帳號</h2>
+              <p v-if="member.role !== 'ROLE_ADMIN'">
+                刪除後無法復原，請確認後再操作。
+              </p>
+              <p v-else>
+                管理員帳號不可從自己的會員頁面刪除。
+              </p>
+            </div>
 
-          <span> 慢跑鞋 </span>
-
-          <span> 籃球鞋 </span>
-
-          <span> 休閒鞋 </span>
-
-          <span> 復古鞋 </span>
-
-          <!-- <span> 城市 </span> -->
+            <button
+              class="delete-button"
+              :disabled="member.role === 'ROLE_ADMIN'"
+              @click="handleDeleteAccount"
+            >
+              刪除我的帳號
+            </button>
+          </div>
         </div>
       </section>
-
-      <!-- Footer -->
-      <footer class="member-footer">
-        <!-- 資源 -->
-        <div class="footer-column">
-          <h3>資源</h3>
-
-          <a href="#" @click.prevent> 加入會員 </a>
-
-          <a href="#" @click.prevent> 跑鞋搜尋工具 </a>
-
-          <a href="#" @click.prevent> 潮鞋搜尋工具 </a>
-
-          <a href="#" @click.prevent> 傳送意見回饋 </a>
-        </div>
-
-        <!-- 協助 -->
-        <div class="footer-column">
-          <h3>協助</h3>
-
-          <a href="#" @click.prevent> 取得協助 </a>
-
-          <a href="#" @click.prevent> 訂單狀態 </a>
-
-          <a href="#" @click.prevent> 聯絡我們 </a>
-        </div>
-
-        <!-- 公司 -->
-        <div class="footer-column">
-          <h3>公司</h3>
-
-          <a href="#" @click.prevent> 關於 SneakerMarket </a>
-
-          <a href="#" @click.prevent> 最新消息 </a>
-
-          <a href="#" @click.prevent> 職涯發展 </a>
-
-          <a href="#" @click.prevent> 環境永續性 </a>
-
-          <!-- <a href="#" @click.prevent> 影響力 </a> -->
-        </div>
-      </footer>
     </template>
   </div>
 </template>
 
 <style scoped>
-/* =========================
-   整體
-========================= */
-
 .member-page {
   min-height: 100vh;
-  background: #ffffff;
+  background: #fff;
   color: #111;
 }
-
-/* =========================
-   Loading
-========================= */
 
 .loading-area {
   padding: 80px;
@@ -483,403 +464,213 @@ onMounted(() => {
   font-size: 18px;
 }
 
-/* =========================
-   上方會員資訊
-========================= */
-
-.member-topbar {
-  height: 50px;
-
-  display: flex;
-
-  justify-content: space-between;
-
-  align-items: center;
-
-  padding: 0 50px;
-
-  border-bottom: 1px solid #eeeeee;
-}
-
-.member-topbar-right {
-  display: flex;
-
-  align-items: center;
-
-  gap: 18px;
-
-  font-size: 14px;
-}
-
-.logout-button {
-  border: none;
-
-  background: none;
-
-  color: #111;
-
-  cursor: pointer;
-
-  font-size: 14px;
-}
-
-.logout-button:hover {
-  text-decoration: underline;
-}
-
-/* =========================
-   會員選單
-========================= */
-
 .member-nav {
   display: flex;
-
   justify-content: center;
-
   gap: 35px;
-
-  padding: 30px 0;
+  padding: 30px 20px;
+  border-bottom: 1px solid #eee;
 }
 
 .member-nav a {
   color: #111;
-
   text-decoration: none;
-
   font-weight: 600;
 }
 
-.member-nav a:hover {
-  color: #777;
-}
-
-/* =========================
-   會員基本資料
-========================= */
-
 .profile-container {
   display: flex;
-
   align-items: center;
-
   gap: 25px;
-
-  padding: 60px 50px 40px;
+  padding: 55px 50px 35px;
 }
 
 .avatar {
   width: 90px;
-
   height: 90px;
-
   border-radius: 50%;
-
   background: #e5e5e5;
-
   display: flex;
-
-  justify-content: center;
-
   align-items: center;
-
+  justify-content: center;
   font-size: 30px;
-
   font-weight: 600;
 }
 
 .profile-info h1 {
   margin: 0 0 8px;
-
   font-size: 30px;
-
   font-weight: 500;
 }
 
 .profile-info p {
   margin: 4px 0;
-
   color: #666;
 }
 
 .member-account {
   font-weight: 600;
-
   color: #333 !important;
 }
 
-/* =========================
-   個人資料
-========================= */
-
-.profile-detail-section {
+.profile-detail-section,
+.security-section {
   padding: 30px 50px 50px;
 }
 
-.section-header {
+.section-header,
+.security-header {
   display: flex;
-
-  justify-content: space-between;
-
   align-items: center;
+  justify-content: space-between;
+  gap: 24px;
 }
 
-.section-header h2 {
+.section-header h2,
+.security-header h2 {
   margin: 0;
-
   font-size: 28px;
+}
+
+.section-description,
+.security-header p {
+  margin: 8px 0 0;
+  color: #777;
 }
 
 .edit-button {
   border: none;
-
   background: none;
-
   font-weight: 600;
-
   cursor: pointer;
 }
 
-/* 編輯按鈕區域 */
-
-.edit-actions {
+.edit-actions,
+.password-actions {
   display: flex;
-
   gap: 12px;
 }
 
 .cancel-button,
-.save-button {
-  padding: 8px 18px;
-
-  border-radius: 4px;
-
+.save-button,
+.outline-button,
+.delete-button {
+  padding: 9px 18px;
+  border-radius: 5px;
   cursor: pointer;
-
   font-weight: 600;
 }
 
-.cancel-button {
+.cancel-button,
+.outline-button {
   border: 1px solid #999;
-
-  background: #ffffff;
+  background: #fff;
 }
 
 .save-button {
   border: 1px solid #111;
-
   background: #111;
-
-  color: #ffffff;
+  color: #fff;
 }
 
-.cancel-button:disabled,
-.save-button:disabled {
-  opacity: 0.6;
+.delete-button {
+  border: 1px solid #c62828;
+  background: #fff;
+  color: #c62828;
+}
 
+.delete-button:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .profile-details {
   display: grid;
-
   grid-template-columns: repeat(2, minmax(0, 1fr));
-
   gap: 28px 60px;
-
   margin-top: 35px;
 }
 
-.detail-item {
+.detail-item,
+.form-group {
   display: flex;
-
   flex-direction: column;
-
   gap: 8px;
 }
 
-.detail-label {
+.detail-label,
+.form-group label {
   color: #777;
-
   font-size: 14px;
 }
 
-/* 編輯 Input */
-
 .edit-input {
   width: 100%;
-
   max-width: 420px;
-
   padding: 10px 12px;
-
-  border: 1px solid #cccccc;
-
+  border: 1px solid #ccc;
   border-radius: 4px;
-
   font-size: 16px;
 }
 
-.edit-input:focus {
-  outline: none;
-
-  border-color: #111;
-}
-
-/* 訊息 */
-
 .message {
   margin-top: 20px;
-
   padding: 12px 14px;
-
   border-radius: 4px;
 }
 
 .success-message {
   background: #e8f5e9;
-
   color: #256029;
 }
 
 .error-message {
   background: #fdecea;
-
   color: #b42318;
 }
 
-/* =========================
-   興趣
-========================= */
-
-.interest-section {
-  padding: 40px 50px 80px;
-
-  border-top: 1px solid #eeeeee;
+.security-section {
+  border-top: 1px solid #eee;
 }
 
-.interest-menu {
-  display: flex;
-
-  flex-wrap: wrap;
-
-  gap: 40px;
-
-  margin-top: 40px;
+.security-card {
+  padding: 28px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  margin-bottom: 22px;
 }
 
-.interest-menu span {
-  color: #555;
-
-  font-weight: 600;
-
-  cursor: pointer;
-}
-
-.interest-menu span.active {
-  color: #111;
-}
-
-/* =========================
-   Footer
-========================= */
-
-.member-footer {
-  margin-top: 40px;
-
-  padding: 55px 65px 80px;
-
-  border-top: 1px solid #e5e5e5;
-
+.password-form {
   display: grid;
-
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-
-  gap: 80px;
-
-  background: #ffffff;
+  gap: 18px;
+  margin-top: 28px;
 }
 
-.footer-column {
-  display: flex;
-
-  flex-direction: column;
-
-  align-items: flex-start;
+.danger-card {
+  border-color: #f1c7c7;
 }
-
-.footer-column h3 {
-  margin: 0 0 35px;
-
-  font-size: 18px;
-
-  font-weight: 700;
-
-  color: #111;
-}
-
-.footer-column a {
-  margin-bottom: 18px;
-
-  color: #555;
-
-  font-size: 16px;
-
-  font-weight: 500;
-
-  text-decoration: none;
-
-  transition: color 0.2s;
-}
-
-.footer-column a:hover {
-  color: #111;
-}
-
-/* =========================
-   Responsive
-========================= */
 
 @media (max-width: 768px) {
-  .member-topbar {
-    padding: 0 20px;
-  }
-
   .member-nav {
     justify-content: flex-start;
-
     overflow-x: auto;
-
-    gap: 22px;
-
-    padding: 25px 20px;
   }
 
-  .profile-container {
-    padding: 40px 20px;
-  }
-
-  .profile-detail-section {
-    padding: 20px 20px 40px;
+  .profile-container,
+  .profile-detail-section,
+  .security-section {
+    padding-left: 20px;
+    padding-right: 20px;
   }
 
   .profile-details {
     grid-template-columns: 1fr;
   }
 
-  .interest-section {
-    padding: 35px 20px 60px;
-  }
-
-  .member-footer {
-    grid-template-columns: 1fr;
-
-    gap: 45px;
-
-    padding: 40px 25px 60px;
-  }
-
-  .footer-column h3 {
-    margin-bottom: 20px;
+  .section-header,
+  .security-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

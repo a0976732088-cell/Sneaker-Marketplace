@@ -33,16 +33,24 @@ async function handleLogin() {
   loading.value = true;
 
   try {
-    // 呼叫登入 API
-    await login({
-      account: account.value.trim(),
-      password: password.value,
-    });
+    const member = await login({
+  account: account.value.trim(),
+  password: password.value,
+});
 
-    console.log("登入成功");
+console.log("登入成功");
+console.log("登入角色：", member.role);
 
-    // 登入成功 → 會員中心
-    await router.push("/member");
+// ADMIN → 管理後台
+if (member.role === "ROLE_ADMIN") {
+
+  await router.push("/admin");
+
+} else {
+
+  // 一般會員 → 會員中心
+  await router.push("/member");
+}
   } catch (error) {
     console.error("登入失敗：", error);
 

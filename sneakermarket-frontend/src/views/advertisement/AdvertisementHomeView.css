@@ -927,6 +927,13 @@ td,
   font-weight: 700;
 }
 
+.create-drawer .image-upload-guidance {
+  margin: 5px 0 0;
+  color: #6f7886;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .drawer-body .image-upload-input {
   position: absolute;
   width: 1px;

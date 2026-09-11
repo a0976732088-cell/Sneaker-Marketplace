@@ -1,6 +1,11 @@
 <template>
   <div class="container py-4">
     <h1 class="mb-4">競標商城</h1>
+    <nav class="d-flex flex-wrap gap-2 mb-4" aria-label="我的競標導覽">
+      <RouterLink class="btn btn-outline-primary" to="/auctions/me/bids">我的出價</RouterLink>
+      <RouterLink class="btn btn-outline-primary" to="/auctions/me/listings">我的刊登</RouterLink>
+      <RouterLink class="btn btn-outline-primary" to="/auction-orders">我的競標訂單</RouterLink>
+    </nav>
 
     <form class="row g-2 mb-4" @submit.prevent="searchAuctions">
       <!-- 關鍵字搜尋 -->

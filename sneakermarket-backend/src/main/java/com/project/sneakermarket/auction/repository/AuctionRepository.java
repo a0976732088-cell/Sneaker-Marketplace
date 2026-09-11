@@ -5,6 +5,8 @@ import java.util.List;
 import java.time.LocalDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -24,6 +26,13 @@ import jakarta.persistence.LockModeType;
 public interface AuctionRepository
         extends JpaRepository<Auction, Long>,
         JpaSpecificationExecutor<Auction> {
+
+    /** 歷史刊登不依 status 過濾，會員範圍在資料庫查詢套用。 */
+    @Query("""
+            select a from Auction a where a.auctionProductId in
+                (select p.auctionProductId from AuctionProduct p where p.sellerId = :memberId)
+            """)
+    Page<Auction> findMemberListings(@Param("memberId") Long memberId, Pageable pageable);
 
     /**
      * 以資料庫悲觀寫入鎖查詢指定競標。

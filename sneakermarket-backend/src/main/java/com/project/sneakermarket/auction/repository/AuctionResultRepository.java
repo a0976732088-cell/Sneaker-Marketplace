@@ -16,6 +16,8 @@ public interface AuctionResultRepository extends JpaRepository<AuctionResult, Lo
 
     Optional<AuctionResult> findByAuctionId(Long auctionId);
 
+    List<AuctionResult> findByAuctionIdIn(List<Long> auctionIds);
+
     /** 建單交易先鎖定正式 Result，再檢查訂單是否存在。 */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from AuctionResult r where r.auctionId = :auctionId")

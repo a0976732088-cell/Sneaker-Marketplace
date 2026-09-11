@@ -76,6 +76,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- 讓 Java ImageIO 能讀取 WEBP 圖片尺寸 -->
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>3.14.0</version>
+        </dependency>
+
         <!-- Tests -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

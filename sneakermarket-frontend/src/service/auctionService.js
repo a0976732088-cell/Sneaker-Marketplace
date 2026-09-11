@@ -1,5 +1,20 @@
 import httpClient from "./httpClient";
 
+/** 我的資料只允許 page / size，身分完全由 Session 決定。 */
+export function getMyBids({ page = 0, size = 10 } = {}) {
+  return httpClient.get("/auctions/me/bids", { params: { page, size } });
+}
+
+export function getMyListings({ page = 0, size = 10 } = {}) {
+  return httpClient.get("/auctions/me/listings", { params: { page, size } });
+}
+
+export function getMyAuctionOrders({ page = 0, size = 10 } = {}) {
+  return httpClient.get("/auction-orders/me", { params: { page, size } });
+}
+
+
+
 /**
  * 查詢競標列表。
  *

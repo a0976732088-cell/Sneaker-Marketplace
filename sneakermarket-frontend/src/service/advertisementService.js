@@ -53,10 +53,11 @@ export async function updateAdvertisementStatus(adId, adStatus) {
   return response.data;
 }
 
-export async function uploadAdvertisementImage(file) {
+export async function uploadAdvertisementImage(file, adPlacement) {
   const formData = new FormData();
 
   formData.append("file", file);
+  formData.append("adPlacement", adPlacement);
 
   const response = await httpClient.post("/admin/ads/upload-image", formData);
 

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import HomeView from "@/views/HomeView.vue";
+import { getCurrentMember } from "@/service/authService";
 
 const routes = [
   {
@@ -42,13 +43,15 @@ const routes = [
     name: "cart",
     component: () => import("@/views/commerce/CartView.vue"),
   },
-  { path: '/checkout', 
-    name: 'checkout', 
-    component: () => import('@/views/commerce/CheckoutView.vue'),
+  {
+    path: "/checkout",
+    name: "checkout",
+    component: () => import("@/views/commerce/CheckoutView.vue"),
   },
-  { path: '/orders/:id', 
-    name: 'order-confirmation', 
-    component: () => import('@/views/commerce/OrderConfirmationView.vue'),
+  {
+    path: "/orders/:id",
+    name: "order-confirmation",
+    component: () => import("@/views/commerce/OrderConfirmationView.vue"),
   },
   {
     path: "/ads",
@@ -76,6 +79,21 @@ const routes = [
     component: () => import("@/views/auction/AuctionCreateView.vue"),
   },
   {
+    path: "/auctions/me/bids",
+    name: "auction-my-bids",
+    component: () => import("@/views/auction/AuctionMyBidsView.vue"),
+  },
+  {
+    path: "/auctions/me/listings",
+    name: "auction-my-listings",
+    component: () => import("@/views/auction/AuctionMyListingsView.vue"),
+  },
+  {
+    path: "/auction-orders",
+    name: "auction-orders",
+    component: () => import("@/views/auction/AuctionOrderListView.vue"),
+  },
+  {
     path: "/auctions/:id",
     name: "auction-detail",
     component: () => import("@/views/auction/AuctionDetailView.vue"),
@@ -85,11 +103,21 @@ const routes = [
     name: "auction-edit",
     component: () => import("@/views/auction/AuctionEditView.vue"),
   },
+
+  // =========================
+  // Admin 管理後台
+  // =========================
   {
     path: "/admin",
     name: "admin",
     component: () => import("@/views/admin/AdminHomeView.vue"),
+
+    // 只有 ROLE_ADMIN 才能進入
+    meta: {
+      requiresAdmin: true,
+    },
   },
+
   {
     path: "/ads/storefront",
     name: "advertisement-storefront",
@@ -101,21 +129,83 @@ const routes = [
     component: () =>
       import("@/views/advertisement/AdvertisementPreviewView.vue"),
   },
-  {
-    path: "/:pathMatch(.*)*",
-    name: "not-found",
-    component: () => import("@/views/NotFoundView.vue"),
-  },
+
+  // =========================
+  // 權限不足頁面
+  // =========================
   {
     path: "/forbidden",
     name: "forbidden",
     component: () => import("@/views/error/ForbiddenView.vue"),
+  },
+
+  // =========================
+  // 404
+  // 放最後面
+  // =========================
+  {
+    path: "/:pathMatch(.*)*",
+    name: "not-found",
+    component: () => import("@/views/NotFoundView.vue"),
   },
 ];
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+});
+
+// ======================================================
+// Admin Route Guard
+// ======================================================
+
+router.beforeEach(async (to) => {
+  // 如果這個頁面不需要 ADMIN 權限
+  // 直接讓使用者進入
+  if (!to.meta.requiresAdmin) {
+    return true;
+  }
+
+  try {
+    // 向後端確認目前 Session 登入的是誰
+    const member = await getCurrentMember();
+
+    console.log("目前登入會員：", member);
+    console.log("目前角色：", member.role);
+
+    // =========================
+    // 有登入，但是不是 ADMIN
+    // =========================
+    if (member.role !== "ROLE_ADMIN") {
+      console.log("不是 ADMIN，禁止進入管理後台");
+
+      return {
+        name: "forbidden",
+      };
+    }
+
+    // =========================
+    // 是 ADMIN
+    // =========================
+    console.log("ADMIN 驗證成功");
+
+    return true;
+  } catch (error) {
+    // =========================
+    // 尚未登入
+    // =========================
+    console.log("尚未登入，導向登入頁");
+
+    return {
+      name: "login",
+
+      query: {
+        // 記錄原本想去的頁面
+        // 登入成功後未來可以導回去
+        redirect: to.fullPath,
+      },
+    };
+  }
 });
 
 export default router;

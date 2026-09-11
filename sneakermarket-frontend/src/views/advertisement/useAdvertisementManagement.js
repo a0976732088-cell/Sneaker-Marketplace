@@ -36,6 +36,38 @@ export function useAdvertisementManagement() {
   // 後端目前固定每頁顯示 5 筆
   const pageSize = ref(5);
 
+  const IMAGE_UPLOAD_RULES = {
+    BANNER: {
+      label: "首頁橫幅",
+      width: 2000,
+      height: 600,
+      minimumWidth: 1200,
+      minimumHeight: 360,
+      ratio: 10 / 3,
+      ratioLabel: "10:3",
+    },
+
+    POPUP: {
+      label: "首頁彈窗",
+      width: 1080,
+      height: 1350,
+      minimumWidth: 600,
+      minimumHeight: 750,
+      ratio: 4 / 5,
+      ratioLabel: "4:5",
+    },
+
+    SMALL_BLOCK: {
+      label: "商品頁側欄",
+      width: 600,
+      height: 600,
+      minimumWidth: 300,
+      minimumHeight: 300,
+      ratio: 1,
+      ratioLabel: "1:1",
+    },
+  };
+
   // Spring Data 的頁碼從 0 開始，畫面顯示時再加 1。
   const pageNumbers = computed(() =>
     Array.from({ length: totalPages.value }, (_, index) => index),
@@ -127,6 +159,10 @@ export function useAdvertisementManagement() {
     sortOrder: 0,
   });
 
+  const currentImageRule = computed(() => {
+    return IMAGE_UPLOAD_RULES[form.adPlacement];
+  });
+
   const timeError = computed(() => {
     // 尚未同時選擇開始與結束時間時，不顯示錯誤
     if (!form.startAt || !form.endAt) return "";
@@ -150,6 +186,29 @@ export function useAdvertisementManagement() {
     return false;
   }
 
+  function readImageDimensions(file) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      const imageUrl = URL.createObjectURL(file);
+
+      image.onload = () => {
+        resolve({
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+        });
+
+        URL.revokeObjectURL(imageUrl);
+      };
+
+      image.onerror = () => {
+        URL.revokeObjectURL(imageUrl);
+        reject(new Error("無法讀取圖片內容"));
+      };
+
+      image.src = imageUrl;
+    });
+  }
+
   async function handleImageUpload(event) {
     const file = event.target.files?.[0];
 
@@ -158,7 +217,35 @@ export function useAdvertisementManagement() {
     isUploadingImage.value = true;
 
     try {
-      const result = await uploadAdvertisementImage(file);
+      const dimensions = await readImageDimensions(file);
+
+      const rule = currentImageRule.value;
+
+      if (
+        dimensions.width < rule.minimumWidth ||
+        dimensions.height < rule.minimumHeight
+      ) {
+        notify(
+          `${rule.label}圖片至少需要 ${rule.minimumWidth} × ${rule.minimumHeight} px，目前圖片為 ${dimensions.width} × ${dimensions.height} px`,
+          "error",
+        );
+
+        return;
+      }
+
+      const actualRatio = dimensions.width / dimensions.height;
+
+      const ratioDifference = Math.abs(actualRatio - rule.ratio) / rule.ratio;
+
+      if (ratioDifference > 0.02) {
+        notify(
+          `${rule.label}圖片比例需要接近 ${rule.ratioLabel}，目前圖片為 ${dimensions.width} × ${dimensions.height} px`,
+          "error",
+        );
+
+        return;
+      }
+      const result = await uploadAdvertisementImage(file, form.adPlacement);
 
       form.imageUrl = result.data;
       notify("圖片上傳成功");
@@ -171,6 +258,7 @@ export function useAdvertisementManagement() {
       );
     } finally {
       isUploadingImage.value = false;
+      event.target.value = "";
     }
   }
 
@@ -519,6 +607,7 @@ export function useAdvertisementManagement() {
     lastItemNumber,
     filteredAds,
     form,
+    currentImageRule,
     isEditing,
     isUploadingImage,
     handleImageUpload,

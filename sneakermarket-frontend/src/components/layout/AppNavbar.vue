@@ -72,18 +72,48 @@
             <RouterLink class="nav-link" to="/cart"> 購物車 </RouterLink>
           </li>
 
-          <!-- 會員中心 -->
-          <li class="nav-item">
-            <RouterLink class="nav-link" to="/member"> 會員中心 </RouterLink>
-          </li>
+          <!-- =================================
+               尚未登入
+          ================================== -->
+          <template v-if="!currentMember">
+            <li class="nav-item">
+              <RouterLink class="nav-link" to="/member"> 登入/註冊 </RouterLink>
+            </li>
+          </template>
 
           <!-- =================================
-               管理後台
-               只有 ROLE_ADMIN 才顯示
+               已登入
           ================================== -->
-          <li v-if="isAdmin" class="nav-item">
-            <RouterLink class="nav-link" to="/admin"> 管理後台 </RouterLink>
-          </li>
+          <template v-else>
+            <!-- 顯示會員帳號 -->
+            <li class="nav-item">
+              <span class="nav-link"> 您好，{{ currentMember.account }} </span>
+            </li>
+
+            <!-- 會員中心 -->
+            <li class="nav-item">
+              <RouterLink class="nav-link" to="/member"> 會員中心 </RouterLink>
+            </li>
+
+            <!-- =================================
+                 管理後台
+                 只有 ROLE_ADMIN 才顯示
+            ================================== -->
+            <li v-if="isAdmin" class="nav-item">
+              <RouterLink class="nav-link" to="/admin"> 管理後台 </RouterLink>
+            </li>
+
+            <!-- 登出 -->
+            <li class="nav-item">
+              <button
+                type="button"
+                class="nav-link btn border-0"
+                @click="handleLogout"
+              >
+                登出
+              </button>
+            </li>
+          </template>
 
           <!--
             只有目前位於競標商城相關頁面
@@ -116,7 +146,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, onUnmounted } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import httpClient from "@/service/httpClient";// 🎯 Import 彈窗元件
 import NotificationDrawer from "@/components/notification/NotificationDrawer.vue";
 
@@ -124,13 +154,14 @@ import NotificationDrawer from "@/components/notification/NotificationDrawer.vue
    Session / 會員資料
 ================================ */
 
-import { getCurrentMember } from "@/service/authService";
+import { getCurrentMember, logout } from "@/service/authService";
 
 /* =====================================================
    Router
 ===================================================== */
 
 const route = useRoute();
+const router = useRouter();
 
 /* =====================================================
    目前登入會員
@@ -166,6 +197,27 @@ async function loadCurrentMember() {
     currentMember.value = null;
 
     console.log("Navbar：目前沒有登入會員");
+  }
+}
+
+/* =====================================================
+   登出
+===================================================== */
+
+async function handleLogout() {
+  try {
+    // 呼叫 authService.js 的 logout service
+    await logout();
+
+    // 清掉 Navbar 的會員狀態
+    currentMember.value = null;
+
+    console.log("會員登出成功");
+
+    // 登出後回首頁
+    await router.push("/");
+  } catch (error) {
+    console.error("會員登出失敗：", error);
   }
 }
 
