@@ -22,6 +22,7 @@ public class AuctionLifecycleService {
     private final AuctionRepository auctionRepository;
     private final AuctionResultRepository auctionResultRepository;
     private final AuctionTime auctionTime;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Transactional
     public void processAuction(Long auctionId) {
@@ -70,5 +71,6 @@ public class AuctionLifecycleService {
         auctionRepository.save(auction);
         // UNIQUE(auction_id) 為最後防線；寫入或提交失敗時 Auction 一併回滾。
         auctionResultRepository.save(result);
+        events.publishEvent(new com.project.sneakermarket.auction.email.AuctionEmailReadyEvent(auction.getAuctionId()));
     }
 }

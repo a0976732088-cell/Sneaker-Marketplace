@@ -24,6 +24,7 @@ public class AuctionOrderService {
     private final AuctionProductRepository products;
     private final MemberRepository members;
     private final AuctionTime time;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     // 訂單不加入呼叫端交易；呼叫端只應傳入已 commit 的 Result 所屬 auctionId。
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -74,6 +75,7 @@ public class AuctionOrderService {
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
         orders.saveAndFlush(order);
+        events.publishEvent(new com.project.sneakermarket.auction.email.AuctionEmailReadyEvent(auctionId));
     }
 
     private void requireText(String value, int maxLength, Long auctionId, String field) {

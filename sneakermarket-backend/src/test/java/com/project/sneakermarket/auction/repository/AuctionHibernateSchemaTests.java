@@ -147,22 +147,28 @@ class AuctionHibernateSchemaTests {
     }
 
     private SessionFactory updateSchema(DataSource isolated) {
+        return schemaConfiguration(isolated, "update").buildSessionFactory();
+    }
+
+    private Configuration schemaConfiguration(DataSource isolated, String mode) {
         Configuration configuration = new Configuration()
                 .addAnnotatedClass(Auction.class)
                 .addAnnotatedClass(AuctionResult.class)
                 .addAnnotatedClass(com.project.sneakermarket.auction.entity.AuctionOrder.class)
                 .addAnnotatedClass(Member.class);
         configuration.getProperties().put("hibernate.connection.datasource", isolated);
-        configuration.setProperty("hibernate.hbm2ddl.auto", "update");
+        configuration.addAnnotatedClass(com.project.sneakermarket.auction.entity.AuctionEmailLog.class);
+        configuration.setProperty("hibernate.hbm2ddl.auto", mode);
         configuration.setProperty("hibernate.hbm2ddl.halt_on_error", "true");
         configuration.setProperty("hibernate.default_schema", "dbo");
         configuration.setProperty("hibernate.physical_naming_strategy",
                 environment.getRequiredProperty("spring.jpa.hibernate.naming.physical-strategy"));
-        return configuration.buildSessionFactory();
+        return configuration;
     }
 
     private void assertSchema(JdbcTemplate jdbc) {
         assertOrderSchema(jdbc);
+        assertEmailSchema(jdbc);
         assertEquals(1, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID('dbo.auction_results')", Integer.class));
         assertEquals(1, jdbc.queryForObject("""
@@ -331,6 +337,162 @@ class AuctionHibernateSchemaTests {
         assertEquals(18, jdbc.queryForObject("""
                 SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.auction_orders')
                 """, Integer.class));
+    }
+
+
+    private void assertEmailSchema(JdbcTemplate jdbc) {
+        String table = "dbo.auction_email_logs";
+        assertEquals(13, jdbc.queryForObject("SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID(?)", Integer.class, table));
+        assertEquals(List.of("last_error", "sent_at"), jdbc.queryForList(
+                "SELECT name FROM sys.columns WHERE object_id=OBJECT_ID(?) AND is_nullable=1 ORDER BY name", String.class, table));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT is_identity FROM sys.columns WHERE object_id=OBJECT_ID(?) AND name='email_log_id'", Integer.class, table));
+        assertEquals(List.of("email_log_id"), jdbc.queryForList("""
+                SELECT c.name FROM sys.indexes i
+                JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id
+                JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id
+                WHERE i.object_id=OBJECT_ID(?) AND i.is_primary_key=1 AND ic.key_ordinal>0 ORDER BY ic.key_ordinal
+                """, String.class, table));
+        var strings = java.util.Map.of("recipient_email", 100, "recipient_role", 20, "email_type", 40,
+                "subject", 200, "send_status", 20, "last_error", 1000);
+        strings.forEach((column, length) -> assertEquals("nvarchar:" + length * 2, jdbc.queryForObject("""
+                SELECT CONCAT(TYPE_NAME(user_type_id), ':', max_length) FROM sys.columns
+                WHERE object_id=OBJECT_ID(?) AND name=?
+                """, String.class, table, column)));
+        for (String column : List.of("email_log_id", "auction_id", "recipient_member_id", "retry_count")) {
+            assertEquals(column.equals("retry_count") ? "int" : "bigint", jdbc.queryForObject("""
+                    SELECT TYPE_NAME(user_type_id) FROM sys.columns WHERE object_id=OBJECT_ID(?) AND name=?
+                    """, String.class, table, column));
+        }
+        for (String column : List.of("created_at", "updated_at", "sent_at")) {
+            assertEquals("datetime2:0", jdbc.queryForObject("""
+                    SELECT CONCAT(TYPE_NAME(user_type_id), ':', scale) FROM sys.columns
+                    WHERE object_id=OBJECT_ID(?) AND name=?
+                    """, String.class, table, column));
+        }
+        for (String[] fk : List.of(
+                new String[]{"FK_auction_email_logs_auctions", "auction_id", "auctions", "auction_id"},
+                new String[]{"FK_auction_email_logs_members", "recipient_member_id", "members", "member_id"})) {
+            assertEquals(1, jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM sys.foreign_keys fk
+                    JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id=fk.object_id
+                    JOIN sys.columns pc ON pc.object_id=fkc.parent_object_id AND pc.column_id=fkc.parent_column_id
+                    JOIN sys.columns rc ON rc.object_id=fkc.referenced_object_id AND rc.column_id=fkc.referenced_column_id
+                    WHERE fk.parent_object_id=OBJECT_ID('dbo.auction_email_logs') AND fk.name=?
+                      AND pc.name=? AND OBJECT_NAME(fk.referenced_object_id)=? AND rc.name=?
+                      AND fk.is_disabled=0 AND fk.is_not_trusted=0
+                    """, Integer.class, (Object[]) fk));
+        }
+        for (String name : List.of("UQ_auction_email_logs_recipient_type", "IX_auction_email_logs_retry")) {
+            assertEquals(name.startsWith("UQ") ? List.of("auction_id", "recipient_member_id", "email_type")
+                    : List.of("send_status", "retry_count", "created_at"), jdbc.queryForList("""
+                    SELECT c.name FROM sys.indexes i
+                    JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id
+                    JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id
+                    WHERE i.object_id=OBJECT_ID(?) AND i.name=? AND i.is_disabled=0 AND i.has_filter=0
+                      AND ic.key_ordinal>0 ORDER BY ic.key_ordinal
+                    """, String.class, table, name));
+        }
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT is_unique FROM sys.indexes WHERE object_id=OBJECT_ID(?) AND name='UQ_auction_email_logs_recipient_type'
+                """, Integer.class, table));
+        var values = java.util.Map.of(
+                "role", List.of("SELLER", "WINNER", "BIDDER"),
+                "type", List.of("SOLD_SELLER", "UNSOLD_SELLER", "WON", "LOST"),
+                "status", List.of("PENDING", "SENT", "FAILED"));
+        values.forEach((name, expected) -> {
+            String definition = jdbc.queryForObject("""
+                    SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(?)
+                      AND name=? AND is_disabled=0 AND is_not_trusted=0
+                    """, String.class, table, "CK_auction_email_logs_" + name);
+            var actual = new java.util.HashSet<String>();
+            var matcher = java.util.regex.Pattern.compile("'([^']*)'").matcher(definition);
+            while (matcher.find()) actual.add(matcher.group(1));
+            assertEquals(new java.util.HashSet<>(expected), actual);
+        });
+        String retryCheck = jdbc.queryForObject("""
+                SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(?)
+                  AND name='CK_auction_email_logs_retry_count' AND is_disabled=0 AND is_not_trusted=0
+                """, String.class, table);
+        assertEquals("retry_count>=0", retryCheck.replaceAll("[\\s\\[\\]()]",""));
+        // Hibernate 亦可能為 @Enumerated 自動產生欄位 CHECK；精確驗證四個具名業務約束。
+        assertEquals(4, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(?)
+                  AND name IN ('CK_auction_email_logs_role', 'CK_auction_email_logs_type',
+                               'CK_auction_email_logs_status', 'CK_auction_email_logs_retry_count')
+                  AND is_disabled=0 AND is_not_trusted=0
+                """, Integer.class, table));
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(?)", Integer.class, table));
+    }
+
+    @Test
+    void emailEntityBuildsSchemaAndUpdatePreservesDataBeforeValidate() {
+        JdbcTemplate admin = new JdbcTemplate(dataSource);
+        String database = "AuctionSchemaTest_" + UUID.randomUUID().toString().replace("-", "");
+        assertTrue(database.matches("AuctionSchemaTest_[a-f0-9]{32}"));
+        admin.execute("CREATE DATABASE [" + database + "]");
+        try {
+            String url = environment.getRequiredProperty("spring.datasource.url");
+            assertTrue(url.matches("(?is).*;databaseName=[^;]+.*"));
+            var isolated = new DriverManagerDataSource(
+                    url.replaceFirst("(?i)(;databaseName=)[^;]+", "$1" + database),
+                    environment.getProperty("spring.datasource.username"), environment.getProperty("spring.datasource.password"));
+            JdbcTemplate jdbc = new JdbcTemplate(isolated);
+            assertEquals(database, jdbc.queryForObject("SELECT DB_NAME()", String.class));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys.tables", Integer.class));
+            // 所有表只由正式 Entity 建立，不執行 CREATE TABLE 或 migration 腳本。
+            try (var factory = updateSchema(isolated)) {
+                assertEmailSchema(jdbc);
+            }
+            long memberId = jdbc.queryForObject("""
+                    INSERT INTO dbo.members (account,password_hash,name,email,phone,role)
+                    OUTPUT inserted.member_id VALUES ('email-schema','not-a-login','Schema','schema@example.invalid','0900000000','Role_Member')
+                    """, Long.class);
+            long auctionId = jdbc.queryForObject("""
+                    INSERT INTO dbo.auctions (auction_product_id,start_price,current_price,min_increment,
+                    start_at,end_at,status,bid_count,version,created_at,updated_at)
+                    OUTPUT inserted.auction_id VALUES (1,5000,5000,100,'2026-09-11','2026-09-12','UNSOLD',0,0,'2026-09-11','2026-09-11')
+                    """, Long.class);
+            var email = new com.project.sneakermarket.auction.entity.AuctionEmailLog();
+            email.setAuctionId(auctionId);
+            email.setRecipientMemberId(memberId);
+            email.setRecipientEmail("snapshot@example.invalid");
+            email.setRecipientRole(com.project.sneakermarket.auction.entity.AuctionEmailRecipientRole.SELLER);
+            email.setEmailType(com.project.sneakermarket.auction.entity.AuctionEmailType.UNSOLD_SELLER);
+            email.setSubject("流標");
+            email.setSendStatus(com.project.sneakermarket.auction.entity.AuctionEmailSendStatus.PENDING);
+            email.setRetryCount(0);
+            email.setCreatedAt(LocalDateTime.of(2026, 9, 12, 12, 0));
+            email.setUpdatedAt(email.getCreatedAt());
+            try (var factory = schemaConfiguration(isolated, "validate").buildSessionFactory();
+                    var session = factory.openSession()) {
+                var transaction = session.beginTransaction();
+                session.persist(email); // 驗證 scalar FK 寫入與 IDENTITY 產生主鍵。
+                transaction.commit();
+            }
+            assertNotNull(email.getEmailLogId());
+            Long tableId = jdbc.queryForObject("SELECT OBJECT_ID('dbo.auction_email_logs')", Long.class);
+            var before = jdbc.queryForMap("SELECT * FROM dbo.auction_email_logs WHERE email_log_id=?", email.getEmailLogId());
+            try (var factory = updateSchema(isolated)) {
+                assertEmailSchema(jdbc);
+                assertEquals(tableId, jdbc.queryForObject("SELECT OBJECT_ID('dbo.auction_email_logs')", Long.class));
+                assertEquals(before, jdbc.queryForMap(
+                        "SELECT * FROM dbo.auction_email_logs WHERE email_log_id=?", email.getEmailLogId()));
+                assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM dbo.auction_email_logs", Integer.class));
+            }
+            // 正式 validate 模式接受 Entity 建立的 Schema，不需要人工建表。
+            try (var factory = schemaConfiguration(isolated, "validate").buildSessionFactory()) {
+                try (var session = factory.openSession()) {
+                    assertEquals("snapshot@example.invalid", session.createQuery(
+                            "from AuctionEmailLog", com.project.sneakermarket.auction.entity.AuctionEmailLog.class)
+                            .getSingleResult().getRecipientEmail());
+                }
+            }
+        } finally {
+            admin.execute("ALTER DATABASE [" + database + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE");
+            admin.execute("DROP DATABASE [" + database + "]");
+        }
     }
 
     private void persistScalarOrder(SessionFactory factory, long auctionId, long memberId) {

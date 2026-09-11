@@ -106,6 +106,7 @@
                     <systemPropertyVariables>
                         <auction.lifecycle.enabled>false</auction.lifecycle.enabled>
                         <auction.order.enabled>false</auction.order.enabled>
+                        <auction.email.enabled>false</auction.email.enabled>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

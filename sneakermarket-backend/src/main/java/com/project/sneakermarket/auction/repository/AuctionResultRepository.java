@@ -30,4 +30,15 @@ public interface AuctionResultRepository extends JpaRepository<AuctionResult, Lo
             order by r.auctionId
             """)
     List<Long> findOrderCandidateIds();
+
+    /** 每場工作同交易建立，所以零筆 Log 表示 AFTER_COMMIT 尚未完成。 */
+    @Query("""
+            select r.auctionId from AuctionResult r
+            where (r.resultStatus = com.project.sneakermarket.auction.entity.AuctionResultStatus.UNSOLD
+                or (r.resultStatus = com.project.sneakermarket.auction.entity.AuctionResultStatus.SOLD
+                    and exists (select o.auctionOrderId from AuctionOrder o where o.auctionId = r.auctionId)))
+              and not exists (select e.emailLogId from AuctionEmailLog e where e.auctionId = r.auctionId)
+            order by r.auctionId
+            """)
+    List<Long> findEmailReadinessCandidateIds();
 }

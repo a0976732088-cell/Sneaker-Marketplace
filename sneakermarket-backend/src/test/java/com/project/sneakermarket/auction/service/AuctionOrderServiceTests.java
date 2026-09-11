@@ -45,7 +45,8 @@ class AuctionOrderServiceTests {
         products = mock(AuctionProductRepository.class);
         members = mock(MemberRepository.class);
         service = new AuctionOrderService(results, orders, auctions, products, members,
-                new AuctionTime(Clock.fixed(Instant.parse("2026-09-10T04:00:00Z"), ZoneOffset.UTC)));
+                new AuctionTime(Clock.fixed(Instant.parse("2026-09-10T04:00:00Z"), ZoneOffset.UTC)),
+                mock(org.springframework.context.ApplicationEventPublisher.class));
         result = new AuctionResult();
         result.setAuctionId(1L);
         result.setWinnerId(2L);

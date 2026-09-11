@@ -33,7 +33,7 @@ class AuctionLifecycleServiceTests {
         auctions = mock(AuctionRepository.class);
         results = mock(AuctionResultRepository.class);
         var time = new AuctionTime(Clock.fixed(Instant.parse("2026-09-10T04:00:00Z"), ZoneOffset.UTC));
-        service = new AuctionLifecycleService(auctions, results, time);
+        service = new AuctionLifecycleService(auctions, results, time, mock(org.springframework.context.ApplicationEventPublisher.class));
         auction = new Auction();
         auction.setAuctionId(1L);
         auction.setStatus(AuctionStatus.SCHEDULED);
@@ -151,7 +151,7 @@ class AuctionLifecycleServiceTests {
     void timeIsReadOnlyAfterLockHasReturned() {
         AuctionTime time = mock(AuctionTime.class);
         when(time.now()).thenReturn(NOW);
-        new AuctionLifecycleService(auctions, results, time).processAuction(1L);
+        new AuctionLifecycleService(auctions, results, time, mock(org.springframework.context.ApplicationEventPublisher.class)).processAuction(1L);
         var order = inOrder(auctions, time);
         order.verify(auctions).findByIdForUpdate(1L);
         order.verify(time).now();
