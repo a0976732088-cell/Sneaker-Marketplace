@@ -1,5 +1,6 @@
 package com.project.sneakermarket.advertisement.controller;
 
+import com.project.sneakermarket.advertisement.entity.AdvertisementPlacement;
 import com.project.sneakermarket.advertisement.service.AdvertisementImageStorageService;
 import com.project.sneakermarket.advertisement.dto.AdvertisementDeliveryStatus;
 import com.project.sneakermarket.advertisement.dto.AdvertisementResponse;
@@ -41,9 +42,10 @@ public class AdvertisementController {
 
     @PostMapping("/upload-image")
     public ResponseEntity<ApiResponse<String>> uploadAdvertisementImage(
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("adPlacement") AdvertisementPlacement adPlacement) {
 
-        String imageUrl = adImageService.store(file);
+        String imageUrl = adImageService.store(file, adPlacement);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok("廣告圖片上傳成功", imageUrl));

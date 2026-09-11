@@ -26,6 +26,7 @@ const {
   lastItemNumber,
   filteredAds,
   form,
+  currentImageRule,
   isEditing,
   isUploadingImage,
   handleImageUpload,
@@ -373,6 +374,11 @@ onUnmounted(() => {
           </div>
           <div class="image-upload-field">
             <span class="image-upload-label">圖片上傳</span>
+            <p class="image-upload-guidance">
+              建議：{{ currentImageRule.width }} × {{ currentImageRule.height }} px |
+              比例{{ currentImageRule.ratioLabel }} |
+              最低{{ currentImageRule.minimumWidth }} × {{ currentImageRule.minimumHeight }} px
+            </p>
 
             <input
               id="advertisement-image-upload"
