@@ -9,6 +9,7 @@ import com.project.sneakermarket.commerce.repository.CartItemRepository;
 import com.project.sneakermarket.commerce.repository.CartRepository;
 import com.project.sneakermarket.commerce.repository.ProductImageRepository;
 import com.project.sneakermarket.commerce.repository.ProductVariantRepository;
+import com.project.sneakermarket.common.exception.ForbiddenException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -100,14 +101,14 @@ public class CartService {
     }
 
     // 改數量
-    public void updateCart(Long cartItemId, Integer quantity, Boolean selected) {
+    public void updateCart(Long memberId,Long cartItemId, Integer quantity, Boolean selected) {
         CartItem item = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new RuntimeException("找不到購物車品項"));
 
-        /* quantity 跟 selected 現在都是可選的：
-        前端「改數量」跟「勾選/取消勾選」是兩個不同的操作，
-        呼叫這支 API 時通常只會傳其中一個，另一個是 null，
-        所以要各自判斷「有沒有傳這個值」，不要兩個綁在一起改。*/
+        // 所有權驗證：這筆品項所屬的購物車，必須是目前登入者自己的
+        if (!item.getCart().getMemberId().equals(memberId)) {
+            throw new ForbiddenException("無權操作他人的購物車品項");
+        }
 
         if (quantity != null) {
             // 合併後的數量不能超過庫存，才不會允許超賣
@@ -121,15 +122,19 @@ public class CartService {
             item.setSelected(selected);
         }
 
-        // 不管剛才改的是哪一個（或兩個都改），最後都要存回資料庫
         cartItemRepository.save(item);
     }
 
     // 刪除品項
-    public void deleteCartItem(Long cartItemId) {
+    public void deleteCartItem(Long memberId, Long cartItemId) {
 
         CartItem item = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new RuntimeException("找不到這個購物車品項"));
+
+        // 所有權驗證：這筆品項所屬的購物車，必須是目前登入者自己的
+        if (!item.getCart().getMemberId().equals(memberId)) {
+            throw new ForbiddenException("無權操作他人的購物車品項");
+        }
 
         cartItemRepository.delete(item);
     }

@@ -8,6 +8,8 @@ import com.project.sneakermarket.commerce.entity.CartItem;
 import com.project.sneakermarket.commerce.entity.Order;
 import com.project.sneakermarket.commerce.entity.OrderItem;
 import com.project.sneakermarket.commerce.repository.*;
+import com.project.sneakermarket.common.exception.ForbiddenException;
+import com.project.sneakermarket.member.service.MemberService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class OrderService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final MemberService memberService;
 
     // 查看「我的訂單列表」：一次列出這個會員的所有訂單摘要
     public List<OrderListItemResponse> getMyOrders(Long memberId) {
@@ -46,10 +49,17 @@ public class OrderService {
     }
 
     // 查看「單一訂單」的完整內容：訂單本身資料 + 買了哪些商品
-    public OrderDetailResponse getOrderDetail(Long orderId) {
+    public OrderDetailResponse getOrderDetail(Long memberId,Long orderId) {
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("找不到這張訂單"));
+
+        boolean isOwner = order.getMemberId().equals(memberId);
+        boolean isAdmin = memberService.isAdmin(memberId);
+
+        if (!isOwner && !isAdmin) {
+            throw new ForbiddenException("無權查看他人的訂單");
+        }
 
         List<OrderItem> orderItems = orderItemRepository.findByOrderOrderId(order.getOrderId());
 
@@ -153,6 +163,6 @@ public class OrderService {
         cartItemRepository.deleteAll(selectedItems);
 
         // 全部存完才組回傳值（借用 getOrderDetail 邏輯）
-        return getOrderDetail(order.getOrderId());
+        return getOrderDetail(memberId,order.getOrderId());
     }
 }
