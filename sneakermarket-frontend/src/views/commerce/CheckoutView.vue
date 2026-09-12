@@ -15,7 +15,6 @@ async function checkout() {
   submitting.value = true
   try {
     const response = await httpClient.post('/orders', {
-      memberId: 1,
       receiverName: receiverName.value,
       receiverPhone: receiverPhone.value,
       shippingAddress: shippingAddress.value
