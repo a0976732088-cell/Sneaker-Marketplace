@@ -1,13 +1,17 @@
 <script setup>
+import { getCurrentMember } from '@/service/authService'
 import { useRoute } from 'vue-router'
 import { ref, onMounted, computed } from 'vue'
 import httpClient from '@/service/httpClient'
+import { useRouter } from 'vue-router'
+
 
 const route = useRoute()
 const product = ref(null)
 const loading = ref(true)
 const errorMessage = ref('')
 const selectedVariantId = ref(null)
+const router = useRouter()
 
 onMounted(async () => {
   try {
@@ -31,8 +35,14 @@ const selectedVariant = computed(() => {
 
 async function addToCart() {
   try {
+    await getCurrentMember()
+  } catch (error) {
+    router.push('/login')
+    return
+  }
+
+  try {
     await httpClient.post('/cart/items', {
-      memberId: 1,
       variantId: selectedVariant.value.variantId,
       quantity: 1,
     })
