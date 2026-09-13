@@ -1,42 +1,103 @@
 <template>
-  <div class="container navbar-space">
-    <!-- 同一排 Tab 按鈕列 -->
-    <div class="tab-buttons mb-4">
-      <button
-        :class="['btn', activeTab === 'create' ? 'btn-primary' : 'btn-outline-primary']"
-        @click="activeTab = 'create'"
-      >
-        新增活動
-      </button>
+<div class="event-admin navbar-space">
+      <!-- 同一排 Tab 按鈕列 -->
+<header class="admin-header">
+  <div class="admin-header-top">
+    <div>
+      <span class="admin-eyebrow">
+        SNEAKERMARKET ADMIN
+      </span>
 
-      <button
-        :class="['btn', activeTab === 'search' ? 'btn-primary' : 'btn-outline-primary', 'ms-2']"
-        @click="switchTab('search')"
-      >
-        查詢活動
-      </button>
+      <h1 class="admin-title">
+        活動與通知管理
+      </h1>
 
-      <button
-        :class="['btn', activeTab === 'createNotice' ? 'btn-primary' : 'btn-outline-primary', 'ms-2']"
-        @click="activeTab = 'createNotice'"
-      >
-        新增通知
-      </button>
-
-      <button
-        :class="['btn', activeTab === 'NotificationManager' ? 'btn-primary' : 'btn-outline-primary', 'ms-2']"
-        @click="activeTab = 'NotificationManager'"
-      >
-        查詢通知
-      </button>
-
-      <button
-        :class="['btn', activeTab === 'NotificationLog' ? 'btn-primary' : 'btn-outline-primary', 'ms-2']"
-        @click="activeTab = 'NotificationLog'"
-      >
-        通知發送紀錄
-      </button>
+      <p class="admin-description">
+        管理平台活動、會員關注、系統通知與發送紀錄。
+      </p>
     </div>
+
+    <span class="admin-badge">
+      CALENDAR · NOTIFICATION
+    </span>
+  </div>
+
+  <nav class="admin-tabs">
+    <button
+      type="button"
+      :class="[
+        'admin-tab',
+        { active: activeTab === 'dashboard' },
+      ]"
+      @click="switchTab('dashboard')"
+    >
+      後台首頁
+    </button>
+
+    <button
+      type="button"
+      :class="[
+        'admin-tab',
+        { active: activeTab === 'create' },
+      ]"
+      @click="switchTab('create')"
+    >
+      新增活動
+    </button>
+
+    <button
+      type="button"
+      :class="[
+        'admin-tab',
+        { active: activeTab === 'search' },
+      ]"
+      @click="switchTab('search')"
+    >
+      查詢活動
+    </button>
+
+    <button
+      type="button"
+      :class="[
+        'admin-tab',
+        { active: activeTab === 'createNotice' },
+      ]"
+      @click="switchTab('createNotice')"
+    >
+      新增通知
+    </button>
+
+    <button
+      type="button"
+      :class="[
+        'admin-tab',
+        { active: activeTab === 'NotificationManager' },
+      ]"
+      @click="switchTab('NotificationManager')"
+    >
+      查詢通知
+    </button>
+
+    <button
+      type="button"
+      :class="[
+        'admin-tab',
+        { active: activeTab === 'NotificationLog' },
+      ]"
+      @click="switchTab('NotificationLog')"
+    >
+      通知發送紀錄
+    </button>
+  </nav>
+</header>
+
+<main class="admin-content">
+
+    <!-- 通知與行事曆後台首頁 -->
+    <NotificationCalendarDashboard
+      v-if="activeTab === 'dashboard'"
+      @navigate="switchTab"
+    />
 
     <!-- 1. 新增活動表單 -->
     <EventCreateForm v-if="activeTab === 'create'" />
@@ -82,11 +143,12 @@
       @close="showEditModal = false"
       @success="fetchEvents(currentPage)"
     />
+    </main>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, watch } from "vue";
+import { ref, reactive } from "vue";
 import { getEventPage, deleteEvent } from "@/api/events";
 
 import EventCreateForm from "@/components/events/EventCreateForm.vue";
@@ -97,8 +159,9 @@ import EventEditModal from "@/components/events/EventEditModal.vue";
 import NotificationManager from "@/components/notification/NotificationManager.vue";
 import NotificationCreateForm from "@/components/notification/NotificationCreateForm.vue";
 import NotificationLog from "@/components/notification/NotificationLog.vue";
+import NotificationCalendarDashboard from "@/components/dashboard/NotificationCalendarDashboard.vue";
 
-const activeTab = ref(localStorage.getItem("event_active_tab") || "search");
+const activeTab = ref("dashboard");
 
 const eventList = ref([]);
 const currentPage = ref(1);
@@ -164,7 +227,7 @@ const openEditModal = (event) => {
 
 const handleDelete = async (eventId) => {
   const confirmed = confirm(
-    `確定要取消 ID: ${eventId} 的活動嗎？\n取消後將通知目前的關注會員。`
+    `確定要取消 ID: ${eventId} 的活動嗎？\n取消後將通知目前的關注會員。`,
   );
 
   if (!confirmed) {

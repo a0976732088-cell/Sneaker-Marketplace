@@ -47,13 +47,29 @@ public class NotificationLogService {
         // 將 Entity 轉換為 DTO 回傳
         return notificationLogRepo.findAll(spec, pageable).map(log -> {
             NotificationLogDTO dto = new NotificationLogDTO();
-            dto.setId(log.getId()); // 👈 對應 Log Entity 的 id 主鍵
+            dto.setId(log.getId());
+            dto.setNotificationId(log.getNotificationId());
+
             dto.setSendType(log.getSendType());
             dto.setTitle(log.getTitle());
             dto.setTargetType(log.getTargetType());
+            dto.setEventId(log.getEventId());
+
+            dto.setStatus(
+                    log.getStatus() != null
+                            ? log.getStatus().name()
+                            : null
+            );
+
+            dto.setTotalRecipients(log.getTotalRecipients());
             dto.setTotalSent(log.getTotalSent());
+            dto.setFailedCount(log.getFailedCount());
+
             dto.setCreatedAt(log.getCreatedAt());
-            dto.setEventId(log.getEventId()); // 👈 對應 Log Entity 的 eventId 欄位
+            dto.setStartedAt(log.getStartedAt());
+            dto.setCompletedAt(log.getCompletedAt());
+
+            dto.setErrorMessage(log.getErrorMessage());
             return dto;
         });
     }

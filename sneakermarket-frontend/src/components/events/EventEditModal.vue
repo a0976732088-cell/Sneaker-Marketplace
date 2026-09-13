@@ -7,11 +7,7 @@
           <h5 class="modal-title fw-bold">
             編輯活動 (ID: {{ editForm.eventId }})
           </h5>
-          <button
-            type="button"
-            class="btn-close"
-            @click="closeModal"
-          ></button>
+          <button type="button" class="btn-close" @click="closeModal"></button>
         </div>
         <div class="modal-body p-4">
           <form @submit.prevent="submitUpdate">
@@ -54,7 +50,6 @@
                   <option value="INACTIVE">停用</option>
                   <option value="DRAFT">草稿</option>
                   <option value="CANCELLED">取消</option>
-
                 </select>
               </div>
             </div>
@@ -177,7 +172,7 @@ const formatForDateTimeInput = (dateStr) => {
   const d = new Date(dateStr);
   const pad = (num) => String(num).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
+    d.getHours(),
   )}:${pad(d.getMinutes())}`;
 };
 
@@ -229,13 +224,16 @@ const closeModal = () => {
 };
 
 const submitUpdate = async () => {
+  if (props.event.status === "CANCELLED") {
+    alert("已取消活動不能重新啟用或修改");
+    return;
+  }
   const isChangingToCancelled =
-    props.event.status !== "CANCELLED" &&
-    editForm.status === "CANCELLED";
+    props.event.status !== "CANCELLED" && editForm.status === "CANCELLED";
 
   if (isChangingToCancelled) {
     const confirmed = confirm(
-      "確定要取消這個活動嗎？\n取消後將通知目前的關注會員。"
+      "確定要取消這個活動嗎？\n取消後將通知目前的關注會員。",
     );
 
     if (!confirmed) {
@@ -249,9 +247,7 @@ const submitUpdate = async () => {
     await updateEvent(editForm.eventId, editForm);
 
     alert(
-      isChangingToCancelled
-        ? "活動已取消，關注會員將收到通知。"
-        : "更新成功！"
+      isChangingToCancelled ? "活動已取消，關注會員將收到通知。" : "更新成功！",
     );
 
     emit("success");

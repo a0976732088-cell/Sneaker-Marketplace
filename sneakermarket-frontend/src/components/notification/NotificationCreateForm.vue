@@ -21,8 +21,13 @@
           <label for="notificationType" class="form-label"
             >通知類型 <span class="text-danger">*</span></label
           >
-          <select class="form-select" id="notificationType" required>
-            <option value="" selected disabled>請選擇通知類型</option>
+          <select
+            v-model="form.notificationType"
+            class="form-select"
+            id="notificationType"
+            required
+          >
+            <option value="" disabled>請選擇通知類型</option>
             <option value="EVENT_REMINDER">活動提醒 (EVENT_REMINDER)</option>
             <option value="SYSTEM_NOTICE">系統公告 (SYSTEM_NOTICE)</option>
             <option value="ORDER_UPDATE">訂單更新 (ORDER_UPDATE)</option>
@@ -34,8 +39,9 @@
           <label for="targetType" class="form-label"
             >對象類型 (Target Type)</label
           >
-          <select class="form-select" id="targetType">
-            <option value="" selected disabled>請選擇對象類型</option>
+          <select v-model="form.targetType" class="form-select" id="targetType">
+            <option value="">無關聯資料</option>
+            <option value="SYSTEM">系統公告 (SYSTEM)</option>
             <option value="EVENT">活動 (EVENT)</option>
             <option value="ORDER">訂單 (ORDER)</option>
             <option value="AUCTION">競標 (AUCTION)</option>

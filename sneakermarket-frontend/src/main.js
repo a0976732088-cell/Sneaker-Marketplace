@@ -8,6 +8,7 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import '@/assets/css/global.css'
 import '@/assets/css/layout.css'
 import '@/assets/css/components.css'
+import "@/assets/css/calendarAndNotificationDashboard.css"
 
 createApp(App)
   .use(router)

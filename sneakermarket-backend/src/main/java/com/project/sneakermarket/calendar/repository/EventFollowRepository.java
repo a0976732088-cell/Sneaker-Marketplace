@@ -53,7 +53,7 @@ public interface EventFollowRepository
                     INNER JOIN dbo.calendar_events e
                         ON e.event_id = f.event_id
                     WHERE f.reminded = 0
-                      AND e.status NOT IN ('INACTIVE', 'DRAFT')
+                      AND e.status NOT IN ('INACTIVE', 'DRAFT', 'CANCELLED')
                       AND DATEADD(
                             MINUTE,
                             -f.remind_before_minutes,

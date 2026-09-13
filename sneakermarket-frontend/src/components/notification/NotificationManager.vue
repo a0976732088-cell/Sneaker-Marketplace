@@ -67,7 +67,7 @@
             <th width="150">類型</th>
             <th width="120">對象類型</th>
             <th width="180">建立時間</th>
-            <th width="260" class="text-center">操作</th>
+            <th width="380" class="text-center">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -85,29 +85,55 @@
               }}</span>
             </td>
             <td>{{ formatDate(item.createdAt) }}</td>
-            <td class="text-center">
-              <div class="btn-group btn-group-sm">
-                <!-- 補回「查看」按鈕 -->
+            <td class="notification-action-cell">
+              <div class="notification-actions">
                 <button
-                  class="btn btn-outline-info"
+                  type="button"
+                  class="notification-action action-view"
+                  title="查看通知"
                   @click="openDetailModal(item)"
                 >
                   查看
                 </button>
+
                 <button
-                  class="btn btn-outline-primary"
+                  type="button"
+                  class="notification-action action-edit"
+                  title="編輯通知"
                   @click="openEditModal(item)"
                 >
                   編輯
                 </button>
+
                 <button
-                  class="btn btn-outline-success"
-                  @click="handleSendNotice(item)"
+                  type="button"
+                  class="notification-action action-all"
+                  title="發送給全體會員"
+                  :disabled="item.isSent || item.isQueued"
+                  @click="handleSendNotice(item, 'ALL_MEMBERS')"
                 >
-                  發送
+                  發給全體
                 </button>
+
                 <button
-                  class="btn btn-outline-danger"
+                  type="button"
+                  class="notification-action action-followers"
+                  title="發送給活動關注者"
+                  :disabled="
+                    item.isSent ||
+                    item.isQueued ||
+                    item.targetType !== 'EVENT' ||
+                    !item.targetId
+                  "
+                  @click="handleSendNotice(item, 'EVENT_FOLLOWERS')"
+                >
+                  發給關注者
+                </button>
+
+                <button
+                  type="button"
+                  class="notification-action action-delete"
+                  title="刪除通知"
                   @click="handleDelete(item.notificationId)"
                 >
                   刪除
@@ -116,7 +142,9 @@
             </td>
           </tr>
           <tr v-if="notificationLogList.length === 0">
-            <td colspan="6" class="text-center py-4 text-muted">目前查無通知資料</td>
+            <td colspan="6" class="text-center py-4 text-muted">
+              目前查無通知資料
+            </td>
           </tr>
         </tbody>
       </table>
@@ -227,7 +255,6 @@ const fetchNotifications = async (page = 1) => {
       params.endCreatedAt = formatToIsoDateTime(searchParams.value.endDate);
     }
 
-
     const res = await httpClient.get("/notification/notificationPage", {
       params,
     });
@@ -268,18 +295,64 @@ const handleEditSuccess = () => {
   fetchNotifications(currentPage.value);
 };
 
-// 點擊「發送」推播按鈕
-const handleSendNotice = async (item) => {
-  if (!confirm(`確定要向全體會員推播「${item.title}」嗎？`)) return;
+// 「發送」推播按鈕
+const handleSendNotice = async (item, audienceType) => {
+  if (item.isSent || item.isQueued) {
+    alert("這則通知已經發送或正在等待發送");
+    return;
+  }
+
+  const audienceLabel =
+    audienceType === "ALL_MEMBERS" ? "全體會員" : "該活動的關注者";
+
+  const confirmed = confirm(
+    `確定要將「${item.title}」發送給${audienceLabel}嗎？`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  // 按下發送後先停用按鈕，避免連續加入兩次 Redis
+  item.isQueued = true;
 
   try {
-    // 改為呼叫發送通知 API
-    await httpClient.post(`/notification/send/${item.notificationId}`);
-    alert("發送推播成功！");
-    fetchNotifications(currentPage.value);
-  } catch (err) {
-    console.error("發送失敗", err);
-    alert("發送失敗，請稍後再試。");
+    const response = await httpClient.post(
+      `/notification/send/${item.notificationId}`,
+      {
+        audienceType: audienceType,
+      },
+    );
+
+    if (response.data.mode === "ASYNC") {
+      alert(`${response.data.message}\n任務編號：${response.data.jobId}`);
+
+      // Redis 背景發送，稍後更新列表
+      setTimeout(() => {
+        fetchNotifications(currentPage.value);
+      }, 2000);
+    } else {
+      alert(
+        `${response.data.message}\n共發送給 ${response.data.totalSent} 位會員`,
+      );
+
+      // 同步發送已經完成
+      item.isQueued = false;
+
+      await fetchNotifications(currentPage.value);
+    }
+  } catch (error) {
+    // 加入 Redis 失敗，重新開放按鈕
+    item.isQueued = false;
+
+    console.error("加入通知佇列失敗：", error);
+
+    const message =
+      error.response?.data?.detail ||
+      error.response?.data?.message ||
+      "加入通知佇列失敗，請稍後再試";
+
+    alert(message);
   }
 };
 
@@ -305,3 +378,81 @@ const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleString("zh-TW", { hour12: false });
 };
 </script>
+
+<style scoped>
+.notification-action-cell {
+  min-width: 340px;
+  text-align: center;
+}
+
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.notification-action {
+  min-height: 34px;
+  padding: 0.42rem 0.72rem;
+  border: 0;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    transform 140ms ease,
+    filter 140ms ease;
+}
+
+.notification-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(0.95);
+}
+
+.notification-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+/* 查看：霧藍灰 */
+.action-view {
+  color: #526168;
+  background: #dce3e6;
+}
+
+/* 編輯：中性水泥灰 */
+.action-edit {
+  color: #3f403d;
+  background: #dfded9;
+}
+
+/* 發送全體：鼠尾草綠 */
+.action-all {
+  color: #52604e;
+  background: #dce3d8;
+}
+
+/* 活動關注者：陶土色 */
+.action-followers {
+  color: #70594c;
+  background: #e8dcd4;
+}
+
+/* 刪除：灰玫瑰 */
+.action-delete {
+  color: #744f4b;
+  background: #eadbd9;
+}
+
+@media (max-width: 768px) {
+  .notification-action-cell {
+    min-width: 260px;
+  }
+
+  .notification-actions {
+    justify-content: flex-start;
+  }
+}
+</style>

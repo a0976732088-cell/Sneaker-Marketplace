@@ -1,7 +1,6 @@
 <!-- 新增活動表單 -->
 <template>
   <div class="card p-4">
-    <h2>新增活動</h2>
     <div class="container py-4">
       <div class="row justify-content-center">
         <div class="col-lg-9 col-xl-8">

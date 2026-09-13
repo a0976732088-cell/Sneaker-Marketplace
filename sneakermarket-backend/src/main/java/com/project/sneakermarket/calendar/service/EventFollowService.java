@@ -37,7 +37,9 @@ public class EventFollowService {
                 ));
 
         if ("INACTIVE".equals(event.getStatus())
-                || "DRAFT".equals(event.getStatus())) {
+                || "DRAFT".equals(event.getStatus())
+                || "CANCELLED".equals(event.getStatus())) {
+
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "目前無法關注這個活動"

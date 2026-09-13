@@ -6,10 +6,23 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import java.time.LocalDateTime;
+import java.util.Collection;
 
 public interface CalendarEventRepository extends
         JpaRepository<CalendarEvent, Long>,
         JpaSpecificationExecutor<CalendarEvent> { // 👈 2. 繼承 JpaSpecificationExecutor[cite: 2]
     @Query("from CalendarEvent")
     Page<CalendarEvent> findLastest(Pageable pgb);
+
+//     計算指定狀態的活動數量。
+
+    long countByStatus(String status);
+
+//     計算尚未開始，而且狀態不在排除清單內的活動。
+
+    long countByStartAtAfterAndStatusNotIn(
+            LocalDateTime now,
+            Collection<String> excludedStatuses
+    );
 }

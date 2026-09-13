@@ -34,13 +34,14 @@
           <td>{{ formatDate(event.endAt) }}</td>
           <td>
             <button
-              class="btn btn-sm btn-outline-info me-1"
+              class="btn btn-sm btn-outline-info event-small-action me-1"
               @click="$emit('open-detail', event)"
             >
               查看
             </button>
             <button
-              class="btn btn-sm btn-outline-primary me-1"
+              v-if="event.status !== 'CANCELLED'"
+              class="btn btn-sm btn-outline-primary event-small-action me-1"
               @click="$emit('open-edit', event)"
             >
               編輯
@@ -53,7 +54,14 @@
               取消活動
             </button>
 
-            <span v-else class="badge bg-danger"> 已取消 </span>
+            <button
+              v-else
+              type="button"
+              class="btn btn-sm event-small-action event-cancelled"
+              disabled
+            >
+              已取消
+            </button>
           </td>
         </tr>
 
@@ -111,3 +119,24 @@ const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleString("zh-TW", { hour12: false });
 };
 </script>
+
+<style scoped>
+.event-small-action {
+  display: inline-flex;
+  width: 64px;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.6rem;
+  white-space: nowrap;
+}
+
+.event-cancelled,
+.event-cancelled:disabled {
+  border: 1px solid var(--admin-rose);
+  color: #704f4b;
+  background: #eadfdd;
+  cursor: default;
+  opacity: 1;
+}
+</style>

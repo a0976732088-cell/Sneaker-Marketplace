@@ -1,0 +1,479 @@
+/*
+ * Calendar & Notification Admin
+ * Nike-inspired black/white layout with Morandi accents
+ */
+
+.event-admin {
+  --admin-black: #111111;
+  --admin-black-soft: #2b2b2b;
+
+  --admin-white: #ffffff;
+  --admin-paper: #f7f7f5;
+  --admin-cement: #e9e8e3;
+  --admin-cement-dark: #d7d5cf;
+
+  --admin-text: #111111;
+  --admin-text-soft: #555550;
+  --admin-muted: #7c7b75;
+  --admin-line: #d8d7d2;
+
+  --admin-sage: #b9c3b3;
+  --admin-sage-dark: #788575;
+
+  --admin-blue-gray: #b5c0c7;
+  --admin-blue-gray-dark: #697982;
+
+  --admin-mauve: #c4b5c1;
+  --admin-mauve-dark: #806f7d;
+
+  --admin-clay: #ccb7aa;
+  --admin-clay-dark: #876d5e;
+
+  --admin-rose: #c9aaa6;
+  --admin-rose-dark: #875f5a;
+
+  min-height: 0;
+  padding: 0;
+  color: var(--admin-text);
+  background: transparent;
+}
+
+/* ==============================
+   頁面標題
+   ============================== */
+
+.event-admin .admin-header {
+  position: relative;
+  margin-bottom: 1.75rem;
+  padding: 2.25rem 0 0;
+  border: 0;
+  border-bottom: 1px solid var(--admin-line);
+  border-radius: 0;
+  color: var(--admin-text);
+  background: transparent;
+  box-shadow: none;
+}
+
+.event-admin .admin-header::before {
+  display: none;
+}
+
+.event-admin .admin-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.event-admin .admin-eyebrow {
+  display: block;
+  margin-bottom: 0.55rem;
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.event-admin .admin-title {
+  margin: 0 0 0.55rem;
+  color: var(--admin-black);
+  font-size: clamp(2rem, 5vw, 3.1rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+
+.event-admin .admin-description {
+  max-width: 620px;
+  margin: 0;
+  color: var(--admin-text-soft);
+  font-size: 0.95rem;
+}
+
+.event-admin .admin-badge {
+  flex: 0 0 auto;
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  background: var(--admin-black);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+}
+
+/* ==============================
+   頁籤
+   ============================== */
+
+.event-admin .admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  overflow: visible;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.event-admin .admin-tab {
+  position: static;
+  flex: 0 0 auto;
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--admin-text);
+  background: var(--admin-cement);
+  font-size: 0.8rem;
+  font-weight: 650;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+
+.event-admin .admin-tab::after {
+  display: none;
+}
+
+.event-admin .admin-tab:hover {
+  transform: translateY(-1px);
+  color: var(--admin-text);
+  background: var(--admin-cement-dark);
+}
+
+.event-admin .admin-tab.active {
+  color: #ffffff;
+  background: var(--admin-black);
+}
+
+/* ==============================
+   內容與卡片
+   ============================== */
+
+.event-admin .admin-content {
+  min-width: 0;
+}
+
+.event-admin .card {
+  border: 0 !important;
+  border-radius: 1.15rem !important;
+  color: var(--admin-text);
+  background: var(--admin-paper) !important;
+  box-shadow: none !important;
+}
+
+.event-admin .card .card {
+  border: 1px solid var(--admin-line) !important;
+  background: var(--admin-white) !important;
+}
+
+.event-admin .container,
+.event-admin .container-fluid {
+  max-width: 100%;
+}
+
+.event-admin h1,
+.event-admin h2,
+.event-admin h3,
+.event-admin h4 {
+  color: var(--admin-black);
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+
+.event-admin hr {
+  border-color: var(--admin-line);
+  opacity: 1;
+}
+
+/* ==============================
+   表單
+   ============================== */
+
+.event-admin .form-label {
+  color: var(--admin-text);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.event-admin .form-control,
+.event-admin .form-select {
+  min-height: 46px;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.65rem;
+  color: var(--admin-text);
+  background: var(--admin-white);
+}
+
+.event-admin textarea.form-control {
+  min-height: 130px;
+}
+
+.event-admin .form-control:focus,
+.event-admin .form-select:focus {
+  border-color: var(--admin-black);
+  box-shadow: 0 0 0 2px rgb(17 17 17 / 8%);
+}
+
+.event-admin .form-control::placeholder {
+  color: #999892;
+}
+
+.event-admin .form-text,
+.event-admin .text-muted,
+.event-admin .text-secondary {
+  color: var(--admin-muted) !important;
+}
+
+.event-admin input[type="file"]::file-selector-button {
+  border: 0;
+  border-right: 1px solid var(--admin-line);
+  color: var(--admin-text);
+  background: var(--admin-cement);
+}
+
+/* ==============================
+   搜尋區
+   ============================== */
+
+.event-admin .bg-light {
+  border: 0 !important;
+  border-radius: 1rem !important;
+  background: var(--admin-cement) !important;
+}
+
+/* ==============================
+   按鈕
+   ============================== */
+
+.event-admin .btn {
+  padding: 0.62rem 1rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.event-admin .btn-primary {
+  border-color: var(--admin-black);
+  color: #ffffff;
+  background: var(--admin-black);
+}
+
+.event-admin .btn-primary:hover,
+.event-admin .btn-primary:focus {
+  border-color: var(--admin-black-soft);
+  background: var(--admin-black-soft);
+}
+
+.event-admin .btn-outline-primary,
+.event-admin .btn-outline-secondary {
+  border-color: var(--admin-black);
+  color: var(--admin-black);
+  background: transparent;
+}
+
+.event-admin .btn-outline-primary:hover,
+.event-admin .btn-outline-secondary:hover {
+  border-color: var(--admin-black);
+  color: #ffffff;
+  background: var(--admin-black);
+}
+
+.event-admin .btn-outline-info {
+  border-color: var(--admin-blue-gray-dark);
+  color: var(--admin-blue-gray-dark);
+}
+
+.event-admin .btn-outline-info:hover {
+  border-color: var(--admin-blue-gray-dark);
+  color: #ffffff;
+  background: var(--admin-blue-gray-dark);
+}
+
+.event-admin .btn-outline-success {
+  border-color: var(--admin-sage-dark);
+  color: var(--admin-sage-dark);
+}
+
+.event-admin .btn-outline-success:hover {
+  border-color: var(--admin-sage-dark);
+  color: #ffffff;
+  background: var(--admin-sage-dark);
+}
+
+.event-admin .btn-outline-warning {
+  border-color: var(--admin-clay-dark);
+  color: var(--admin-clay-dark);
+}
+
+.event-admin .btn-outline-warning:hover {
+  border-color: var(--admin-clay-dark);
+  color: #ffffff;
+  background: var(--admin-clay-dark);
+}
+
+.event-admin .btn-outline-danger {
+  border-color: var(--admin-rose-dark);
+  color: var(--admin-rose-dark);
+}
+
+.event-admin .btn-outline-danger:hover {
+  border-color: var(--admin-rose-dark);
+  color: #ffffff;
+  background: var(--admin-rose-dark);
+}
+
+/* ==============================
+   表格
+   ============================== */
+
+.event-admin .table-responsive {
+  overflow: hidden;
+  border: 0;
+  border-radius: 1rem;
+  background: var(--admin-white);
+}
+
+.event-admin .table {
+  margin-bottom: 0;
+  color: var(--admin-text);
+}
+
+.event-admin .table thead th {
+  padding: 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--admin-line);
+  color: var(--admin-text-soft);
+  background: var(--admin-cement) !important;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.event-admin .table tbody td {
+  padding: 1rem;
+  border-color: #ecebe7;
+  color: var(--admin-text);
+  background: var(--admin-white);
+  font-size: 0.82rem;
+  vertical-align: middle;
+}
+
+.event-admin .table-hover tbody tr:hover td {
+  background: #f3f2ee;
+}
+
+.event-admin .text-dark {
+  color: var(--admin-black) !important;
+}
+
+.event-admin .text-success {
+  color: var(--admin-sage-dark) !important;
+}
+
+/* ==============================
+   狀態 Badge
+   ============================== */
+
+.event-admin .badge {
+  padding: 0.42rem 0.65rem;
+  border-radius: 999px;
+  font-weight: 650;
+}
+
+.event-admin .badge.bg-info,
+.event-admin .badge.bg-primary {
+  color: #53636c !important;
+  background: var(--admin-blue-gray) !important;
+}
+
+.event-admin .badge.bg-success {
+  color: #556250 !important;
+  background: var(--admin-sage) !important;
+}
+
+.event-admin .badge.bg-warning {
+  color: #6e594d !important;
+  background: var(--admin-clay) !important;
+}
+
+.event-admin .badge.bg-danger {
+  color: #704f4b !important;
+  background: var(--admin-rose) !important;
+}
+
+.event-admin .badge.bg-secondary {
+  color: #575752 !important;
+  background: var(--admin-cement-dark) !important;
+}
+
+/* ==============================
+   分頁與提示
+   ============================== */
+
+.event-admin .page-link {
+  border-color: var(--admin-line);
+  color: var(--admin-black);
+  background: var(--admin-white);
+}
+
+.event-admin .page-item.active .page-link {
+  border-color: var(--admin-black);
+  color: #ffffff;
+  background: var(--admin-black);
+}
+
+.event-admin .alert-success {
+  border-color: var(--admin-sage);
+  color: #546250;
+  background: #e5e9e2;
+}
+
+.event-admin .alert-danger {
+  border-color: var(--admin-rose);
+  color: #76524e;
+  background: #eee3e1;
+}
+
+/* ==============================
+   彈窗
+   ============================== */
+
+.event-admin .modal-content {
+  border: 0;
+  border-radius: 1.2rem;
+  color: var(--admin-text);
+  background: var(--admin-white);
+}
+
+.event-admin .modal-header,
+.event-admin .modal-footer {
+  border-color: var(--admin-line);
+}
+
+/* ==============================
+   手機版
+   ============================== */
+
+@media (max-width: 768px) {
+  .event-admin .admin-header {
+    padding-top: 1.5rem;
+  }
+
+  .event-admin .admin-header-top {
+    flex-direction: column;
+  }
+
+  .event-admin .admin-title {
+    font-size: 2rem;
+  }
+
+  .event-admin .admin-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+}

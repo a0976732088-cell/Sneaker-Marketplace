@@ -64,6 +64,15 @@ public class CalendarEventService {
                                         "找不到活動"
                                 )
                         );
+        /*
+         * 已取消活動不可恢復，也不可再修改內容。
+         */
+        if ("CANCELLED".equals(calendarEvent.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "已取消活動不能重新啟用或修改"
+            );
+        }
 
         LocalDateTime previousStartAt =
                 calendarEvent.getStartAt();
@@ -184,7 +193,8 @@ public class CalendarEventService {
             String status,
             LocalDateTime startDate,
             LocalDateTime endDate,
-            Integer pageNumber){
+            Integer pageNumber,
+            Integer pageSize){
         Specification<CalendarEvent> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             // 1. 標題模糊查詢 (LIKE %title%)
@@ -210,8 +220,22 @@ public class CalendarEventService {
             // 將所有條件用 AND 串起來
             return cb.and(predicates.toArray(new Predicate[0]));
         };
-        Pageable pgb = PageRequest.of(pageNumber-1, 10, Sort.Direction.DESC, "startAt");//從0開始所以要-1
+        int safePage =
+                pageNumber != null && pageNumber > 0
+                        ? pageNumber - 1
+                        : 0;
 
+        int safePageSize =
+                pageSize != null && pageSize > 0
+                        ? Math.min(pageSize, 100)
+                        : 10;
+
+        Pageable pgb = PageRequest.of(
+                safePage,
+                safePageSize,
+                Sort.Direction.DESC,
+                "startAt"
+        );
         return calendarEventRepo.findAll(spec, pgb);
     }
 

@@ -240,7 +240,13 @@ const unreadCount = computed(() => {
   return notifications.value.filter((n) => !n.isRead).length;
 });
 
+// 未登入時連通知抽屜都不能打開
 const toggleNotice = () => {
+  if (!currentMember.value) {
+    alert("請先登入會員");
+    return;
+  }
+
   isNoticeOpen.value = !isNoticeOpen.value;
 
   if (isNoticeOpen.value) {
@@ -263,6 +269,15 @@ const fetchNotifications = async () => {
   }
 };
 
+watch(currentMember, (member) => {
+  if (member) {
+    fetchNotifications();
+  } else {
+    notifications.value = [];
+    isNoticeOpen.value = false;
+  }
+});
+
 const handleMarkAsRead = async (id) => {
   try {
     // 呼叫後端更新資料庫 is_read = 1 與 read_at
@@ -284,8 +299,6 @@ onMounted(() => {
   // Navbar 登入會員由 watch
   // immediate: true 負責讀取
 
-  // 這裡保留原本通知初始化
-  fetchNotifications();
   // 🎯 每 5 秒自動向後端拉取最新通知
   timer = setInterval(() => {
     fetchNotifications();
