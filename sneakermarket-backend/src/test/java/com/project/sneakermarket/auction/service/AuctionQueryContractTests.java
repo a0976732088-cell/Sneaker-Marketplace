@@ -44,7 +44,7 @@ class AuctionQueryContractTests {
         product.setSellerId(42L);
         product.setBrandId(71L);
         product.setCategoryId(92L);
-        when(auctions.findById(12L)).thenReturn(Optional.of(auction));
+        when(auctions.findPublicById(12L)).thenReturn(Optional.of(auction));
         when(products.findById(3L)).thenReturn(Optional.of(product));
         when(images.findByAuctionProductIdOrderBySortOrderAsc(3L)).thenReturn(List.of());
         when(references.getOptions()).thenReturn(new AuctionOptionsResponse(
@@ -100,7 +100,7 @@ class AuctionQueryContractTests {
         assertEquals(AuctionStatus.ACTIVE, result.status());
         assertEquals(endAt, result.endAt());
         assertEquals(updatedAt, result.updatedAt());
-        verify(auctions).findById(12L);
+        verify(auctions).findPublicById(12L);
         verify(auctions, never()).findByIdForUpdate(anyLong());
         verify(auctions, never()).save(any());
     }
@@ -118,7 +118,7 @@ class AuctionQueryContractTests {
 
     @Test
     void missingAuctionStatusReturnsNotFound() {
-        when(auctions.findById(99L)).thenReturn(Optional.empty());
+        when(auctions.findPublicById(99L)).thenReturn(Optional.empty());
 
         assertThrows(
                 ResourceNotFoundException.class,
@@ -150,4 +150,29 @@ class AuctionQueryContractTests {
         assertNull(result.brandName());
         assertNull(result.categoryName());
     }
-}
+
+    @Test
+    void removedDeletedAndLegacyRemovedAuctionsAreNotPubliclyReadable() {
+        for (Auction hidden : List.of(hiddenWithRemovedAt(), hiddenWithDeletedAt(), hiddenWithRemovedStatus())) {
+            when(auctions.findPublicById(12L)).thenReturn(Optional.empty());
+            assertThrows(ResourceNotFoundException.class, () -> query.getAuctionStatus(12L));
+            assertThrows(ResourceNotFoundException.class, () -> query.getAuctionDetail(12L, null));
+        }
+    }
+
+    private Auction hiddenWithRemovedAt() {
+        auction.setRemovedAt(LocalDateTime.of(2026, 9, 7, 11, 0));
+        return auction;
+    }
+
+    private Auction hiddenWithDeletedAt() {
+        auction.setRemovedAt(null);
+        auction.setDeletedAt(LocalDateTime.of(2026, 9, 7, 11, 0));
+        return auction;
+    }
+
+    private Auction hiddenWithRemovedStatus() {
+        auction.setDeletedAt(null);
+        auction.setStatus(AuctionStatus.REMOVED);
+        return auction;
+    }}

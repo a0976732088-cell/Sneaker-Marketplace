@@ -100,10 +100,10 @@ class AuctionMemberAccessTests {
         var money = new BigDecimal("6500");
         when(queries.getMyBids(77L, 0, 10)).thenReturn(new PageData<>(List.of(
                 new AuctionMyBidResponse(1L, "Shoe", "Model", "US 9", money, money, 3,
-                        AuctionStatus.SOLD, false, true, AuctionResultStatus.SOLD, money, at, at)), 0, 10, 1, 1));
+                        AuctionStatus.SOLD, AuctionAdminManagementState.VISIBLE, false, true, AuctionResultStatus.SOLD, money, at, at)), 0, 10, 1, 1));
         when(queries.getMyListings(77L, 0, 10)).thenReturn(new PageData<>(List.of(
                 new AuctionMyListingResponse(1L, "Shoe", "Model", "US 9", money, 3,
-                        AuctionStatus.SOLD, AuctionResultStatus.SOLD, money, at, at, at)), 0, 10, 1, 1));
+                        AuctionStatus.SOLD, AuctionAdminManagementState.VISIBLE, AuctionResultStatus.SOLD, money, at, at, at)), 0, 10, 1, 1));
         when(queries.getMyAuctionOrders(77L, 0, 10)).thenReturn(new PageData<>(List.of(
                 new AuctionOrderSummaryResponse("AO-test", 1L, "Shoe", money, "Transfer",
                         AuctionPaymentStatus.PENDING, AuctionShippingStatus.NOT_SHIPPED,
@@ -114,13 +114,15 @@ class AuctionMemberAccessTests {
                     .andExpect(jsonPath("$.data.items[0].auctionId").value(1));
             for (String field : List.of("bidderId", "highestBidderId", "winnerId", "sellerId", "buyerId",
                     "memberId", "email", "jwt", "JWT", "password", "passwordHash",
-                    "receiverName", "receiverPhone", "shippingAddress")) {
+                    "receiverName", "receiverPhone", "shippingAddress", "removedByMemberId", "deletedByMemberId",
+                    "removeReason", "deleteReason")) {
                 request.andExpect(jsonPath("$.data.items[0]." + field).doesNotExist());
             }
         }
         mvc.perform(get("/api/auctions/me/bids").session(activeSession()))
                 .andExpect(jsonPath("$.data.items[0].won").value(true))
-                .andExpect(jsonPath("$.data.items[0].leading").value(false));
+                .andExpect(jsonPath("$.data.items[0].leading").value(false))
+                .andExpect(jsonPath("$.data.items[0].managementState").value("VISIBLE"));
     }
 
     @ParameterizedTest

@@ -25,6 +25,7 @@ class AuctionLifecycleServiceTests {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 10, 12, 0);
     private AuctionRepository auctions;
     private AuctionResultRepository results;
+    private org.springframework.context.ApplicationEventPublisher events;
     private AuctionLifecycleService service;
     private Auction auction;
 
@@ -32,8 +33,9 @@ class AuctionLifecycleServiceTests {
     void setup() {
         auctions = mock(AuctionRepository.class);
         results = mock(AuctionResultRepository.class);
+        events = mock(org.springframework.context.ApplicationEventPublisher.class);
         var time = new AuctionTime(Clock.fixed(Instant.parse("2026-09-10T04:00:00Z"), ZoneOffset.UTC));
-        service = new AuctionLifecycleService(auctions, results, time, mock(org.springframework.context.ApplicationEventPublisher.class));
+        service = new AuctionLifecycleService(auctions, results, time, events);
         auction = new Auction();
         auction.setAuctionId(1L);
         auction.setStatus(AuctionStatus.SCHEDULED);
@@ -70,6 +72,57 @@ class AuctionLifecycleServiceTests {
         service.processAuction(1L);
         assertEquals(AuctionStatus.ACTIVE, auction.getStatus());
         noWrites();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"-1", "1"})
+    void removedScheduledBeforeEndNeverBecomesActive(int startOffsetMinutes) {
+        auction.setRemovedAt(NOW.minusHours(1));
+        auction.setStartAt(NOW.plusMinutes(startOffsetMinutes));
+
+        service.processAuction(1L);
+
+        assertEquals(AuctionStatus.SCHEDULED, auction.getStatus());
+        noWrites();
+    }
+
+    @Test
+    void removedActiveBeforeEndWaitsWithoutClosing() {
+        auction.setStatus(AuctionStatus.ACTIVE);
+        auction.setRemovedAt(NOW.minusHours(1));
+
+        service.processAuction(1L);
+
+        assertEquals(AuctionStatus.ACTIVE, auction.getStatus());
+        noWrites();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"SCHEDULED,0", "SCHEDULED,3", "ACTIVE,0", "ACTIVE,3"})
+    void removedAuctionAtEndIsVoidedAndKeepsBidLedger(AuctionStatus initial, int bidCount) {
+        auction.setStatus(initial);
+        auction.setStartAt(NOW.minusHours(1));
+        auction.setEndAt(NOW);
+        auction.setRemovedAt(NOW.minusMinutes(30));
+        auction.setBidCount(bidCount);
+        auction.setHighestBidderId(bidCount > 0 ? 77L : null);
+        auction.setCurrentPrice(new BigDecimal(bidCount > 0 ? "6500.00" : "5000.00"));
+
+        service.processAuction(1L);
+        service.processAuction(1L);
+
+        assertEquals(AuctionStatus.REMOVED, auction.getStatus());
+        assertEquals(bidCount, auction.getBidCount());
+        assertEquals(bidCount > 0 ? 77L : null, auction.getHighestBidderId());
+        assertEquals(0, new BigDecimal(bidCount > 0 ? "6500.00" : "5000.00")
+                .compareTo(auction.getCurrentPrice()));
+        AuctionResult result = onlyResult();
+        assertEquals(AuctionResultStatus.REMOVED, result.getResultStatus());
+        assertNull(result.getWinnerId());
+        assertNull(result.getFinalPrice());
+        assertNotNull(result.getReason());
+        assertFalse(result.getReason().isBlank());
+        verifyNoInteractions(events);
     }
 
     @ParameterizedTest
@@ -141,6 +194,34 @@ class AuctionLifecycleServiceTests {
     }
 
     @Test
+    void existingResultPreventsDuplicateInsertWithoutUsingUniqueConstraintAsControlFlow() {
+        auction.setStatus(AuctionStatus.ACTIVE);
+        auction.setEndAt(NOW);
+        AuctionResult existing = new AuctionResult();
+        existing.setAuctionId(1L);
+        existing.setResultStatus(AuctionResultStatus.SOLD);
+        when(results.findByAuctionId(1L)).thenReturn(Optional.of(existing));
+
+        assertDoesNotThrow(() -> service.processAuction(1L));
+
+        assertEquals(AuctionStatus.ACTIVE, auction.getStatus());
+        verify(results, never()).save(any());
+        verify(auctions, never()).save(any());
+    }
+
+    @Test
+    void deletedRunningAuctionIsIgnored() {
+        auction.setStatus(AuctionStatus.ACTIVE);
+        auction.setEndAt(NOW);
+        auction.setDeletedAt(NOW.minusMinutes(1));
+
+        service.processAuction(1L);
+
+        assertEquals(AuctionStatus.ACTIVE, auction.getStatus());
+        noWrites();
+    }
+
+    @Test
     void missingCandidateIsIgnored() {
         when(auctions.findByIdForUpdate(1L)).thenReturn(Optional.empty());
         service.processAuction(1L);
@@ -171,7 +252,7 @@ class AuctionLifecycleServiceTests {
 
     private void noWrites() {
         verify(auctions, never()).save(any());
-        verifyNoInteractions(results);
+        verify(results, never()).save(any());
         assertEquals(NOW.minusDays(1), auction.getUpdatedAt());
     }
 }

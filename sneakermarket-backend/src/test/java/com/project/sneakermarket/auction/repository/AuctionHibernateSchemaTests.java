@@ -65,10 +65,11 @@ class AuctionHibernateSchemaTests {
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys.tables", Integer.class));
 
             Long resultId;
+            Long auctionId;
             try (SessionFactory factory = updateSchema(isolated)) {
                 assertSchema(jdbc);
                 assertColumnTypes(jdbc);
-                long auctionId = jdbc.queryForObject("""
+                auctionId = jdbc.queryForObject("""
                         INSERT INTO dbo.auctions
                         (auction_product_id, start_price, current_price, min_increment,
                          start_at, end_at, status, bid_count, version, created_at, updated_at)
@@ -125,11 +126,25 @@ class AuctionHibernateSchemaTests {
                         + " result_status = 'UNSOLD' WHERE result_id = ?", resultId);
             }
 
-            // 再次 update 不重建 table、不丟掉既有 Result / Order，索引不重複。
+            // 模擬既有交易被管理員下架與假刪除；再次 update 必須保留帳本和 metadata。
+            jdbc.update("""
+                    UPDATE dbo.auctions SET removed_at='2026-09-12T13:00:00', removed_by_member_id=7,
+                        remove_reason=N'平台下架', removed_from_status='SOLD',
+                        deleted_at='2026-09-12T14:00:00', deleted_by_member_id=7, delete_reason=N'假刪除'
+                    WHERE auction_id=?
+                    """, auctionId);
+
+            // 再次 update 不重建 table、不丟掉既有 Result / Order 或管理 metadata，索引不重複。
             try (SessionFactory factory = updateSchema(isolated)) {
                 assertSchema(jdbc);
                 assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM dbo.auction_results", Integer.class));
                 assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM dbo.auction_orders", Integer.class));
+                assertEquals("平台下架", jdbc.queryForObject(
+                        "SELECT remove_reason FROM dbo.auctions WHERE auction_id=?", String.class, auctionId));
+                assertEquals("SOLD", jdbc.queryForObject(
+                        "SELECT removed_from_status FROM dbo.auctions WHERE auction_id=?", String.class, auctionId));
+                assertEquals("假刪除", jdbc.queryForObject(
+                        "SELECT delete_reason FROM dbo.auctions WHERE auction_id=?", String.class, auctionId));
                 assertEquals("收件快照", jdbc.queryForObject(
                         "SELECT receiver_name FROM dbo.auction_orders WHERE order_number = 'AO-schema'", String.class));
                 try (var session = factory.openSession()) {
@@ -169,6 +184,7 @@ class AuctionHibernateSchemaTests {
     private void assertSchema(JdbcTemplate jdbc) {
         assertOrderSchema(jdbc);
         assertEmailSchema(jdbc);
+        assertAuctionModerationSchema(jdbc);
         assertEquals(1, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys.tables WHERE object_id = OBJECT_ID('dbo.auction_results')", Integer.class));
         assertEquals(1, jdbc.queryForObject("""
@@ -192,6 +208,41 @@ class AuctionHibernateSchemaTests {
         assertIndex(jdbc, "IX_auctions_status_end_at", List.of("status", "end_at"));
     }
 
+    private void assertAuctionModerationSchema(JdbcTemplate jdbc) {
+        String table = "dbo.auctions";
+        List<String> columns = List.of(
+                "delete_reason", "deleted_at", "deleted_by_member_id", "remove_reason",
+                "removed_at", "removed_by_member_id", "removed_from_status");
+        assertEquals(columns, jdbc.queryForList("""
+                SELECT name FROM sys.columns
+                WHERE object_id=OBJECT_ID(?)
+                  AND name IN ('removed_at','removed_by_member_id','remove_reason','removed_from_status',
+                               'deleted_at','deleted_by_member_id','delete_reason')
+                  AND is_nullable=1 ORDER BY name
+                """, String.class, table));
+        for (String column : List.of("removed_at", "deleted_at")) {
+            assertEquals("datetime2:0", jdbc.queryForObject("""
+                    SELECT CONCAT(TYPE_NAME(user_type_id), ':', scale) FROM sys.columns
+                    WHERE object_id=OBJECT_ID(?) AND name=?
+                    """, String.class, table, column));
+        }
+        for (String column : List.of("removed_by_member_id", "deleted_by_member_id")) {
+            assertEquals("bigint", jdbc.queryForObject("""
+                    SELECT TYPE_NAME(user_type_id) FROM sys.columns
+                    WHERE object_id=OBJECT_ID(?) AND name=?
+                    """, String.class, table, column));
+        }
+        for (String column : List.of("remove_reason", "delete_reason")) {
+            assertEquals("nvarchar:1000", jdbc.queryForObject("""
+                    SELECT CONCAT(TYPE_NAME(user_type_id), ':', max_length) FROM sys.columns
+                    WHERE object_id=OBJECT_ID(?) AND name=?
+                    """, String.class, table, column));
+        }
+        assertEquals("varchar:20", jdbc.queryForObject("""
+                SELECT CONCAT(TYPE_NAME(user_type_id), ':', max_length) FROM sys.columns
+                WHERE object_id=OBJECT_ID(?) AND name='removed_from_status'
+                """, String.class, table));
+    }
     private void assertForeignKey(JdbcTemplate jdbc, String name, String source, String targetTable, String target) {
         assertEquals(1, jdbc.queryForObject("""
                 SELECT COUNT(*) FROM sys.foreign_keys fk
@@ -444,6 +495,7 @@ class AuctionHibernateSchemaTests {
             // 所有表只由正式 Entity 建立，不執行 CREATE TABLE 或 migration 腳本。
             try (var factory = updateSchema(isolated)) {
                 assertEmailSchema(jdbc);
+        assertAuctionModerationSchema(jdbc);
             }
             long memberId = jdbc.queryForObject("""
                     INSERT INTO dbo.members (account,password_hash,name,email,phone,role)
@@ -476,6 +528,7 @@ class AuctionHibernateSchemaTests {
             var before = jdbc.queryForMap("SELECT * FROM dbo.auction_email_logs WHERE email_log_id=?", email.getEmailLogId());
             try (var factory = updateSchema(isolated)) {
                 assertEmailSchema(jdbc);
+        assertAuctionModerationSchema(jdbc);
                 assertEquals(tableId, jdbc.queryForObject("SELECT OBJECT_ID('dbo.auction_email_logs')", Long.class));
                 assertEquals(before, jdbc.queryForMap(
                         "SELECT * FROM dbo.auction_email_logs WHERE email_log_id=?", email.getEmailLogId()));
@@ -517,4 +570,5 @@ class AuctionHibernateSchemaTests {
             transaction.commit();
         }
         assertNotNull(order.getAuctionOrderId());
-    }}
+    }
+}

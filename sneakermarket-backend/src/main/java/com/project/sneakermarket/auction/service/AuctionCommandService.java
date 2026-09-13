@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.project.sneakermarket.common.exception.ForbiddenException;
+import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -187,6 +188,9 @@ public class AuctionCommandService {
                                 )
                         );
 
+        if (auction.getRemovedAt() != null || auction.getDeletedAt() != null) {
+            throw new AuctionConflictException("競標已下架，無法修改");
+        }
         // 只有刊登者本人可以修改
         if (!product.getSellerId().equals(sellerId)) {
             throw new ForbiddenException(
@@ -472,6 +476,9 @@ public class AuctionCommandService {
                                 )
                         );
 
+        if (auction.getRemovedAt() != null || auction.getDeletedAt() != null) {
+            throw new AuctionConflictException("競標已下架，無法取消");
+        }
         // 只有刊登商品的賣家本人可以取消
         if (!product.getSellerId().equals(sellerId)) {
             throw new ForbiddenException(
@@ -520,7 +527,7 @@ public class AuctionCommandService {
 
         if (auction.getStatus() == AuctionStatus.REMOVED) {
             throw new BusinessException(
-                    "此競標已被管理員下架"
+                    "此競標已廢標"
             );
         }
 

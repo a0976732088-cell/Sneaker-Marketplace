@@ -55,7 +55,11 @@ function harness(statusResponse) {
   };
 }
 
-for (const [status, label, bidCount] of [["SOLD", "已成交", 1], ["UNSOLD", "流標", 0]]) {
+for (const [status, label, bidCount] of [
+  ["SOLD", "已成交", 1],
+  ["UNSOLD", "流標", 0],
+  ["REMOVED", "廢標", 1],
+]) {
   test(`existing polling displays ${status}, disables bidding and stops timer`, async () => {
     const h = harness({
       auctionId: 1, status, bidCount,

@@ -23,4 +23,14 @@ public interface AuctionProductImageRepository
     List<AuctionProductImage> findByAuctionProductIdOrderBySortOrderAsc(
             Long auctionProductId
     );
+
+    /**
+     * 一次取得多個競標商品的圖片，供分頁列表選出每個商品的第一張圖。
+     *
+     * @param auctionProductIds 目前頁面的競標商品 ID
+     * @return 依商品 ID 與顯示順序排列的圖片清單
+     */
+    List<AuctionProductImage> findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(
+            List<Long> auctionProductIds
+    );
 }

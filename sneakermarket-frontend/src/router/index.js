@@ -117,6 +117,23 @@ const routes = [
       requiresAdmin: true,
     },
   },
+  {
+    path: "/admin/auctions",
+    name: "admin-auctions",
+    component: () => import("@/views/admin/AdminAuctionListView.vue"),
+    meta: {
+      requiresAdmin: true,
+    },
+  },
+
+  {
+    path: "/admin/auctions/:id",
+    name: "admin-auction-detail",
+    component: () => import("@/views/admin/AdminAuctionDetailView.vue"),
+    meta: {
+      requiresAdmin: true,
+    },
+  },
 
   {
     path: "/ads/storefront",

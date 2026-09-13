@@ -1,12 +1,12 @@
 package com.project.sneakermarket.auction.repository;
 
-import java.util.Optional;
-import java.util.List;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -16,53 +16,39 @@ import com.project.sneakermarket.auction.entity.Auction;
 
 import jakarta.persistence.LockModeType;
 
-/**
- * 競標主資料 Repository。
- * 負責存取 dbo.auctions 資料表。
- *
- * JpaRepository 已提供基本 CRUD 功能，
- * JpaSpecificationExecutor 則提供動態條件查詢能力。
- */
-public interface AuctionRepository
-        extends JpaRepository<Auction, Long>,
-        JpaSpecificationExecutor<Auction> {
+/** 競標主資料 Repository；管理寫入一律透過 findByIdForUpdate 競爭同一筆 row lock。 */
+public interface AuctionRepository extends JpaRepository<Auction, Long>, JpaSpecificationExecutor<Auction> {
 
-    /** 歷史刊登不依 status 過濾，會員範圍在資料庫查詢套用。 */
+    /** 歷史刊登保留下架與刪除資料，讓賣家仍能查看自己的交易歷史。 */
     @Query("""
             select a from Auction a where a.auctionProductId in
                 (select p.auctionProductId from AuctionProduct p where p.sellerId = :memberId)
             """)
     Page<Auction> findMemberListings(@Param("memberId") Long memberId, Pageable pageable);
 
-    /**
-     * 以資料庫悲觀寫入鎖查詢指定競標。
-     *
-     * 用於編輯、取消、出價等會改變競標狀態的操作，
-     * 避免多個交易同時依舊資料進行判斷。
-     *
-     * 此方法應在 @Transactional Service 中呼叫，
-     * Transaction 結束後鎖才會釋放。
-     *
-     * @param auctionId 競標 ID
-     * @return 被鎖定的競標資料
-     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            select a
-            from Auction a
-            where a.auctionId = :auctionId
-            """)
-    Optional<Auction> findByIdForUpdate(
-            @Param("auctionId") Long auctionId
-    );
+    @Query("select a from Auction a where a.auctionId = :auctionId")
+    Optional<Auction> findByIdForUpdate(@Param("auctionId") Long auctionId);
 
-    /** 僅投影到期候選 ID；Service 取得 row lock 後仍須重新判斷。 */
+    /** 公開端點共同使用；舊資料只有 REMOVED status 時也不可重新曝光。 */
+    @Query("""
+            select a from Auction a
+            where a.auctionId = :auctionId
+              and a.removedAt is null
+              and a.deletedAt is null
+              and a.status <> com.project.sneakermarket.auction.entity.AuctionStatus.REMOVED
+            """)
+    Optional<Auction> findPublicById(@Param("auctionId") Long auctionId);
+
+    /** 僅投影可處理的候選 ID；Service 取得 row lock 後仍會重新判斷 metadata 與狀態。 */
     @Query("""
             select a.auctionId from Auction a
-            where (a.status = com.project.sneakermarket.auction.entity.AuctionStatus.SCHEDULED
-                   and a.startAt <= :now)
-               or (a.status = com.project.sneakermarket.auction.entity.AuctionStatus.ACTIVE
-                   and a.endAt <= :now)
+            where a.deletedAt is null
+              and ((a.status = com.project.sneakermarket.auction.entity.AuctionStatus.SCHEDULED
+                    and ((a.removedAt is null and a.startAt <= :now)
+                      or (a.removedAt is not null and a.endAt <= :now)))
+                or (a.status = com.project.sneakermarket.auction.entity.AuctionStatus.ACTIVE
+                    and a.endAt <= :now))
             order by a.auctionId
             """)
     List<Long> findLifecycleCandidateIds(@Param("now") LocalDateTime now);

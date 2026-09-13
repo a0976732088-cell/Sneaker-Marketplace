@@ -65,8 +65,8 @@ const adminModules = [
   },
   {
     title: "競標系統",
-    description: "競標商品、出價、結標與競標訂單。",
-    to: { name: "auction" },
+    description: "管理競標、下架／恢復顯示與批量刪除。",
+    to: { name: "admin-auctions" },
   },
 ];
 

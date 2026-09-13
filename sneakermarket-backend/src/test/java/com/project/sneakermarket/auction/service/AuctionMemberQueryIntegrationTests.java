@@ -18,6 +18,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 
+import com.project.sneakermarket.auction.dto.AuctionAdminManagementState;
 import com.project.sneakermarket.auction.entity.*;
 import com.project.sneakermarket.auction.repository.*;
 import com.project.sneakermarket.common.exception.BusinessException;
@@ -94,6 +95,7 @@ class AuctionMemberQueryIntegrationTests {
             assertFalse(row.won());
             assertNull(row.resultStatus());
             assertNull(row.finalPrice());
+            assertEquals(AuctionAdminManagementState.VISIBLE, row.managementState());
         }
     }
 
@@ -128,6 +130,8 @@ class AuctionMemberQueryIntegrationTests {
         flush();
         var row = service.getMyBids(a, 0, 10).items().get(0);
         assertEquals(status, row.status());
+        assertEquals(status == AuctionStatus.REMOVED ? AuctionAdminManagementState.REMOVED
+                : AuctionAdminManagementState.VISIBLE, row.managementState());
         assertEquals(status.name(), row.resultStatus().name());
         assertFalse(row.leading());
         assertFalse(row.won());
@@ -148,6 +152,8 @@ class AuctionMemberQueryIntegrationTests {
         var row = page.items().get(0);
         assertEquals(mine.getAuctionId(), row.auctionId());
         assertEquals(status, row.status());
+        assertEquals(status == AuctionStatus.REMOVED ? AuctionAdminManagementState.REMOVED
+                : AuctionAdminManagementState.VISIBLE, row.managementState());
         assertEquals("Member query fixture", row.productName());
         assertEquals("Model 9", row.model());
         assertEquals("US 9", row.size());
@@ -161,6 +167,45 @@ class AuctionMemberQueryIntegrationTests {
         else assertEquals(status.name(), row.resultStatus().name());
     }
 
+    @Test
+    void removedAndDeletedActiveAuctionsRemainInMemberHistoryWithManagementState() {
+        var removed = auction(a, AuctionStatus.ACTIVE, NOW.minusMinutes(2));
+        removed.setHighestBidderId(a);
+        removed.setRemovedAt(NOW.minusMinutes(1));
+        removed.setRemovedByMemberId(seller);
+        removed.setRemoveReason("平台下架測試");
+
+        var deleted = auction(a, AuctionStatus.ACTIVE, NOW.minusMinutes(1));
+        deleted.setHighestBidderId(a);
+        deleted.setRemovedAt(NOW.minusSeconds(30));
+        deleted.setRemovedByMemberId(seller);
+        deleted.setRemoveReason("刪除前下架");
+        deleted.setDeletedAt(NOW);
+        deleted.setDeletedByMemberId(seller);
+        deleted.setDeleteReason("平台刪除測試");
+
+        bid(removed, a, "6500", NOW.minusMinutes(1));
+        bid(deleted, a, "6500", NOW);
+        flush();
+
+        var bidRows = service.getMyBids(a, 0, 10).items();
+        var removedBid = bidRows.stream().filter(row -> row.auctionId().equals(removed.getAuctionId()))
+                .findFirst().orElseThrow();
+        var deletedBid = bidRows.stream().filter(row -> row.auctionId().equals(deleted.getAuctionId()))
+                .findFirst().orElseThrow();
+        assertEquals(AuctionAdminManagementState.REMOVED, removedBid.managementState());
+        assertEquals(AuctionAdminManagementState.DELETED, deletedBid.managementState());
+        assertFalse(removedBid.leading());
+        assertFalse(deletedBid.leading());
+
+        var listingRows = service.getMyListings(a, 0, 10).items();
+        assertEquals(AuctionAdminManagementState.REMOVED,
+                listingRows.stream().filter(row -> row.auctionId().equals(removed.getAuctionId()))
+                        .findFirst().orElseThrow().managementState());
+        assertEquals(AuctionAdminManagementState.DELETED,
+                listingRows.stream().filter(row -> row.auctionId().equals(deleted.getAuctionId()))
+                        .findFirst().orElseThrow().managementState());
+    }
     @Test
     void listingsPageByCreationTimeThenId() {
         var old = auction(a, AuctionStatus.CANCELLED, NOW.minusDays(1));

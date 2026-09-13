@@ -612,7 +612,7 @@ const ownerManageMessage = computed(() => {
     SOLD: "此競標已成交，無法再修改或取消。",
     UNSOLD: "此競標已流標，無法再修改或取消。",
     CANCELLED: "此競標已取消。",
-    REMOVED: "此競標已被下架。",
+    REMOVED: "此競標已廢標。",
   };
 
   return statusMessageMap[auction.value.status] ?? "目前競標狀態不允許操作。";
@@ -723,7 +723,7 @@ function formatStatus(status) {
     SOLD: "已成交",
     UNSOLD: "流標",
     CANCELLED: "已取消",
-    REMOVED: "已下架",
+    REMOVED: "廢標",
   };
 
   return statusMap[status] ?? status;

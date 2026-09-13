@@ -1,0 +1,264 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import vm from "node:vm";
+import { computed, reactive, ref } from "vue";
+
+const servicePath = new URL("../src/service/auctionAdminService.js", import.meta.url);
+const viewPath = new URL("../src/views/admin/AdminAuctionListView.vue", import.meta.url);
+const routerPath = new URL("../src/router/index.js", import.meta.url);
+const homePath = new URL("../src/views/admin/AdminHomeView.vue", import.meta.url);
+const detailPath = new URL("../src/views/admin/AdminAuctionDetailView.vue", import.meta.url);
+const imageUrlPath = new URL("../src/utils/auctionImageUrl.js", import.meta.url);
+
+const [service, view, router, home, detail, imageUrl] = await Promise.all([
+  readFile(servicePath, "utf8"),
+  readFile(viewPath, "utf8"),
+  readFile(routerPath, "utf8"),
+  readFile(homePath, "utf8"),
+  readFile(detailPath, "utf8"),
+  readFile(imageUrlPath, "utf8"),
+]);
+
+test("admin auction service reuses httpClient and implements list, detail and mutation APIs", () => {
+  assert.match(service, /import httpClient from ["']\.\/httpClient["']/);
+  assert.doesNotMatch(service, /localhost:8080/);
+  for (const endpoint of [
+    "/admin/auctions",
+    "/admin/auctions/",
+    "/remove",
+    "/restore",
+    "/delete",
+    "/admin/auctions/batch/remove",
+    "/admin/auctions/batch/restore",
+    "/admin/auctions/batch/delete",
+    "getAdminAuctionDetail",
+  ]) assert.ok(service.includes(endpoint), endpoint);
+  assert.match(service, /restoreAdminAuctionsBatch[\s\S]*?\{ auctionIds \}/);
+});
+
+test("admin auction route is guarded and AdminHome links to the management page", () => {
+  assert.match(router, /path: ["']\/admin\/auctions["'][\s\S]*?requiresAdmin: true/);
+  assert.match(home, /title: ["']競標系統["'][\s\S]*?name: ["']admin-auctions["']/);
+  assert.match(home, /管理競標、下架／恢復顯示與批量刪除/);
+  assert.doesNotMatch(home, /批次假刪除/);
+});
+
+test("admin view uses auction status wording and keeps required SFC order", () => {
+  assert.ok(view.indexOf("<template>") < view.indexOf("<script setup>"));
+  for (const text of ["競標狀態", "管理狀態", "全選目前頁", "上一頁", "下一頁"]) {
+    assert.ok(view.includes(text), text);
+  }
+  assert.doesNotMatch(view, /生命週期/);
+  assert.doesNotMatch(view, /假刪除/);
+});
+
+test("single action buttons follow visible removed and deleted states", () => {
+  assert.match(view, /v-if="isLegacyRemoved\(auction\)"[\s\S]*?>補登下架資訊<\/button>/);
+  assert.match(view, /v-else-if="!auction\.removedAt && !auction\.deletedAt"[\s\S]*?>下架<\/button>/);
+  assert.match(view, /v-if="canRestoreAuction\(auction\)"[\s\S]*?btn-success[\s\S]*?>恢復顯示<\/button>/);
+  assert.match(view, /v-if="auction\.removedAt && !auction\.deletedAt"[\s\S]*?btn-danger[\s\S]*?>刪除<\/button>/);
+  assert.match(view, /v-if="auction\.deletedAt"[\s\S]*?>已刪除<\/span>/);
+  assert.match(view, /\.action-button[\s\S]*?box-shadow/);
+});
+
+test("action dialog requires confirmation and reasons only for remove or delete", () => {
+  assert.match(view, /<Teleport to="body">/);
+  assert.match(view, /role="dialog"/);
+  assert.match(view, /v-if="dialog\.action !== 'restore'"/);
+  assert.match(view, /id="auction-action-reason"[\s\S]*?maxlength="500"/);
+  assert.match(view, /v-model="dialog\.confirmed"/);
+  assert.match(view, /:disabled="!dialogValid \|\| submitting"/);
+  assert.match(view, /@submit\.prevent="confirmAction"/);
+  assert.match(view, /dialog\.confirmed[\s\S]*?dialog\.action === "restore"[\s\S]*?dialog\.reason\.trim\(\)\.length > 0/);
+  assert.doesNotMatch(view, /id="admin-action-reason"/);
+});
+
+test("batch controls appear only after entering batch mode", () => {
+  assert.match(view, /v-if="!batchMode"[\s\S]*?@click="enterBatchMode"[\s\S]*?>批量操作<\/button>/);
+  assert.match(view, /<div v-else[\s\S]*?openBatchAction\('remove'\)[\s\S]*?>批量下架<\/button>/);
+  assert.match(view, /openBatchAction\('restore'\)[\s\S]*?>批量恢復顯示<\/button>/);
+  assert.match(view, /openBatchAction\('delete'\)[\s\S]*?>批量刪除<\/button>/);
+  assert.match(view, /@click="exitBatchMode"[\s\S]*?>結束批量操作<\/button>/);
+  assert.match(view, /const restorableStatuses = new Set\(\["DRAFT", "SCHEDULED", "ACTIVE"\]\)/);
+  assert.match(view, /const canBatchRestore = computed\([\s\S]*?every\(canRestoreAuction\)/);
+  assert.match(view, /const canBatchDelete = computed\([\s\S]*?auction\.removedAt && !auction\.deletedAt/);
+});
+
+test("admin view prevents duplicate submissions and shows per-item batch results", () => {
+  assert.ok(view.includes("submitting.value || loading.value"));
+  assert.match(view, /if \(!dialogValid\.value \|\| submitting\.value\) return/);
+  assert.match(view, /restoreAdminAuctionsBatch\(ids\)/);
+  assert.match(view, /restoreAdminAuction\(ids\[0\]\)/);
+  assert.match(view, /result\.items/);
+  assert.match(view, /item\.success/);
+});
+
+test("admin list shows clear selectors, thumbnails, detail links and 15-row numbering", () => {
+  assert.ok(view.includes('class="form-check-input batch-checkbox"'));
+  assert.ok(view.includes("border: 2px solid #334155"));
+  assert.ok(view.includes('v-if="auction.imageUrl && !brokenImageIds.has(auction.auctionId)"'));
+  assert.ok(view.includes(':src="resolveAuctionImageUrl(auction.imageUrl)"'));
+  assert.ok(view.includes("name: 'admin-auction-detail'"));
+  assert.ok(view.includes('v-for="(auction, index) in items"'));
+  assert.ok(view.includes("pagination.page * pagination.size + index + 1"));
+  assert.ok(view.includes("size: 15"));
+});
+
+test("admin detail remains available after moderation and resolves images against backend", () => {
+  assert.match(router, /path: ["']\/admin\/auctions\/:id["'][\s\S]*?requiresAdmin: true/);
+  assert.ok(detail.includes("getAdminAuctionDetail"));
+  assert.ok(detail.includes("公開中、已下架及已刪除"));
+  assert.ok(detail.includes("resolveAuctionImageUrl(imageUrl)"));
+  assert.ok(imageUrl.includes('import httpClient from "@/service/httpClient"'));
+  assert.ok(imageUrl.includes('replace(/\\/api\\/?$/, "")'));
+  assert.ok(view.includes('@error="markThumbnailBroken(auction.auctionId)"'));
+});
+
+test("admin view handles backend 401 and 403 responses", () => {
+  assert.match(view, /error\.response\?\.status === 401/);
+  assert.match(view, /error\.response\?\.status === 403/);
+  assert.match(view, /name: "forbidden"/);
+});
+
+function stripImports(script) {
+  let remaining = script;
+  while (remaining.includes("import ")) {
+    const start = remaining.indexOf("import ");
+    const end = remaining.indexOf(";", start);
+    if (end < 0) throw new Error("Unterminated import");
+    remaining = remaining.slice(0, start) + remaining.slice(end + 1);
+  }
+  return remaining;
+}
+
+const scriptStart = view.indexOf("<script setup>") + "<script setup>".length;
+const adminViewScript = stripImports(view.slice(scriptStart, view.indexOf("</script>", scriptStart)));
+function adminAuction(id, managementState = "VISIBLE", status = "ACTIVE") {
+  return {
+    auctionId: id,
+    productName: "Auction " + id,
+    managementState,
+    status,
+    removedAt: managementState === "VISIBLE" ? null : "2026-09-13T10:00:00",
+    deletedAt: managementState === "DELETED" ? "2026-09-13T11:00:00" : null,
+    endAt: "2099-09-13T12:00:00",
+  };
+}
+
+function adminHarness(pages) {
+  const batchCalls = [];
+  const context = {
+    computed,
+    reactive,
+    ref,
+    onMounted: () => {},
+    RouterLink: {},
+    useRouter: () => ({ replace: async () => {} }),
+    resolveAuctionImageUrl: (value) => value,
+    getAdminAuctions: async ({ page }) => {
+      const items = pages[page] || [];
+      return { data: { data: { items, page, size: 15, totalElements: pages.flat().length, totalPages: pages.length } } };
+    },
+    removeAdminAuction: async () => ({}),
+    restoreAdminAuction: async () => ({}),
+    deleteAdminAuction: async () => ({}),
+    removeAdminAuctionsBatch: async (ids) => {
+      batchCalls.push([...ids]);
+      return { data: { data: {
+        totalCount: ids.length, successCount: ids.length, failureCount: 0,
+        items: ids.map((auctionId) => ({ auctionId, success: true, message: "success" })),
+      } } };
+    },
+    restoreAdminAuctionsBatch: async () => ({ data: { data: { totalCount: 0, successCount: 0, failureCount: 0, items: [] } } }),
+    deleteAdminAuctionsBatch: async () => ({ data: { data: { totalCount: 0, successCount: 0, failureCount: 0, items: [] } } }),
+  };
+  vm.runInNewContext(adminViewScript + String.fromCharCode(10) + "globalThis.subject = { items, selectedIds, selectedAuctionMap, pagination, errorMessage, dialog, canBatchRemove, canBatchRestore, canBatchDelete, canRestoreAuction, formatStatus, loadAuctions, enterBatchMode, toggleSelection, toggleCurrentPage, openBatchAction, confirmAction };", context);
+  return { ...context.subject, batchCalls };
+}
+
+test("batch selection remains across pages and current-page deselection preserves other pages", async () => {
+  const h = adminHarness([
+    [adminAuction(1), adminAuction(2)],
+    [adminAuction(16), adminAuction(17)],
+  ]);
+  await h.loadAuctions(0);
+  h.enterBatchMode();
+  h.toggleSelection(h.items.value[0]);
+  await h.loadAuctions(1);
+  assert.deepEqual([...h.selectedIds.value], [1]);
+
+  h.toggleCurrentPage({ target: { checked: true } });
+  assert.deepEqual([...h.selectedIds.value], [1, 16, 17]);
+  assert.equal(h.canBatchRemove.value, true);
+
+  h.toggleCurrentPage({ target: { checked: false } });
+  assert.deepEqual([...h.selectedIds.value], [1]);
+});
+
+test("batch action eligibility rejects terminal statuses retained from multiple pages", async () => {
+  const h = adminHarness([
+    [adminAuction(1, "REMOVED", "SOLD")],
+    [adminAuction(16, "REMOVED", "UNSOLD")],
+  ]);
+  await h.loadAuctions(0);
+  h.enterBatchMode();
+  h.toggleSelection(h.items.value[0]);
+  await h.loadAuctions(1);
+  h.toggleSelection(h.items.value[0]);
+  assert.equal(h.canBatchRemove.value, false);
+  assert.equal(h.canBatchRestore.value, false);
+  assert.equal(h.canBatchDelete.value, true);
+});
+
+test("restore is offered only for removed non-expired draft scheduled and active auctions", () => {
+  const h = adminHarness([]);
+  for (const status of ["DRAFT", "SCHEDULED", "ACTIVE"]) {
+    assert.equal(h.canRestoreAuction(adminAuction(1, "REMOVED", status)), true, status);
+  }
+  for (const status of ["SOLD", "UNSOLD", "CANCELLED", "REMOVED"]) {
+    assert.equal(h.canRestoreAuction(adminAuction(1, "REMOVED", status)), false, status);
+  }
+  const expired = adminAuction(1, "REMOVED", "ACTIVE");
+  expired.endAt = "2000-01-01T00:00:00";
+  assert.equal(h.canRestoreAuction(expired), false);
+  assert.equal(h.canRestoreAuction(adminAuction(1, "DELETED", "ACTIVE")), false);
+  assert.equal(h.formatStatus("REMOVED"), "廢標");
+  assert.match(detail, /REMOVED: "廢標"/);
+});
+
+test("batch action guard rejects mixed management states across pages", async () => {
+  const h = adminHarness([
+    [adminAuction(1, "VISIBLE")],
+    [adminAuction(16, "REMOVED", "SOLD")],
+  ]);
+  await h.loadAuctions(0);
+  h.enterBatchMode();
+  h.toggleSelection(h.items.value[0]);
+  await h.loadAuctions(1);
+  h.toggleSelection(h.items.value[0]);
+  assert.equal(h.canBatchRemove.value, false);
+  assert.equal(h.canBatchRestore.value, false);
+  assert.equal(h.canBatchDelete.value, false);
+});
+
+test("batch selection stops at 100 and reports the limit", () => {
+  const h = adminHarness([]);
+  h.enterBatchMode();
+  for (let id = 1; id <= 101; id++) h.toggleSelection(adminAuction(id));
+  assert.equal(h.selectedIds.value.length, 100);
+  assert.equal(h.errorMessage.value, "批量操作最多可選取 100 筆");
+});
+
+test("successful batch processing clears cross-page selection", async () => {
+  const h = adminHarness([[adminAuction(1), adminAuction(2)]]);
+  await h.loadAuctions(0);
+  h.enterBatchMode();
+  h.toggleCurrentPage({ target: { checked: true } });
+  h.openBatchAction("remove");
+  h.dialog.reason = "批量下架測試";
+  h.dialog.confirmed = true;
+  await h.confirmAction();
+  assert.deepEqual(h.batchCalls, [[1, 2]]);
+  assert.equal(h.selectedIds.value.length, 0);
+});

@@ -24,7 +24,7 @@ public enum AuctionStatus {
     // 競標由賣家或系統取消
     CANCELLED,
 
-    // 競標由管理員強制下架
+    // 競標在平台下架期間到達截止時間，由 Lifecycle 判定為廢標
     REMOVED
 
 }

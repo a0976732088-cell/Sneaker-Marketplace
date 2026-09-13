@@ -731,7 +731,7 @@ function formatStatus(status) {
     SOLD: "已成交",
     UNSOLD: "流標",
     CANCELLED: "已取消",
-    REMOVED: "已下架",
+    REMOVED: "廢標",
   };
 
   return statusMap[status] ?? status;

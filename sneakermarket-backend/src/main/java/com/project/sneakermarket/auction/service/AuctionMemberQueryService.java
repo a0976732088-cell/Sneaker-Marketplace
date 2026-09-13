@@ -39,10 +39,14 @@ public class AuctionMemberQueryService {
             Auction auction = auctionMap.get(bid.getAuctionId());
             AuctionProduct product = productMap.get(auction.getAuctionProductId());
             AuctionResult result = resultMap.get(auction.getAuctionId());
+            AuctionAdminManagementState managementState = managementState(auction);
             return new AuctionMyBidResponse(
                     auction.getAuctionId(), product.getProductName(), product.getModel(), product.getSize(),
                     bid.getMyHighestBid(), auction.getCurrentPrice(), auction.getBidCount(), auction.getStatus(),
-                    auction.getStatus() == AuctionStatus.ACTIVE && memberId.equals(auction.getHighestBidderId()),
+                    managementState,
+                    managementState == AuctionAdminManagementState.VISIBLE
+                            && auction.getStatus() == AuctionStatus.ACTIVE
+                            && memberId.equals(auction.getHighestBidderId()),
                     result != null && result.getResultStatus() == AuctionResultStatus.SOLD
                             && memberId.equals(result.getWinnerId()),
                     result == null ? null : result.getResultStatus(),
@@ -58,13 +62,23 @@ public class AuctionMemberQueryService {
         return pageData(listings.map(auction -> {
             AuctionProduct product = productMap.get(auction.getAuctionProductId());
             AuctionResult result = resultMap.get(auction.getAuctionId());
+            AuctionAdminManagementState managementState = managementState(auction);
             return new AuctionMyListingResponse(
                     auction.getAuctionId(), product.getProductName(), product.getModel(), product.getSize(),
                     auction.getCurrentPrice(), auction.getBidCount(), auction.getStatus(),
+                    managementState,
                     result == null ? null : result.getResultStatus(),
                     result == null ? null : result.getFinalPrice(),
                     auction.getCreatedAt(), auction.getStartAt(), auction.getEndAt());
         }));
+    }
+
+    private AuctionAdminManagementState managementState(Auction auction) {
+        if (auction.getDeletedAt() != null) return AuctionAdminManagementState.DELETED;
+        if (auction.getRemovedAt() != null || auction.getStatus() == AuctionStatus.REMOVED) {
+            return AuctionAdminManagementState.REMOVED;
+        }
+        return AuctionAdminManagementState.VISIBLE;
     }
 
     public PageData<AuctionOrderSummaryResponse> getMyAuctionOrders(Long memberId, int page, int size) {

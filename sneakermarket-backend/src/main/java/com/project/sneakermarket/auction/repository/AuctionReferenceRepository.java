@@ -1,14 +1,17 @@
 package com.project.sneakermarket.auction.repository;
-import com.project.sneakermarket.auction.dto.AuctionLookupOption;
-import jakarta.persistence.EntityManager;
-import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.List;
-/**
- * 競標用唯讀整合入口：引用 owner 已存在的 Entity，不複製主資料或提供寫入方法。
- * 待 owner 提供正式 Service 契約時，可集中替換此處。
- */
+
+import com.project.sneakermarket.auction.dto.AuctionLookupOption;
+
+import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
+
+/** 競標用唯讀整合入口：引用 owner 已存在的 Entity，不複製會員或主資料。 */
 @Repository
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -19,6 +22,16 @@ public class AuctionReferenceRepository {
         return id != null && id > 0 && entityManager.createQuery(
                 "select count(m) from Member m where m.memberId = :id and m.deletedAt is null", Long.class)
                 .setParameter("id", id).getSingleResult() > 0;
+    }
+
+    /** 同時取得未刪除會員的角色，讓呼叫端可區分失效身分與權限不足。 */
+    public Optional<String> findActiveMemberRole(Long id) {
+        if (id == null || id <= 0) return Optional.empty();
+        return entityManager.createQuery(
+                "select m.role from Member m where m.memberId = :id and m.deletedAt is null", String.class)
+                .setParameter("id", id)
+                .getResultStream()
+                .findFirst();
     }
 
     public boolean brandExists(Long id) {

@@ -15,7 +15,7 @@ public enum AuctionResultStatus {
     // 競標被取消
     CANCELLED,
 
-    // 競標由管理員強制下架
+    // 競標在平台下架期間到達截止時間，交易不成立的廢標結果
     REMOVED
 
 }

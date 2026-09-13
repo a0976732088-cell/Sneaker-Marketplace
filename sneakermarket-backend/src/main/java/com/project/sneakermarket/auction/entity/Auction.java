@@ -91,4 +91,28 @@ public class Auction {
     // 競標最後更新時間
     @Column(nullable = false, columnDefinition = "DATETIME2(0)")
     private LocalDateTime updatedAt;
+
+    // 平台下架時間；終局交易狀態仍保留在 status。
+    @Column(columnDefinition = "DATETIME2(0)")
+    private LocalDateTime removedAt;
+
+    // 執行下架的管理員會員 ID，採 scalar ID 避免跨模組寫入關聯。
+    private Long removedByMemberId;
+
+    @Column(length = 500, columnDefinition = "NVARCHAR(500)")
+    private String removeReason;
+
+    // 下架當下的競標狀態，供管理端顯示管理資訊。
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private AuctionStatus removedFromStatus;
+
+    // 管理端 Soft Delete metadata；不實體刪除任何競標帳本資料。
+    @Column(columnDefinition = "DATETIME2(0)")
+    private LocalDateTime deletedAt;
+
+    private Long deletedByMemberId;
+
+    @Column(length = 500, columnDefinition = "NVARCHAR(500)")
+    private String deleteReason;
 }

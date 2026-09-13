@@ -110,6 +110,29 @@ class AuctionEmailIntegrationTests {
     }
 
     @Test
+    void removedResultCreatesNoEmailLogAndIsNotARecoveryCandidate() {
+        Long id = fixture(true);
+        Auction auction = auctions.findById(id).orElseThrow();
+        auction.setRemovedAt(NOW.minusMinutes(10));
+        auction.setRemovedByMemberId(seller);
+        auction.setRemoveReason("平台下架後到期");
+        auction.setRemovedFromStatus(AuctionStatus.ACTIVE);
+        auctions.saveAndFlush(auction);
+
+        lifecycle.processAuction(id);
+
+        AuctionResult result = results.findByAuctionId(id).orElseThrow();
+        assertEquals(AuctionStatus.REMOVED, auctions.findById(id).orElseThrow().getStatus());
+        assertEquals(AuctionResultStatus.REMOVED, result.getResultStatus());
+        assertNull(result.getWinnerId());
+        assertNull(result.getFinalPrice());
+        assertTrue(emails.ensureEmailLogsForAuction(id).isEmpty());
+        assertFalse(results.findEmailReadinessCandidateIds().contains(id));
+        assertTrue(logs.findByAuctionId(id).isEmpty());
+        verifyNoInteractions(sender);
+    }
+
+    @Test
     void soldWithoutOrderIsNormalNotReadyEvenWithMissingAddress() {
         Long id = closed(true, false);
         var buyer = members.findById(winner).orElseThrow();

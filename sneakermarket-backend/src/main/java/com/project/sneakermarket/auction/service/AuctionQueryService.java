@@ -60,7 +60,7 @@ public class AuctionQueryService {
     public List<AuctionSummaryResponse> getAllAuctions() {
 
         // 查詢所有競標資料
-        List<Auction> auctions = auctionRepository.findAll();
+        List<Auction> auctions = auctionRepository.findAll(AuctionSpecification.withCriteria(new AuctionSearchCriteria()));
 
         // 一次查出列表需要的競標商品資料
         Map<Long, AuctionProduct> productMap =
@@ -141,7 +141,7 @@ public class AuctionQueryService {
 
         // 先確認競標本身存在。
         // 若 auctionId 不存在，不應把「不存在」誤認成「目前沒有出價」。
-        if (!auctionRepository.existsById(auctionId)) {
+        if (auctionRepository.findPublicById(auctionId).isEmpty()) {
             throw new ResourceNotFoundException(
                     "找不到指定的競標資料"
             );
@@ -170,7 +170,7 @@ public class AuctionQueryService {
      */
     public AuctionStatusResponse getAuctionStatus(Long auctionId) {
 
-        Auction auction = auctionRepository.findById(auctionId)
+        Auction auction = auctionRepository.findPublicById(auctionId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "找不到指定的競標資料"
@@ -202,7 +202,7 @@ public class AuctionQueryService {
             Long currentMemberId) {
 
         // 查詢競標主資料；不存在時回 404
-        Auction auction = auctionRepository.findById(auctionId)
+        Auction auction = auctionRepository.findPublicById(auctionId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "找不到指定的競標資料"

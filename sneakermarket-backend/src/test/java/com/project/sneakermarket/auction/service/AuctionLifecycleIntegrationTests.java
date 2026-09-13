@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -94,13 +95,24 @@ class AuctionLifecycleIntegrationTests {
         Long delayed = fixture(AuctionStatus.SCHEDULED, END.minusHours(1), END.minusSeconds(1));
         Long active = fixture(AuctionStatus.ACTIVE, END.minusHours(1), END.plusSeconds(1));
         Long due = fixture(AuctionStatus.ACTIVE, END.minusHours(1), END);
-        List<Long> excluded = new ArrayList<>(List.of(future, active));
+        Long removedScheduledWaiting = fixture(AuctionStatus.SCHEDULED, END.minusHours(1), END.plusSeconds(1));
+        Long removedScheduledDue = fixture(AuctionStatus.SCHEDULED, END.minusHours(1), END);
+        Long removedActiveWaiting = fixture(AuctionStatus.ACTIVE, END.minusHours(1), END.plusSeconds(1));
+        Long removedActiveDue = fixture(AuctionStatus.ACTIVE, END.minusHours(1), END);
+        Long deletedDue = fixture(AuctionStatus.ACTIVE, END.minusHours(1), END);
+        change(removedScheduledWaiting, this::markRemoved);
+        change(removedScheduledDue, this::markRemoved);
+        change(removedActiveWaiting, this::markRemoved);
+        change(removedActiveDue, this::markRemoved);
+        change(deletedDue, a -> a.setDeletedAt(END.minusMinutes(1)));
+        List<Long> excluded = new ArrayList<>(List.of(
+                future, active, removedScheduledWaiting, removedActiveWaiting, deletedDue));
         for (AuctionStatus terminal : List.of(AuctionStatus.DRAFT, AuctionStatus.SOLD,
                 AuctionStatus.UNSOLD, AuctionStatus.CANCELLED, AuctionStatus.REMOVED)) {
             excluded.add(fixture(terminal, END.minusHours(1), END));
         }
         List<Long> candidates = auctions.findLifecycleCandidateIds(END);
-        assertTrue(candidates.containsAll(List.of(start, delayed, due)));
+        assertTrue(candidates.containsAll(List.of(start, delayed, due, removedScheduledDue, removedActiveDue)));
         excluded.forEach(id -> assertFalse(candidates.contains(id)));
         // 取得候選後被取消，Service 必須以 lock 內的新狀態為準。
         change(start, a -> a.setStatus(AuctionStatus.CANCELLED));
@@ -131,6 +143,27 @@ class AuctionLifecycleIntegrationTests {
         assertConsistent(id, false);
         assertEquals(END, results.findByAuctionId(id).orElseThrow().getEndedAt());
         assertEquals(END, persisted(id).getUpdatedAt());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"SCHEDULED,false", "SCHEDULED,true", "ACTIVE,false", "ACTIVE,true"})
+    void removedAuctionAtEndCommitsVoidedResultAndPreservesLedger(
+            AuctionStatus initial, boolean withBid) {
+        Long id = fixture(withBid ? AuctionStatus.ACTIVE : initial, END.minusHours(1), END);
+        if (withBid) {
+            when(time.now()).thenReturn(END.minusSeconds(1));
+            bid(id);
+        }
+        change(id, auction -> {
+            auction.setStatus(initial);
+            markRemoved(auction);
+        });
+        when(time.now()).thenReturn(END);
+
+        lifecycle.processAuction(id);
+        lifecycle.processAuction(id);
+
+        assertVoided(id, withBid);
     }
 
     @Test
@@ -293,6 +326,26 @@ class AuctionLifecycleIntegrationTests {
         assertConsistent(id, false);
     }
 
+    private void assertVoided(Long id, boolean withBid) {
+        Auction auction = persisted(id);
+        AuctionResult result = results.findByAuctionId(id).orElseThrow();
+        List<AuctionBid> history = bids.findByAuctionIdOrderByCreatedAtDesc(id);
+        assertEquals(AuctionStatus.REMOVED, auction.getStatus());
+        assertNotNull(auction.getRemovedAt());
+        assertEquals(withBid ? 1 : 0, auction.getBidCount());
+        assertEquals(withBid ? buyerId : null, auction.getHighestBidderId());
+        assertEquals(0, new BigDecimal(withBid ? "5500.00" : "5000.00")
+                .compareTo(auction.getCurrentPrice()));
+        assertEquals(withBid ? 1 : 0, history.size());
+        assertEquals(AuctionResultStatus.REMOVED, result.getResultStatus());
+        assertNull(result.getWinnerId());
+        assertNull(result.getFinalPrice());
+        assertNotNull(result.getReason());
+        assertFalse(result.getReason().isBlank());
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.auction_results WHERE auction_id = ?", Integer.class, id));
+    }
+
     private void assertConsistent(Long id, boolean sold) {
         Auction auction = persisted(id);
         AuctionResult result = results.findByAuctionId(id).orElseThrow();
@@ -330,6 +383,13 @@ class AuctionLifecycleIntegrationTests {
         Auction auction = persisted(id);
         change.accept(auction);
         auctions.saveAndFlush(auction);
+    }
+
+    private void markRemoved(Auction auction) {
+        auction.setRemovedAt(END.minusMinutes(30));
+        auction.setRemovedByMemberId(7L);
+        auction.setRemoveReason("整合測試下架");
+        auction.setRemovedFromStatus(auction.getStatus());
     }
 
     private Long fixture(AuctionStatus status, LocalDateTime start, LocalDateTime end) {

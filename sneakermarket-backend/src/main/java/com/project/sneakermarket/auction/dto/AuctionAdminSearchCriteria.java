@@ -1,0 +1,13 @@
+package com.project.sneakermarket.auction.dto;
+
+import com.project.sneakermarket.auction.entity.AuctionStatus;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class AuctionAdminSearchCriteria {
+    private String keyword;
+    private AuctionStatus status;
+    private AuctionAdminManagementState managementState;
+}

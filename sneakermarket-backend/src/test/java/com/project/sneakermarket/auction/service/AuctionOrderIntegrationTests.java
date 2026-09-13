@@ -41,10 +41,12 @@ class AuctionOrderIntegrationTests {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 10, 12, 0);
     @Autowired private AuctionOrderService service;
     @Autowired private AuctionLifecycleService lifecycle;
+    @Autowired private AuctionAdminMutationService adminMutations;
     @Autowired private AuctionOrderRepository orders;
     @Autowired private AuctionResultRepository results;
     @Autowired private AuctionRepository auctions;
     @Autowired private AuctionProductRepository products;
+    @Autowired private AuctionBidRepository bids;
     @Autowired private MemberRepository members;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
@@ -74,6 +76,7 @@ class AuctionOrderIntegrationTests {
         for (Long id : auctionIds) {
             orders.findByAuctionId(id).ifPresent(orders::delete);
             results.findByAuctionId(id).ifPresent(results::delete);
+            bids.deleteAllInBatch(bids.findByAuctionIdOrderByCreatedAtDesc(id));
             auctions.deleteById(id);
         }
         for (Long id : productIds) products.deleteById(id);
@@ -114,6 +117,46 @@ class AuctionOrderIntegrationTests {
         Long id = fixture(false);
         service.createOrderForAuction(id);
         assertEquals(0, orderCount(id));
+    }
+
+    @Test
+    void removedAuctionAtEndCreatesRemovedResultAndNeverCreatesOrder() {
+        Long id = openFixture(true);
+
+        adminMutations.removeAuction(id, sellerId, "到期前平台下架");
+        lifecycle.processAuction(id);
+        new AuctionOrderScheduler(results, service).createAuctionOrders();
+
+        Auction auction = auctions.findById(id).orElseThrow();
+        AuctionResult result = results.findByAuctionId(id).orElseThrow();
+        assertEquals(AuctionStatus.REMOVED, auction.getStatus());
+        assertNotNull(auction.getRemovedAt());
+        assertEquals(1, auction.getBidCount());
+        assertEquals(buyerId, auction.getHighestBidderId());
+        assertEquals(0, new BigDecimal("6000").compareTo(auction.getCurrentPrice()));
+        assertEquals(AuctionResultStatus.REMOVED, result.getResultStatus());
+        assertNull(result.getWinnerId());
+        assertNull(result.getFinalPrice());
+        assertFalse(result.getReason().isBlank());
+        assertFalse(results.findOrderCandidateIds().contains(id));
+        assertEquals(0, orderCount(id));
+    }
+
+    @Test
+    void soldBeforeAdminRemoveStillCreatesOrder() {
+        Long id = fixture(true);
+
+        adminMutations.removeAuction(id, sellerId, "成交後隱藏");
+        new AuctionOrderScheduler(results, service).createAuctionOrders();
+
+        Auction auction = auctions.findById(id).orElseThrow();
+        AuctionResult result = results.findByAuctionId(id).orElseThrow();
+        assertEquals(AuctionStatus.SOLD, auction.getStatus());
+        assertNotNull(auction.getRemovedAt());
+        assertEquals(AuctionResultStatus.SOLD, result.getResultStatus());
+        assertEquals(buyerId, result.getWinnerId());
+        assertEquals(0, new BigDecimal("6000").compareTo(result.getFinalPrice()));
+        assertEquals(1, orderCount(id));
     }
 
     @Test
@@ -318,7 +361,7 @@ class AuctionOrderIntegrationTests {
         return id;
     }
 
-    private Long fixture(boolean sold) {
+    private Long openFixture(boolean sold) {
         AuctionProduct product = new AuctionProduct();
         product.setSellerId(sellerId);
         product.setBrandId(1L);
@@ -351,6 +394,19 @@ class AuctionOrderIntegrationTests {
         auction.setUpdatedAt(NOW.minusHours(2));
         Long id = auctions.saveAndFlush(auction).getAuctionId();
         auctionIds.add(id);
+        if (sold) {
+            AuctionBid bid = new AuctionBid();
+            bid.setAuctionId(id);
+            bid.setBidderId(buyerId);
+            bid.setBidAmount(new BigDecimal("6000"));
+            bid.setCreatedAt(NOW.minusMinutes(1));
+            bids.saveAndFlush(bid);
+        }
+        return id;
+    }
+
+    private Long fixture(boolean sold) {
+        Long id = openFixture(sold);
         lifecycle.processAuction(id); // 正式功能 7 先獨立 COMMIT，功能 8 才能消費。
         assertEquals(0, orderCount(id));
         return id;

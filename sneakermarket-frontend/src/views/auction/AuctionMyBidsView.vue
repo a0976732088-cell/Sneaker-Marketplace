@@ -13,12 +13,20 @@
                 <dt class="col-5">目前價格</dt><dd class="col-7">{{ formatTwd(bid.currentPrice) }}</dd>
                 <dt class="col-5">出價次數</dt><dd class="col-7">{{ bid.bidCount }}</dd>
                 <dt class="col-5">競標狀態</dt><dd class="col-7">{{ formatMemberAuctionStatus(bid.status) }}</dd>
+                <dt class="col-5">管理狀態</dt><dd class="col-7">{{ formatMemberManagementState(bid.managementState) }}</dd>
                 <dt class="col-5">結標結果</dt><dd class="col-7">{{ formatMemberAuctionStatus(bid.resultStatus) }}</dd>
                 <dt v-if="bid.finalPrice != null" class="col-5">成交價格</dt><dd v-if="bid.finalPrice != null" class="col-7">{{ formatTwd(bid.finalPrice) }}</dd>
                 <dt class="col-5">最近出價</dt><dd class="col-7">{{ formatAuctionTime(bid.lastBidAt) }}</dd>
                 <dt class="col-5">結束時間</dt><dd class="col-7">{{ formatAuctionTime(bid.endAt) }}</dd>
               </dl>
-              <RouterLink class="btn btn-outline-primary" :to="{ name: 'auction-detail', params: { id: bid.auctionId } }">查看競標</RouterLink>
+              <RouterLink
+                v-if="bid.managementState === 'VISIBLE'"
+                class="btn btn-outline-primary"
+                :to="{ name: 'auction-detail', params: { id: bid.auctionId } }"
+              >查看競標</RouterLink>
+              <p v-else class="alert alert-secondary py-2 mb-0 small">
+                {{ formatMemberPublicDetailNotice(bid.managementState) }}
+              </p>
             </div>
           </article>
         </div>
@@ -32,5 +40,5 @@ import AuctionMemberPage from "@/components/auction/AuctionMemberPage.vue";
 import { getMyBids } from "@/service/auctionService";
 import { formatTwd } from "@/utils/auctionMoney";
 import { formatAuctionTime } from "@/utils/auctionTime";
-import { formatMemberAuctionStatus, formatMyBidOutcome } from "@/utils/auctionMemberStatus";
+import { formatMemberAuctionStatus, formatMemberManagementState, formatMemberPublicDetailNotice, formatMyBidOutcome } from "@/utils/auctionMemberStatus";
 </script>

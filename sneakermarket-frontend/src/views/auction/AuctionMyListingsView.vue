@@ -12,11 +12,19 @@
                 <dt v-if="listing.finalPrice != null" class="col-5">成交價格</dt><dd v-if="listing.finalPrice != null" class="col-7">{{ formatTwd(listing.finalPrice) }}</dd>
                 <dt class="col-5">出價次數</dt><dd class="col-7">{{ listing.bidCount }}</dd>
                 <dt class="col-5">競標狀態</dt><dd class="col-7">{{ formatMemberAuctionStatus(listing.status) }}</dd>
+                <dt class="col-5">管理狀態</dt><dd class="col-7">{{ formatMemberManagementState(listing.managementState) }}</dd>
                 <dt class="col-5">結標結果</dt><dd class="col-7">{{ formatMemberAuctionStatus(listing.resultStatus) }}</dd>
                 <dt class="col-5">開始時間</dt><dd class="col-7">{{ formatAuctionTime(listing.startAt) }}</dd>
                 <dt class="col-5">結束時間</dt><dd class="col-7">{{ formatAuctionTime(listing.endAt) }}</dd>
               </dl>
-              <RouterLink class="btn btn-outline-primary" :to="{ name: 'auction-detail', params: { id: listing.auctionId } }">查看競標</RouterLink>
+              <RouterLink
+                v-if="listing.managementState === 'VISIBLE'"
+                class="btn btn-outline-primary"
+                :to="{ name: 'auction-detail', params: { id: listing.auctionId } }"
+              >查看競標</RouterLink>
+              <p v-else class="alert alert-secondary py-2 mb-0 small">
+                {{ formatMemberPublicDetailNotice(listing.managementState) }}
+              </p>
             </div>
           </article>
         </div>
@@ -30,5 +38,5 @@ import AuctionMemberPage from "@/components/auction/AuctionMemberPage.vue";
 import { getMyListings } from "@/service/auctionService";
 import { formatTwd } from "@/utils/auctionMoney";
 import { formatAuctionTime } from "@/utils/auctionTime";
-import { formatMemberAuctionStatus } from "@/utils/auctionMemberStatus";
+import { formatMemberAuctionStatus, formatMemberManagementState, formatMemberPublicDetailNotice } from "@/utils/auctionMemberStatus";
 </script>

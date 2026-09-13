@@ -8,7 +8,8 @@ import com.project.sneakermarket.auction.entity.AuctionResultStatus;
 public record AuctionMyBidResponse(
         Long auctionId, String productName, String model, String size,
         BigDecimal myHighestBid, BigDecimal currentPrice, Integer bidCount,
-        AuctionStatus status, boolean leading, boolean won,
+        AuctionStatus status, AuctionAdminManagementState managementState,
+        boolean leading, boolean won,
         AuctionResultStatus resultStatus, BigDecimal finalPrice,
         LocalDateTime lastBidAt, LocalDateTime endAt) {
 }

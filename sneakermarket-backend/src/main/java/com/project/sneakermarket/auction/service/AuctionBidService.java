@@ -75,6 +75,9 @@ public class AuctionBidService {
             throw new ForbiddenException("賣家不可對自己的競標出價");
         }
 
+        if (auction.getRemovedAt() != null || auction.getDeletedAt() != null) {
+            throw new AuctionConflictException("競標已下架，無法出價");
+        }
         if (auction.getStatus() != AuctionStatus.ACTIVE) {
             throw new AuctionConflictException("目前競標狀態不允許出價");
         }
