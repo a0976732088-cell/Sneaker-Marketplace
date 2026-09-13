@@ -1,12 +1,10 @@
 <script setup>
 import { onMounted, onUnmounted } from "vue";
-import { VueDatePicker } from "@vuepic/vue-datepicker";
-import "@vuepic/vue-datepicker/dist/main.css";
-import { zhTW } from "date-fns/locale";
-import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
-import { faTrash, faPencil } from "@fortawesome/free-solid-svg-icons";
+import AdvertisementFormDrawer from "@/components/advertisement/admin/AdvertisementFormDrawer.vue";
 import { useAdvertisementManagement } from "./useAdvertisementManagement";
-import { resolveAdvertisementImageUrl } from "@/service/advertisementService";
+import AdvertisementPagination from "@/components/advertisement/admin/AdvertisementPagination.vue";
+import AdvertisementFilterBar from "@/components/advertisement/admin/AdvertisementFilterBar.vue";
+import AdvertisementTable from "@/components/advertisement/admin/AdvertisementTable.vue";
 
 const {
   tabs,
@@ -107,36 +105,12 @@ onUnmounted(() => {
       </div> -->
 
       <div class="ad-panel">
-        <div class="panel-tabs" role="tablist">
-          <button
-            v-for="tab in tabs"
-            :key="tab"
-            :class="{ active: activeTab === tab }"
-            @click="activeTab = tab"
-          >
-            {{ tab }}
-          </button>
-        </div>
-        <div class="filter-row">
-          <label class="search-box"
-            ><span>⌕</span
-            ><input
-              v-model="keyword"
-              type="search"
-              placeholder="搜尋廣告名稱或編號..."
-          /></label>
-          <select v-model="placement" aria-label="篩選廣告版位">
-            <option>全部版位</option>
-            <option>首頁橫幅</option>
-            <option>首頁彈窗</option>
-            <option>商品頁側欄</option>
-          </select>
-
-          <!-- 未來有機會可以匯出到excel檔案 -->
-          <!-- <button class="outline-button" @click="notify('報表已匯出')">
-            ⇩ 匯出報表
-          </button> -->
-        </div>
+        <AdvertisementFilterBar
+          v-model:active-tab="activeTab"
+          v-model:keyword="keyword"
+          v-model:placement="placement"
+          :tabs="tabs"
+        />
 
         <!-- 查詢 API 尚未完成時顯示載入狀態 -->
         <div v-if="loadingAds" class="py-5 text-center text-secondary">
@@ -164,363 +138,42 @@ onUnmounted(() => {
         </div>
 
         <template v-else>
-          <div class="table-wrap">
-            <table>
-              <!-- 固定各欄位比例，狀態或資料筆數改變時表格不會左右跳動。 -->
-              <colgroup>
-                <col class="column-ad" />
-                <col class="column-placement" />
-                <col class="column-period" />
-                <col class="column-status" />
-                <!-- <col class="column-number" />
-                <col class="column-number" />
-                <col class="column-ctr" /> -->
-                <col class="column-actions" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>廣告內容</th>
-                  <th>版位／類型</th>
-                  <th>投放期間</th>
-                  <th>狀態</th>
-                  <!-- <th class="number">曝光</th> -->
-                  <!-- <th class="number">點擊</th> -->
-                  <!-- <th class="number">CTR</th> -->
-                  <th class="actions-column">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="ad in filteredAds" :key="ad.id">
-                  <td>
-                    <div class="ad-identity">
-                      <!-- 有圖與無圖皆使用固定大小；圖片完整顯示、不裁切 -->
-                      <div class="ad-thumbnail">
-                        <!-- 有網址且圖片載入正常時顯示 -->
-                        <img
-                          v-if="ad.imageUrl && !ad.imageLoadFailed"
-                          class="ad-thumbnail-image"
-                          :src="resolveAdvertisementImageUrl(ad.imageUrl)"
-                          :alt="ad.name"
-                          loading="lazy"
-                          @error="ad.imageLoadFailed = true"
-                        />
+          <AdvertisementTable
+            :ads="filteredAds"
+            @edit="openEditDrawer"
+            @toggle="toggle"
+            @delete="handleDeleteAdvertisement"
+          />
 
-                        <!-- 沒網址或圖片載入失敗時顯示 -->
-                        <div v-else class="ad-thumbnail-empty">尚無圖片</div>
-                      </div>
-                      <div>
-                        <strong>{{ ad.name }}</strong
-                        ><small>{{ ad.desc }}</small>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <strong class="cell-main">{{ ad.place }}</strong
-                    ><small class="cell-sub">{{ ad.type }}</small>
-                  </td>
-                  <td>
-                    <span class="period">{{ ad.period }}</span>
-                  </td>
-                  <td>
-                    <span class="status-badge" :class="ad.status"
-                      >● {{ ad.status }}</span
-                    >
-                  </td>
-                  <!-- <td class="number">{{ ad.views }}</td>
-                  <td class="number">{{ ad.clicks }}</td>
-                  <td class="number">
-                    <strong>{{ ad.ctr }}</strong>
-                  </td> -->
-                  <td class="actions-column">
-                    <div class="row-actions">
-                      <button
-                        v-if="['DRAFT', 'INACTIVE'].includes(ad.adStatus)"
-                        title="編輯"
-                        @click="openEditDrawer(ad)"
-                      >
-                        <FontAwesomeIcon :icon="faPencil" />
-                      </button>
-                      <!--草稿與已停用顯示上架按鈕，進行中顯示停用按鈕，已結束不允許操作，所以不顯示按鈕。-->
-                      <button
-                        v-if="
-                          ['ACTIVE', 'DRAFT', 'INACTIVE'].includes(ad.adStatus)
-                        "
-                        type="button"
-                        :title="ad.adStatus === 'ACTIVE' ? '停用' : '發布/排程'"
-                        @click="toggle(ad)"
-                      >
-                        {{ ad.adStatus === "ACTIVE" ? "Ⅱ" : "▶" }}
-                      </button>
-                      <button
-                        v-if="['DRAFT', 'INACTIVE'].includes(ad.adStatus)"
-                        title="刪除"
-                        @click="handleDeleteAdvertisement(ad)"
-                      >
-                        <FontAwesomeIcon :icon="faTrash" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr v-if="!filteredAds.length">
-                  <td colspan="5" class="empty-state">
-                    找不到符合條件的廣告，請調整搜尋或篩選條件。
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <footer class="panel-footer">
-            <span>
-              顯示 {{ firstItemNumber }}–{{ lastItemNumber }}，共
-              {{ totalElements }} 筆
-            </span>
-            <div>
-              <!-- 後端頁碼從 0 開始，所以顯示時加 1。 -->
-              <button
-                type="button"
-                aria-label="上一頁"
-                :disabled="currentPage === 0 || loadingAds"
-                @click="goToPage(currentPage - 1)"
-              >
-                ‹
-              </button>
-              <button
-                v-for="pageNumber in pageNumbers"
-                :key="pageNumber"
-                type="button"
-                :class="{ current: currentPage === pageNumber }"
-                :disabled="loadingAds"
-                @click="goToPage(pageNumber)"
-              >
-                {{ pageNumber + 1 }}
-              </button>
-              <button
-                type="button"
-                aria-label="下一頁"
-                :disabled="
-                  totalPages === 0 ||
-                  currentPage >= totalPages - 1 ||
-                  loadingAds
-                "
-                @click="goToPage(currentPage + 1)"
-              >
-                ›
-              </button>
-            </div>
-          </footer>
+          <AdvertisementPagination
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :total-elements="totalElements"
+            :page-numbers="pageNumbers"
+            :first-item-number="firstItemNumber"
+            :last-item-number="lastItemNumber"
+            :loading="loadingAds"
+            @change-page="goToPage"
+          />
         </template>
       </div>
     </main>
 
-    <div
-      v-if="showCreate"
-      class="drawer-backdrop"
-      @click.self="closeAdvertisementDrawer"
-    >
-      <form
-        class="create-drawer"
-        @submit.prevent="isEditing ? updateAd() : createDraft()"
-      >
-        <header>
-          <div>
-            <span>
-              {{ isEditing ? "EDIT CAMPAIGN" : "NEW CAMPAIGN" }}
-            </span>
+    <AdvertisementFormDrawer
+      :show="showCreate"
+      :form="form"
+      :is-editing="isEditing"
+      :current-image-rule="currentImageRule"
+      :is-uploading-image="isUploadingImage"
+      :minimum-start-at="minimumStartAt"
+      :is-start-at-locked="isStartAtLocked"
+      :toast="toast"
+      :toast-type="toastType"
+      @close="closeAdvertisementDrawer"
+      @submit="isEditing ? updateAd() : createDraft()"
+      @image-change="handleImageUpload"
+    />
 
-            <h2>
-              {{ isEditing ? "編輯廣告" : "建立新廣告" }}
-            </h2>
-
-            <p>
-              {{
-                isEditing
-                  ? "修改目前這則廣告的內容與設定。"
-                  : "先建立草稿，稍後可補上圖片與導向設定。"
-              }}
-            </p>
-          </div>
-          <button
-            type="button"
-            aria-label="關閉"
-            @click="closeAdvertisementDrawer"
-          >
-            ×
-          </button>
-        </header>
-        <div class="drawer-body">
-          <label
-            >廣告名稱
-            <input
-              v-model.trim="form.adName"
-              required
-              placeholder="例如：九月新品上市"
-          /></label>
-          <div class="form-grid">
-            <label
-              >廣告類型<select v-model="form.adType" required>
-                <option value="NEW_PRODUCT">新品推薦</option>
-                <option value="HOT_PRODUCT">熱門商品</option>
-                <option value="AUCTION">競標活動</option>
-                <!-- <option value="DISCOUNT">折扣優惠</option> -->
-              </select></label
-            >
-            <label
-              >顯示版位<select v-model="form.adPlacement">
-                <option value="BANNER">首頁橫幅</option>
-                <option value="POPUP">首頁彈窗</option>
-                <option value="SMALL_BLOCK">商品頁側欄</option>
-              </select></label
-            >
-          </div>
-          <div class="image-upload-field">
-            <span class="image-upload-label">圖片上傳</span>
-            <p class="image-upload-guidance">
-              建議：{{ currentImageRule.width }} ×
-              {{ currentImageRule.height }} px | 比例{{
-                currentImageRule.ratioLabel
-              }}
-              | 最低{{ currentImageRule.minimumWidth }} ×
-              {{ currentImageRule.minimumHeight }} px
-            </p>
-
-            <input
-              id="advertisement-image-upload"
-              class="image-upload-input"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              :disabled="isUploadingImage"
-              @change="handleImageUpload"
-            />
-
-            <label
-              for="advertisement-image-upload"
-              class="image-upload-control"
-              :class="{
-                'is-uploading': isUploadingImage,
-                'is-uploaded': form.imageUrl && !isUploadingImage,
-              }"
-            >
-              <span class="image-upload-icon">
-                {{ isUploadingImage ? "…" : form.imageUrl ? "✓" : "↑" }}
-              </span>
-
-              <span class="image-upload-copy">
-                <strong>
-                  {{
-                    isUploadingImage
-                      ? "圖片上傳中"
-                      : form.imageUrl
-                        ? "圖片已上傳，可點擊更換"
-                        : "選擇廣告圖片"
-                  }}
-                </strong>
-              </span>
-            </label>
-          </div>
-          <div class="form-grid">
-            <label>
-              導向類型
-              <select v-model="form.targetType" required>
-                <option value="PRODUCT">一般商品</option>
-                <option value="AUCTION">競標商品</option>
-                <!-- <option value="COUPON">優惠券</option> -->
-                <!-- <option value="URL">外部網址</option> -->
-              </select>
-            </label>
-
-            <!-- <label v-if="form.targetType === 'URL'">
-                導向網址
-                <input
-                  v-model.trim="form.targetUrl"
-                  type="url"
-                  maxlength="500"
-                  required
-                  placeholder="https://example.com/activity"
-                />
-              </label> -->
-
-            <!-- 這段不是必須的，測試功能所使用正式會需要依賴其他組員API -->
-            <!-- <label v-else>
-              導向目標編號
-              <input
-                v-model.number="form.targetId"
-                type="number"
-                min="1"
-                required
-                placeholder="請輸入目標 ID"
-              />
-            </label> -->
-          </div>
-          <label
-            >廣告說明<textarea
-              v-model="form.adDescription"
-              rows="3"
-              placeholder="輸入活動簡介..."
-            ></textarea>
-          </label>
-          <div class="form-grid">
-            <label>
-              開始時間
-              <VueDatePicker
-                v-model="form.startAt"
-                :disabled="isStartAtLocked"
-                :min-date="minimumStartAt"
-                model-type="yyyy-MM-dd'T'HH:mm"
-                :locale="zhTW"
-                :teleport="true"
-                six-weeks
-                :formats="{ input: 'yyyy/MM/dd HH:mm' }"
-                :time-config="{ is24: true, timePickerInline: true }"
-                placeholder="選擇日期與時間"
-              />
-            </label>
-
-            <label>
-              結束時間
-              <VueDatePicker
-                v-model="form.endAt"
-                model-type="yyyy-MM-dd'T'HH:mm"
-                :locale="zhTW"
-                :teleport="true"
-                :transitions="false"
-                six-weeks
-                :formats="{ input: 'yyyy/MM/dd HH:mm' }"
-                :time-config="{ is24: true, timePickerInline: true }"
-                placeholder="選擇日期與時間"
-              />
-            </label>
-          </div>
-        </div>
-
-        <Transition name="toast">
-          <div
-            v-if="toast"
-            class="form-notice"
-            :class="toastType"
-            role="status"
-          >
-            {{ toastType === "success" ? "✓" : "!" }} {{ toast }}
-          </div>
-        </Transition>
-
-        <footer>
-          <button type="button" @click="closeAdvertisementDrawer">取消</button>
-          <button
-            class="submit"
-            type="submit"
-            :disabled="isUploadingImage || !form.imageUrl"
-          >
-            {{
-              isUploadingImage
-                ? "圖片上傳中…"
-                : isEditing
-                  ? "儲存修改"
-                  : "建立草稿"
-            }}
-          </button>
-        </footer>
-      </form>
-    </div>
     <Transition name="toast">
       <div
         v-if="toast && !showCreate"
