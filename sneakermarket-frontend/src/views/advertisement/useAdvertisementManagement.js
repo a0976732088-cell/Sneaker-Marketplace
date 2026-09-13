@@ -92,6 +92,11 @@ export function useAdvertisementManagement() {
     POPUP: "首頁彈窗",
     SMALL_BLOCK: "商品頁側欄",
   };
+  const placementApiValues = {
+    首頁橫幅: "BANNER",
+    首頁彈窗: "POPUP",
+    商品頁側欄: "SMALL_BLOCK",
+  };
   function resolveDisplayStatus(ad) {
     if (ad.adStatus === "DRAFT") return "草稿";
     if (ad.adStatus === "INACTIVE") {
@@ -133,15 +138,10 @@ export function useAdvertisementManagement() {
   const selectedDeliveryStatus = computed(
     () => tabDeliveryStatusValues[activeTab.value] || null,
   );
-  const filteredAds = computed(() =>
-    ads.value.filter((ad) => {
-      const term = keyword.value.trim().toLowerCase();
-      return (
-        (placement.value === "全部版位" || ad.place === placement.value) &&
-        (!term || `${ad.name} ${ad.id} ${ad.desc}`.toLowerCase().includes(term))
-      );
-    }),
+  const selectedAdPlacement = computed(
+    () => placementApiValues[placement.value] || null,
   );
+  const filteredAds = computed(() => ads.value);
 
   const form = reactive({
     // 未來登入功能完成後應由登入者資料取得
@@ -153,7 +153,7 @@ export function useAdvertisementManagement() {
     adPlacement: "BANNER",
     startAt: "",
     endAt: "",
-    targetType: "URL",
+    targetType: "PRODUCT",
     targetId: null,
     targetUrl: "",
     sortOrder: 0,
@@ -272,7 +272,7 @@ export function useAdvertisementManagement() {
       adPlacement: "BANNER",
       startAt: "",
       endAt: "",
-      targetType: "URL",
+      targetType: "PRODUCT",
       targetId: null,
       targetUrl: "",
       sortOrder: 0,
@@ -416,7 +416,7 @@ export function useAdvertisementManagement() {
       adPlacement: ad.adPlacement,
       startAt: toDatePickerValue(ad.startAt),
       endAt: toDatePickerValue(ad.endAt),
-      targetType: ad.targetType || "URL",
+      targetType: ad.targetType || "PRODUCT",
       targetId: ad.targetId ?? null,
       targetUrl: ad.targetUrl || "",
       sortOrder: ad.sortOrder ?? 0,
@@ -472,6 +472,8 @@ export function useAdvertisementManagement() {
         pageNumber,
         selectedAdStatus.value,
         selectedDeliveryStatus.value,
+        selectedAdPlacement.value,
+        keyword.value.trim() || null,
       );
       const pageData = result.data;
 
@@ -519,6 +521,18 @@ export function useAdvertisementManagement() {
   // 切換頁籤時回到第一頁，並交由後端依狀態篩選後再分頁。
   watch(activeTab, () => {
     loadAdvertisements(0);
+  });
+  watch(placement, () => {
+    loadAdvertisements(0);
+  });
+  watch(keyword, (_, __, onCleanup) => {
+    const timer = window.setTimeout(() => {
+      loadAdvertisements(0, true);
+    }, 300);
+
+    onCleanup(() => {
+      window.clearTimeout(timer);
+    });
   });
 
   async function goToPage(pageNumber) {

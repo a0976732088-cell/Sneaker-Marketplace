@@ -2,9 +2,11 @@ package com.project.sneakermarket.advertisement.dto;
 
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import jakarta.validation.constraints.NotNull;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class UpdateAdvertisementStatusRequest {
 
     @NotNull(message = "廣告狀態不可為空")

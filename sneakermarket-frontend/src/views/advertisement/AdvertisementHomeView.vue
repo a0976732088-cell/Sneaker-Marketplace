@@ -81,7 +81,7 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <div class="metric-grid">
+      <!-- <div class="metric-grid">
         <article>
           <i class="coral">↗</i>
           <div>
@@ -104,7 +104,7 @@ onUnmounted(() => {
           <div><span>平均點擊率</span><strong>4.48%</strong></div>
           <em>↑ 0.6%</em>
         </article>
-      </div>
+      </div> -->
 
       <div class="ad-panel">
         <div class="panel-tabs" role="tablist">
@@ -172,9 +172,9 @@ onUnmounted(() => {
                 <col class="column-placement" />
                 <col class="column-period" />
                 <col class="column-status" />
+                <!-- <col class="column-number" />
                 <col class="column-number" />
-                <col class="column-number" />
-                <col class="column-ctr" />
+                <col class="column-ctr" /> -->
                 <col class="column-actions" />
               </colgroup>
               <thead>
@@ -183,10 +183,10 @@ onUnmounted(() => {
                   <th>版位／類型</th>
                   <th>投放期間</th>
                   <th>狀態</th>
-                  <th class="number">曝光</th>
-                  <th class="number">點擊</th>
-                  <th class="number">CTR</th>
-                  <th><span class="visually-hidden">操作</span></th>
+                  <!-- <th class="number">曝光</th> -->
+                  <!-- <th class="number">點擊</th> -->
+                  <!-- <th class="number">CTR</th> -->
+                  <th class="actions-column">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -226,12 +226,12 @@ onUnmounted(() => {
                       >● {{ ad.status }}</span
                     >
                   </td>
-                  <td class="number">{{ ad.views }}</td>
+                  <!-- <td class="number">{{ ad.views }}</td>
                   <td class="number">{{ ad.clicks }}</td>
                   <td class="number">
                     <strong>{{ ad.ctr }}</strong>
-                  </td>
-                  <td>
+                  </td> -->
+                  <td class="actions-column">
                     <div class="row-actions">
                       <button
                         v-if="['DRAFT', 'INACTIVE'].includes(ad.adStatus)"
@@ -262,7 +262,7 @@ onUnmounted(() => {
                   </td>
                 </tr>
                 <tr v-if="!filteredAds.length">
-                  <td colspan="8" class="empty-state">
+                  <td colspan="5" class="empty-state">
                     找不到符合條件的廣告，請調整搜尋或篩選條件。
                   </td>
                 </tr>
@@ -361,7 +361,7 @@ onUnmounted(() => {
                 <option value="NEW_PRODUCT">新品推薦</option>
                 <option value="HOT_PRODUCT">熱門商品</option>
                 <option value="AUCTION">競標活動</option>
-                <option value="DISCOUNT">折扣優惠</option>
+                <!-- <option value="DISCOUNT">折扣優惠</option> -->
               </select></label
             >
             <label
@@ -375,9 +375,12 @@ onUnmounted(() => {
           <div class="image-upload-field">
             <span class="image-upload-label">圖片上傳</span>
             <p class="image-upload-guidance">
-              建議：{{ currentImageRule.width }} × {{ currentImageRule.height }} px |
-              比例{{ currentImageRule.ratioLabel }} |
-              最低{{ currentImageRule.minimumWidth }} × {{ currentImageRule.minimumHeight }} px
+              建議：{{ currentImageRule.width }} ×
+              {{ currentImageRule.height }} px | 比例{{
+                currentImageRule.ratioLabel
+              }}
+              | 最低{{ currentImageRule.minimumWidth }} ×
+              {{ currentImageRule.minimumHeight }} px
             </p>
 
             <input
@@ -420,21 +423,21 @@ onUnmounted(() => {
               <select v-model="form.targetType" required>
                 <option value="PRODUCT">一般商品</option>
                 <option value="AUCTION">競標商品</option>
-                <option value="COUPON">優惠券</option>
-                <option value="URL">外部網址</option>
+                <!-- <option value="COUPON">優惠券</option> -->
+                <!-- <option value="URL">外部網址</option> -->
               </select>
             </label>
 
-            <label v-if="form.targetType === 'URL'">
-              導向網址
-              <input
-                v-model.trim="form.targetUrl"
-                type="url"
-                maxlength="500"
-                required
-                placeholder="https://example.com/activity"
-              />
-            </label>
+            <!-- <label v-if="form.targetType === 'URL'">
+                導向網址
+                <input
+                  v-model.trim="form.targetUrl"
+                  type="url"
+                  maxlength="500"
+                  required
+                  placeholder="https://example.com/activity"
+                />
+              </label> -->
 
             <!-- 這段不是必須的，測試功能所使用正式會需要依賴其他組員API -->
             <!-- <label v-else>

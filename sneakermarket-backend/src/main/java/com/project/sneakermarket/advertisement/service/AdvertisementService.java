@@ -18,7 +18,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.domain.Specification;
 
+import jakarta.persistence.criteria.Predicate;
+
+
+import java.util.ArrayList;
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -206,37 +212,125 @@ public class AdvertisementService {
         return adRepo.save(advertisement);
     }
 
-    public Page<AdvertisementResponse> findAdByPage(Integer pageNumber,
-                                                    AdvertisementStatus adStatus,
-                                                    AdvertisementDeliveryStatus deliveryStatus){
-        Pageable page = PageRequest.of(pageNumber,5, Sort.Direction.DESC, "createdAt");
+    public Page<AdvertisementResponse> findAdByPage(
+            Integer pageNumber,
+            AdvertisementStatus adStatus,
+            AdvertisementDeliveryStatus deliveryStatus,
+            AdvertisementPlacement adPlacement,
+            String keyword
+    ) {
+        Pageable page = PageRequest.of(
+                pageNumber,
+                5,
+                Sort.Direction.DESC,
+                "createdAt"
+        );
 
-        Page<Advertisement> result;
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Taipei"));
 
-        LocalDateTime now =
-                LocalDateTime.now(ZoneId.of("Asia/Taipei"));
+        Specification<Advertisement> specification =
+                (root, query, criteriaBuilder) -> {
 
-        if (deliveryStatus == AdvertisementDeliveryStatus.SCHEDULED) {
-            result = adRepo.findByAdStatusAndStartAtAfter(
-                    AdvertisementStatus.ACTIVE,
-                    now,
-                    page
-            );
-        } else if (deliveryStatus == AdvertisementDeliveryStatus.RUNNING) {
-            result =
-                    adRepo.findByAdStatusAndStartAtLessThanEqualAndEndAtAfter(
-                            AdvertisementStatus.ACTIVE,
-                            now,
-                            now,
-                            page
+                    List<Predicate> predicates = new ArrayList<>();
+
+                    // 版位篩選
+                    if (adPlacement != null) {
+                        predicates.add(
+                                criteriaBuilder.equal(
+                                        root.<AdvertisementPlacement>get("adPlacement"),
+                                        adPlacement
+                                )
+                        );
+                    }
+
+                    // 投放狀態篩選
+                    if (deliveryStatus == AdvertisementDeliveryStatus.SCHEDULED) {
+                        predicates.add(
+                                criteriaBuilder.equal(
+                                        root.<AdvertisementStatus>get("adStatus"),
+                                        AdvertisementStatus.ACTIVE
+                                )
+                        );
+                        predicates.add(
+                                criteriaBuilder.greaterThan(
+                                        root.<LocalDateTime>get("startAt"),
+                                        now
+                                )
+                        );
+
+                    } else if (deliveryStatus == AdvertisementDeliveryStatus.RUNNING) {
+                        predicates.add(
+                                criteriaBuilder.equal(
+                                        root.<AdvertisementStatus>get("adStatus"),
+                                        AdvertisementStatus.ACTIVE
+                                )
+                        );
+                        predicates.add(
+                                criteriaBuilder.lessThanOrEqualTo(
+                                        root.<LocalDateTime>get("startAt"),
+                                        now
+                                )
+                        );
+                        predicates.add(
+                                criteriaBuilder.greaterThan(
+                                        root.<LocalDateTime>get("endAt"),
+                                        now
+                                )
+                        );
+
+                    } else if (adStatus != null) {
+                        predicates.add(
+                                criteriaBuilder.equal(
+                                        root.<AdvertisementStatus>get("adStatus"),
+                                        adStatus
+                                )
+                        );
+                    }
+
+                    // 關鍵字：搜尋廣告名稱，或精確搜尋廣告編號
+                    String normalizedKeyword = keyword == null
+                            ? ""
+                            : keyword.trim().toLowerCase(Locale.ROOT);
+
+                    if (!normalizedKeyword.isEmpty()) {
+                        List<Predicate> keywordPredicates = new ArrayList<>();
+
+                        keywordPredicates.add(
+                                criteriaBuilder.like(
+                                        criteriaBuilder.lower(
+                                                root.<String>get("adName")
+                                        ),
+                                        "%" + normalizedKeyword + "%"
+                                )
+                        );
+
+                        try {
+                            Long adId = Long.valueOf(normalizedKeyword);
+
+                            keywordPredicates.add(
+                                    criteriaBuilder.equal(
+                                            root.<Long>get("adId"),
+                                            adId
+                                    )
+                            );
+                        } catch (NumberFormatException ignored) {
+                            // 非數字關鍵字只搜尋廣告名稱。
+                        }
+
+                        predicates.add(
+                                criteriaBuilder.or(
+                                        keywordPredicates.toArray(new Predicate[0])
+                                )
+                        );
+                    }
+
+                    return criteriaBuilder.and(
+                            predicates.toArray(new Predicate[0])
                     );
-        } else if (adStatus != null) {
-            result = adRepo.findByAdStatus(adStatus, page);
-        } else {
-            result = adRepo.findAll(page);
-        }
+                };
 
-        return result.map(this::toResponse);
+        return adRepo.findAll(specification, page)
+                .map(this::toResponse);
     }
 
     @Transactional

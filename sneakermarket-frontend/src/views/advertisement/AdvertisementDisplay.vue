@@ -1,4 +1,5 @@
 <script setup>
+import { useRouter } from "vue-router";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import {
   getPublicActiveAdvertisements,
@@ -6,6 +7,20 @@ import {
 } from "@/service/advertisementService";
 
 const ads = ref([]);
+const router = useRouter();
+
+function goToAdvertisementTarget(ad) {
+  if (!ad) return;
+
+  if (ad.targetType === "PRODUCT") {
+    router.push("/products");
+    return;
+  }
+
+  if (ad.targetType === "AUCTION") {
+    router.push("/auctions");
+  }
+}
 const loading = ref(false);
 const errorMessage = ref("");
 
@@ -146,6 +161,7 @@ onUnmounted(() => {
         <img
           :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
           :alt="currentBanner.adName"
+          @click="goToAdvertisementTarget(currentBanner)"
         />
 
         <button
@@ -191,6 +207,7 @@ onUnmounted(() => {
         <img
           :src="resolveAdvertisementImageUrl(currentSmallBlock.imageUrl)"
           :alt="currentSmallBlock.adName"
+          @click="goToAdvertisementTarget(currentSmallBlock)"
         />
       </aside>
 
@@ -203,6 +220,7 @@ onUnmounted(() => {
           <img
             :src="resolveAdvertisementImageUrl(currentPopup.imageUrl)"
             :alt="currentPopup.adName"
+            @click="goToAdvertisementTarget(currentPopup)"
           />
         </article>
       </div>

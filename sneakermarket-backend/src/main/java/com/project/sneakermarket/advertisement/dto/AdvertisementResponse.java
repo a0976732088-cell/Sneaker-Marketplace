@@ -4,11 +4,14 @@ import com.project.sneakermarket.advertisement.entity.AdvertisementPlacement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import com.project.sneakermarket.advertisement.entity.AdvertisementTargetType;
 import com.project.sneakermarket.advertisement.entity.AdvertisementType;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+
 
 import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
 public class AdvertisementResponse {
 
     private Long adId;

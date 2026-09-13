@@ -6,12 +6,13 @@ import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-public interface AdvertisementRepository extends JpaRepository<Advertisement, Long> {
+public interface AdvertisementRepository extends JpaRepository<Advertisement, Long> , JpaSpecificationExecutor<Advertisement> {
 
     List<Advertisement> findByAdStatusInAndEndAtBefore(
             List<AdvertisementStatus> adStatuses,
@@ -41,6 +42,31 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
 
     Page<Advertisement> findByAdStatusAndStartAtLessThanEqualAndEndAtAfter(
             AdvertisementStatus adStatus,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            Pageable pageable
+    );
+    Page<Advertisement> findByAdPlacement(
+            AdvertisementPlacement adPlacement,
+            Pageable pageable
+    );
+
+    Page<Advertisement> findByAdStatusAndAdPlacement(
+            AdvertisementStatus adStatus,
+            AdvertisementPlacement adPlacement,
+            Pageable pageable
+    );
+
+    Page<Advertisement> findByAdStatusAndAdPlacementAndStartAtAfter(
+            AdvertisementStatus adStatus,
+            AdvertisementPlacement adPlacement,
+            LocalDateTime startAt,
+            Pageable pageable
+    );
+
+    Page<Advertisement> findByAdStatusAndAdPlacementAndStartAtLessThanEqualAndEndAtAfter(
+            AdvertisementStatus adStatus,
+            AdvertisementPlacement adPlacement,
             LocalDateTime startAt,
             LocalDateTime endAt,
             Pageable pageable

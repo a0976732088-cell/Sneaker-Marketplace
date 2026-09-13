@@ -5,11 +5,13 @@ import com.project.sneakermarket.advertisement.entity.AdvertisementPlacement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementTargetType;
 import com.project.sneakermarket.advertisement.entity.AdvertisementType;
 import jakarta.validation.constraints.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
 public class UpdateAdvertisementRequest {
 
     @NotBlank(message = "廣告名稱不可為空")

@@ -33,6 +33,8 @@ export async function getAdvertisementsByPage(
   pageNumber = 0,
   adStatus = null,
   deliveryStatus = null,
+  adPlacement = null,
+  keyword = null,
 ) {
   const response = await httpClient.get("/admin/ads/findPage", {
     // adStatus 沒有值時查詢全部；有值時由後端先篩選狀態，再進行分頁。
@@ -40,6 +42,8 @@ export async function getAdvertisementsByPage(
       pageNumber,
       adStatus: adStatus || undefined,
       deliveryStatus: deliveryStatus || undefined,
+      adPlacement: adPlacement || undefined,
+      keyword: keyword || undefined,
     },
   });
   return response.data;

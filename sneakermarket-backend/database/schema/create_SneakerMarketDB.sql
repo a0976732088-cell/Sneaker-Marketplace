@@ -3,7 +3,7 @@ GO
 
 CREATE TABLE dbo.advertisements (
                                     ad_id BIGINT IDENTITY(1,1) PRIMARY KEY,
-                                    created_by INT NOT NULL,
+                                    created_by BIGINT NOT NULL,
 
                                     ad_name NVARCHAR(120) NOT NULL,
                                     image_url NVARCHAR(500) NOT NULL,

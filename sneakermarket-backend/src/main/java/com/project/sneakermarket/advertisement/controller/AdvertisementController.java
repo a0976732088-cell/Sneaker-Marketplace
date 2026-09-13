@@ -81,11 +81,12 @@ public class AdvertisementController {
     public ResponseEntity<ApiResponse<Page<AdvertisementResponse>>> findAdByPage(
             @RequestParam(defaultValue = "0") Integer pageNumber,
             @RequestParam(required = false) AdvertisementStatus adStatus,
-            @RequestParam(required = false)
-            AdvertisementDeliveryStatus deliveryStatus){
+            @RequestParam(required = false) AdvertisementDeliveryStatus deliveryStatus,
+            @RequestParam(required = false) AdvertisementPlacement adPlacement,
+            @RequestParam(required = false) String keyword){
 
         Page<AdvertisementResponse> result =
-                adService.findAdByPage(pageNumber, adStatus, deliveryStatus);
+                adService.findAdByPage(pageNumber, adStatus, deliveryStatus, adPlacement, keyword);
 
         return ResponseEntity.ok(
                 ApiResponse.ok("廣告查詢成功", result)

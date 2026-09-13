@@ -371,25 +371,23 @@ table {
   border-collapse: collapse;
 }
 .column-ad {
-  width: 31%;
+  width: 34%;
 }
+
 .column-placement {
-  width: 13%;
+  width: 16%;
 }
+
 .column-period {
-  width: 18%;
+  width: 22%;
 }
+
 .column-status {
-  width: 10%;
+  width: 14%;
 }
-.column-number {
-  width: 7%;
-}
-.column-ctr {
-  width: 6%;
-}
+
 .column-actions {
-  width: 8%;
+  width: 14%;
 }
 th {
   padding: 11px 16px;
@@ -1010,4 +1008,12 @@ td,
 .image-upload-control.is-uploaded .image-upload-icon {
   color: #198754;
   background: #dff5e9;
+}
+
+.actions-column {
+  text-align: right;
+}
+
+.row-actions {
+  margin-left: auto;
 }
