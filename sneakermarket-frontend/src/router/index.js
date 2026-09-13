@@ -9,11 +9,6 @@ const routes = [
     component: HomeView,
   },
   {
-    path: "/system-check",
-    name: "system-check",
-    component: () => import("@/views/SystemCheckView.vue"),
-  },
-  {
     path: "/member",
     name: "member",
     component: () => import("@/views/member/MemberHomeView.vue"),

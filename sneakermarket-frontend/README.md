@@ -47,8 +47,6 @@ VITE_API_BASE_URL=http://localhost:8080/api
 1. 啟動 `sneakermarket-backend`。
 2. 確認後端 `http://localhost:8080/api/health` 可正常回應。
 3. 啟動 Vue：`npm run dev`。
-4. 開啟 `http://localhost:5173/system-check`。
-5. 顯示 `後端連線成功` 即代表 Vue → Axios → Spring Boot REST API 已接通。
 
 ## 目錄
 

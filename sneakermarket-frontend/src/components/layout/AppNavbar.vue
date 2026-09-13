@@ -124,13 +124,6 @@
               建立競標
             </RouterLink>
           </li>
-
-          <!-- 系統測試 -->
-          <li class="nav-item">
-            <RouterLink class="nav-link" to="/system-check">
-              系統測試
-            </RouterLink>
-          </li>
         </ul>
       </div>
     </div>
@@ -147,7 +140,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import httpClient from "@/service/httpClient";// 🎯 Import 彈窗元件
+import httpClient from "@/service/httpClient"; // 🎯 Import 彈窗元件
 import NotificationDrawer from "@/components/notification/NotificationDrawer.vue";
 
 /* ================================
@@ -274,7 +267,7 @@ const handleMarkAsRead = async (id) => {
   try {
     // 呼叫後端更新資料庫 is_read = 1 與 read_at
     await httpClient.put(`/notification/read/${id}`);
-    
+
     // 更新前端狀態（紅點數量會自動減少）
     const target = notifications.value.find((n) => n.notificationId === id);
 

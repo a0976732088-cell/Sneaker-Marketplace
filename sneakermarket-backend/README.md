@@ -130,11 +130,6 @@ macOS / Linux：
 ./mvnw spring-boot:run
 ```
 
-BASE Health API：
-
-```text
-GET http://localhost:8080/api/health
-```
 
 ## 7. Vue 前端
 
