@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 
 @Getter
 @AllArgsConstructor
-//商品[規格資料]
+//「回應」商品[規格資料]
 public class ProductVariantResponse {
 
     private String size;
