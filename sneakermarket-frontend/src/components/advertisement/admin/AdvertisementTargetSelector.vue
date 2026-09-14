@@ -16,6 +16,7 @@ const keyword = ref("");
 const results = ref([]);
 const loading = ref(false);
 const errorMessage = ref("");
+const hasSearched = ref(false);
 
 watch(
   () => props.targetType,
@@ -23,6 +24,7 @@ watch(
     keyword.value = "";
     results.value = [];
     errorMessage.value = "";
+    hasSearched.value = false;
   },
 );
 
@@ -30,6 +32,7 @@ async function searchTargets() {
   loading.value = true;
   errorMessage.value = "";
   results.value = [];
+  hasSearched.value = true;
 
   try {
     if (props.targetType === "PRODUCT") {
@@ -85,9 +88,7 @@ function selectTarget(target) {
         <p>搜尋後選擇一筆資料，作為廣告導向目標。</p>
       </div>
 
-      <button type="button" aria-label="關閉" @click="emit('close')">
-        ×
-      </button>
+      <button type="button" aria-label="關閉" @click="emit('close')">×</button>
     </header>
 
     <div class="target-drawer-body">
@@ -128,7 +129,9 @@ function selectTarget(target) {
           <button type="button" @click="selectTarget(target)">選擇</button>
         </li>
       </ul>
-
+      <p v-else-if="hasSearched" class="hint">
+        查無符合條件的{{ props.targetType === "PRODUCT" ? "商品" : "競標商品" }}
+      </p>
     </div>
   </aside>
 </template>

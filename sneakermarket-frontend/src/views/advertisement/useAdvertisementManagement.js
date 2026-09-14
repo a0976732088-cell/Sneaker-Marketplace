@@ -186,6 +186,14 @@ export function useAdvertisementManagement() {
     return false;
   }
 
+  function handlePlacementChange() {
+    if (!form.imageUrl) return;
+
+    form.imageUrl = "";
+
+    notify("顯示版位已變更，請依照新版位規格重新上傳圖片", "error");
+  }
+
   function readImageDimensions(file) {
     return new Promise((resolve, reject) => {
       const image = new Image();
@@ -624,9 +632,10 @@ export function useAdvertisementManagement() {
     currentImageRule,
     isEditing,
     isUploadingImage,
-    handleImageUpload,
     minimumStartAt,
     isStartAtLocked,
+    handlePlacementChange,
+    handleImageUpload,
     toggle,
     closeAdvertisementDrawer,
     openCreateDrawer,

@@ -27,9 +27,10 @@ const {
   currentImageRule,
   isEditing,
   isUploadingImage,
-  handleImageUpload,
   minimumStartAt,
   isStartAtLocked,
+  handlePlacementChange,
+  handleImageUpload,
   toggle,
   closeAdvertisementDrawer,
   openCreateDrawer,
@@ -172,6 +173,7 @@ onUnmounted(() => {
       @close="closeAdvertisementDrawer"
       @submit="isEditing ? updateAd() : createDraft()"
       @image-change="handleImageUpload"
+      @placement-change="handlePlacementChange"
     />
 
     <Transition name="toast">

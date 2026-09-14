@@ -44,7 +44,12 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["close", "submit", "image-change"]);
+const emit = defineEmits([
+  "close",
+  "submit",
+  "image-change",
+  "placement-change",
+]);
 const showTargetSelector = ref(false);
 const selectedTarget = ref(null);
 
@@ -121,7 +126,10 @@ function handleTargetTypeChange() {
             </select></label
           >
           <label
-            >顯示版位<select v-model="form.adPlacement">
+            >顯示版位<select
+              v-model="form.adPlacement"
+              @change="emit('placement-change')"
+            >
               <option value="BANNER">首頁橫幅</option>
               <option value="POPUP">首頁彈窗</option>
               <option value="SMALL_BLOCK">商品頁側欄</option>

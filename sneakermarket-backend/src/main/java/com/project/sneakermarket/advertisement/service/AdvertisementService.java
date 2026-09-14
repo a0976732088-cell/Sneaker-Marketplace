@@ -34,26 +34,24 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class AdvertisementService {
 
-    private static final String ADVERTISEMENT_IMAGE_URL_PREFIX =
-            "/uploads/advertisements/";
+
 
     private final AdvertisementRepository adRepo;
 
-    private void validateAdvertisementImageUrl(String imageUrl) {
-        if (imageUrl == null
-                || !imageUrl.startsWith(ADVERTISEMENT_IMAGE_URL_PREFIX)) {
-            throw new BusinessException(
-                    "廣告圖片必須使用本機上傳的圖片"
-            );
-        }
-    }
+    // 用來讀取及驗證已上傳的廣告圖片
+    private final AdvertisementImageStorageService adImageService;
+
 
     public Advertisement insertAdvertisement(CreateAdvertisementRequest request) {
         Advertisement advertisement = new Advertisement();
 
         validateAdvertisementTime(request.getStartAt(), request.getEndAt());
         validateDraftStartAtNotInPast(request.getStartAt());
-        validateAdvertisementImageUrl(request.getImageUrl());
+        // 根據目前選擇的版位，重新驗證伺服器裡的圖片
+        adImageService.validateStoredImage(
+                request.getImageUrl(),
+                request.getAdPlacement()
+        );
 
         advertisement.setCreatedBy(request.getCreatedBy());
         advertisement.setAdName(request.getAdName());
@@ -162,7 +160,11 @@ public class AdvertisementService {
         ensureAdvertisementIsEditable(advertisement);
 
         validateAdvertisementTime(request.getStartAt(), request.getEndAt());
-        validateAdvertisementImageUrl(request.getImageUrl());
+        // 根據目前選擇的版位，重新驗證伺服器裡的圖片
+        adImageService.validateStoredImage(
+                request.getImageUrl(),
+                request.getAdPlacement()
+        );
 
         if (advertisement.getAdStatus() ==AdvertisementStatus.DRAFT){
             validateDraftStartAtNotInPast(request.getStartAt());
@@ -421,30 +423,58 @@ public class AdvertisementService {
         }
     }
 
-    private void validatePlacementAvailability(Advertisement advertisement) {
-        AdvertisementPlacement placement = advertisement.getAdPlacement();
+    /**
+     * 檢查廣告版位的投放時段是否可以使用。
+     *
+     * BANNER 可以同時存在多則廣告，因為前端會輪播。
+     * POPUP、SMALL_BLOCK 同一時段只能有一則。
+     */
+    private void validatePlacementAvailability(
+            Advertisement advertisement
+    ) {
+        AdvertisementPlacement placement =
+                advertisement.getAdPlacement();
 
+        // BANNER 可以同時投放多則，不需要檢查時段重疊
         if (placement == AdvertisementPlacement.BANNER) {
             return;
         }
 
-        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Taipei"));
-
-        long activeAdvertisementCount =
-                adRepo.countByAdPlacementAndAdStatusAndStartAtLessThanEqualAndEndAtAfter(
+        /*
+         * 查詢同一版位、狀態為 ACTIVE，
+         * 而且投放時間與目前廣告重疊的資料。
+         *
+         * 目前的 ACTIVE 同時包含：
+         * 1. 已排程但尚未開始
+         * 2. 正在投放
+         */
+        List<Advertisement> overlappingAdvertisements =
+                adRepo.findOverlappingAdvertisements(
                         placement,
                         AdvertisementStatus.ACTIVE,
-                        now,
-                        now
+                        advertisement.getAdId(),
+                        advertisement.getStartAt(),
+                        advertisement.getEndAt()
                 );
 
-        if (activeAdvertisementCount > 0) {
-            throw new BusinessException(
-                    placement == AdvertisementPlacement.POPUP
-                            ? "目前已有正在投放的 POPUP 廣告"
-                            : "目前已有正在投放的 SMALL_BLOCK 廣告"
-            );
+        // 沒有查到資料，代表這個時段可以使用
+        if (overlappingAdvertisements.isEmpty()) {
+            return;
         }
+
+        // 取出第一則衝突的廣告，讓錯誤訊息更清楚
+        Advertisement conflictingAdvertisement =
+                overlappingAdvertisements.get(0);
+
+        throw new BusinessException(
+                placement == AdvertisementPlacement.POPUP
+                        ? "此 POPUP 投放時段與廣告「"
+                        + conflictingAdvertisement.getAdName()
+                        + "」重疊，請調整時間"
+                        : "此 SMALL_BLOCK 投放時段與廣告「"
+                        + conflictingAdvertisement.getAdName()
+                        + "」重疊，請調整時間"
+        );
     }
 
     @Transactional

@@ -3,12 +3,15 @@
   --muted: #718096;
   --line: #e8ebf0;
   --coral: #ff5c4d;
+
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   min-height: calc(100vh - 128px);
-  /* 抵銷外層 container 的上下間距，讓廣告版面銜接導覽列與頁尾。 */
-  margin: -1.5rem calc((100vw - 100%) / -2);
-  margin-bottom: -1.5rem;
+
+  /* 遵守 App.vue 外層 container，不再突破到瀏覽器兩側 */
+  margin: 0;
+
   background: #f6f7f9;
   color: var(--ink);
   font-family: Inter, "Noto Sans TC", system-ui, sans-serif;
@@ -137,7 +140,10 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 32px clamp(24px, 3vw, 48px) 46px;
+  width: 100%;
+
+  /* 保留上下距離，取消左右額外縮排 */
+  padding: 32px 0 46px;
 }
 .workspace-header {
   display: flex;
@@ -406,5 +412,5 @@
 }
 
 .workspace-header h1 {
-  font-size: clamp(32px, 3vw, 42px);
+  font-size: clamp(25px, 2vw, 42px);
 }
