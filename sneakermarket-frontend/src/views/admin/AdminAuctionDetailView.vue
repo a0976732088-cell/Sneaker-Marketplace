@@ -57,6 +57,7 @@
           <section class="card shadow-sm mb-4">
             <div class="card-header fw-semibold">競標資料</div>
             <dl class="row card-body detail-list mb-0">
+              <dt class="col-5">賣家</dt><dd class="col-7">{{ auction.sellerName || "會員資料未提供" }}</dd>
               <dt class="col-5">賣家 ID</dt><dd class="col-7">#{{ auction.sellerId }}</dd>
               <dt class="col-5">目前價格</dt><dd class="col-7">{{ formatMoney(auction.currentPrice) }}</dd>
               <dt class="col-5">出價次數</dt><dd class="col-7">{{ auction.bidCount }}</dd>

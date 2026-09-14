@@ -257,7 +257,10 @@
                   </div>
                 </div>
               </td>
-              <td>#{{ auction.sellerId }}</td>
+              <td>
+                <div>{{ auction.sellerName || "會員資料未提供" }}</div>
+                <div class="small text-secondary">ID #{{ auction.sellerId }}</div>
+              </td>
               <td>
                 <div>{{ formatMoney(auction.currentPrice) }}</div>
                 <div class="small text-secondary">

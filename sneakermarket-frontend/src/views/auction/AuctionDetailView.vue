@@ -121,6 +121,8 @@
         <div class="card-header">競標資訊</div>
 
         <div class="card-body">
+          <p>賣家：{{ auction.sellerName || "會員資料未提供" }}</p>
+
           <p>起標價：{{ formatTwd(auction.startPrice) }}</p>
 
           <p>目前價格：{{ formatTwd(auction.currentPrice) }}</p>
@@ -280,7 +282,7 @@
                   :key="`${bid.createdAt}-${index}`"
                 >
                   <td>
-                    {{ bid.maskedBidder }}
+                    {{ bid.bidderName || "會員資料未提供" }}
                   </td>
 
                   <td>{{ formatTwd(bid.bidAmount) }}</td>

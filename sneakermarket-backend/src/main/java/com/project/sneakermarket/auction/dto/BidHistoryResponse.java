@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
  * 競標出價紀錄 Response DTO。
  * <p>
  * 用來回傳競標詳細頁中的公開出價紀錄。
- * 不直接回傳 bidderId、完整會員帳號或 Email，
+ * 不直接回傳 bidderId、會員帳號或 Email，
  * 避免暴露會員識別資訊。
  */
 public record BidHistoryResponse(
@@ -18,8 +18,8 @@ public record BidHistoryResponse(
         // 出價成功時間
         LocalDateTime createdAt,
 
-        // 遮蔽後的出價者識別資訊
-        String maskedBidder
+        // 出價會員名稱
+        String bidderName
 
 ) {
 }

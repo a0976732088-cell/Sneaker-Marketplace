@@ -2,6 +2,7 @@ package com.project.sneakermarket.auction.service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -22,6 +23,8 @@ import com.project.sneakermarket.auction.entity.AuctionBid;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.common.exception.BusinessException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
+import com.project.sneakermarket.member.entity.Member;
+import com.project.sneakermarket.member.repository.MemberRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -49,6 +52,7 @@ public class AuctionQueryService {
     private final AuctionProductRepository auctionProductRepository;
     private final AuctionBidRepository auctionBidRepository;
     private final AuctionProductImageRepository auctionProductImageRepository;
+    private final MemberRepository memberRepository;
     /**
      * 查詢全部競標列表。
      *
@@ -65,6 +69,8 @@ public class AuctionQueryService {
         // 一次查出列表需要的競標商品資料
         Map<Long, AuctionProduct> productMap =
                 getProductMap(auctions);
+        Map<Long, String> sellerNames = loadMemberNames(productMap.values().stream()
+                .map(AuctionProduct::getSellerId).toList());
 
         AuctionOptionsResponse options = referenceService.getOptions();
 
@@ -72,7 +78,7 @@ public class AuctionQueryService {
         return auctions.stream()
                 .map(auction -> toSummaryResponse(
                         auction,
-                        productMap.get(auction.getAuctionProductId()), options
+                        productMap.get(auction.getAuctionProductId()), options, sellerNames
                 ))
                 .toList();
     }
@@ -106,6 +112,8 @@ public class AuctionQueryService {
         // 一次查出目前這一頁需要的競標商品資料
         Map<Long, AuctionProduct> productMap =
                 getProductMap(auctions);
+        Map<Long, String> sellerNames = loadMemberNames(productMap.values().stream()
+                .map(AuctionProduct::getSellerId).toList());
 
         AuctionOptionsResponse options = referenceService.getOptions();
         List<AuctionSummaryResponse> items =
@@ -114,7 +122,7 @@ public class AuctionQueryService {
                                 auction,
                                 productMap.get(
                                         auction.getAuctionProductId()
-                                ), options
+                                ), options, sellerNames
                         ))
                         .toList();
 
@@ -131,7 +139,7 @@ public class AuctionQueryService {
     /**
      * 查詢指定競標的公開出價紀錄。
      *
-     * 只回傳成功出價的金額、時間與遮蔽後的出價者資訊，
+     * 只回傳成功出價的金額、時間與出價會員名稱，
      * 不直接將 AuctionBid Entity 或 bidderId 暴露給前端。
      *
      * @param auctionId 競標 ID
@@ -154,9 +162,12 @@ public class AuctionQueryService {
                                 auctionId
                         );
 
+        Map<Long, String> bidderNames = loadMemberNames(bids.stream()
+                .map(AuctionBid::getBidderId).toList());
+
         // 將 Entity 轉為公開 Response DTO
         return bids.stream()
-                .map(this::toBidHistoryResponse)
+                .map(bid -> toBidHistoryResponse(bid, bidderNames))
                 .toList();
     }
 
@@ -220,6 +231,9 @@ public class AuctionQueryService {
                         );
 
 
+        String sellerName = memberRepository.findById(product.getSellerId())
+                .map(Member::getName).orElse(null);
+
         /*
          * 判斷目前瀏覽者是否為此競標的賣家。
          *
@@ -263,6 +277,7 @@ public class AuctionQueryService {
                 product.getBrandId(),
                 product.getCategoryId(),
                 product.getProductName(),
+                sellerName,
                 product.getModel(),
                 product.getSize(),
                 product.getCondition(),
@@ -371,6 +386,18 @@ public class AuctionQueryService {
                 ));
     }
 
+    private Map<Long, String> loadMemberNames(List<Long> memberIds) {
+        List<Long> distinctIds = memberIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (distinctIds.isEmpty()) {
+            return Map.of();
+        }
+        return memberRepository.findAllById(distinctIds).stream()
+                .collect(Collectors.toMap(Member::getMemberId, Member::getName));
+    }
+
     /**
      * 將競標資料與商品資料轉換成列表用 Response DTO。
      *
@@ -381,12 +408,14 @@ public class AuctionQueryService {
     private AuctionSummaryResponse toSummaryResponse(
             Auction auction,
             AuctionProduct product,
-            AuctionOptionsResponse options) {
+            AuctionOptionsResponse options,
+            Map<Long, String> sellerNames) {
 
         return new AuctionSummaryResponse(
                 auction.getAuctionId(),
                 auction.getAuctionProductId(),
                 product.getProductName(),
+                sellerNames.get(product.getSellerId()),
                 product.getModel(),
                 product.getSize(),
                 product.getCondition(),
@@ -414,12 +443,12 @@ public class AuctionQueryService {
      * @return 公開出價紀錄 DTO
      */
     private BidHistoryResponse toBidHistoryResponse(
-            AuctionBid bid) {
+            AuctionBid bid, Map<Long, String> bidderNames) {
 
         return new BidHistoryResponse(
                 bid.getBidAmount(),
                 bid.getCreatedAt(),
-                "匿名會員"
+                bidderNames.get(bid.getBidderId())
         );
     }
 }

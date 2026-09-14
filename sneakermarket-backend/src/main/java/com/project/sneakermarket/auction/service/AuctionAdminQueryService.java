@@ -3,6 +3,7 @@ package com.project.sneakermarket.auction.service;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,6 +29,8 @@ import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
 
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
+import com.project.sneakermarket.member.entity.Member;
+import com.project.sneakermarket.member.repository.MemberRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,6 +45,7 @@ public class AuctionAdminQueryService {
     private final AuctionRepository auctions;
     private final AuctionProductRepository products;
     private final AuctionProductImageRepository images;
+    private final MemberRepository members;
 
     public PageData<AuctionAdminSummaryResponse> search(
             AuctionAdminSearchCriteria criteria, Pageable pageable) {
@@ -49,11 +53,18 @@ public class AuctionAdminQueryService {
         var page = auctions.findAll(AuctionAdminSpecification.withCriteria(criteria), safePageable);
         Map<Long, AuctionProduct> productMap = productMap(page.getContent());
         Map<Long, String> firstImageMap = firstImageMap(page.getContent());
+        Map<Long, String> sellerNames = sellerNameMap(productMap);
         var items = page.getContent().stream()
-                .map(auction -> toResponse(
-                        auction,
-                        productMap.get(auction.getAuctionProductId()),
-                        firstImageMap.get(auction.getAuctionProductId())))
+                .map(auction -> {
+                    AuctionProduct product = productMap.get(auction.getAuctionProductId());
+                    String sellerName = product == null
+                            ? null : sellerNames.get(product.getSellerId());
+                    return toResponse(
+                            auction,
+                            product,
+                            firstImageMap.get(auction.getAuctionProductId()),
+                            sellerName);
+                })
                 .toList();
         return new PageData<>(items, page.getNumber(), page.getSize(),
                 page.getTotalElements(), page.getTotalPages());
@@ -64,12 +75,19 @@ public class AuctionAdminQueryService {
                 .orElseThrow(() -> new ResourceNotFoundException("找不到指定的競標資料"));
         AuctionProduct product = products.findById(auction.getAuctionProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("找不到此競標的商品資料"));
+        String sellerName = members.findById(product.getSellerId())
+                .map(Member::getName)
+                .orElse(null);
         List<String> imageUrls = images.findByAuctionProductIdOrderBySortOrderAsc(
                         product.getAuctionProductId()).stream()
                 .map(AuctionProductImage::getImageUrl)
                 .toList();
         return new AuctionAdminDetailResponse(
-                toResponse(auction, product, imageUrls.isEmpty() ? null : imageUrls.get(0)),
+                toResponse(
+                        auction,
+                        product,
+                        imageUrls.isEmpty() ? null : imageUrls.get(0),
+                        sellerName),
                 product.getSize(), product.getCondition(), product.getDescription(),
                 product.getDefectNote(), product.getAuthenticityNote(), product.getLocation(),
                 product.getShippingMethod(), product.getShippingFee(), product.getPaymentMethod(),
@@ -92,6 +110,18 @@ public class AuctionAdminQueryService {
                 .collect(Collectors.toMap(AuctionProduct::getAuctionProductId, Function.identity()));
     }
 
+    private Map<Long, String> sellerNameMap(
+            Map<Long, AuctionProduct> productMap) {
+        List<Long> sellerIds = productMap.values().stream()
+                .map(AuctionProduct::getSellerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (sellerIds.isEmpty()) return Map.of();
+        return members.findAllById(sellerIds).stream()
+                .collect(Collectors.toMap(Member::getMemberId, Member::getName));
+    }
+
     private Map<Long, String> firstImageMap(List<Auction> page) {
         if (page.isEmpty()) return Map.of();
         return images.findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(productIds(page))
@@ -108,13 +138,15 @@ public class AuctionAdminQueryService {
     }
 
     private AuctionAdminSummaryResponse toResponse(
-            Auction auction, AuctionProduct product, String imageUrl) {
+            Auction auction, AuctionProduct product, String imageUrl,
+            String sellerName) {
         return new AuctionAdminSummaryResponse(
                 auction.getAuctionId(),
                 product == null ? null : product.getProductName(),
                 product == null ? null : product.getModel(),
                 imageUrl,
                 product == null ? null : product.getSellerId(),
+                sellerName,
                 auction.getCurrentPrice(), auction.getBidCount(), auction.getStatus(),
                 auction.getStartAt(), auction.getEndAt(), auction.getCreatedAt(),
                 auction.getRemovedAt(), auction.getRemovedByMemberId(), auction.getRemoveReason(),

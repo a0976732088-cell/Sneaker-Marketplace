@@ -11,6 +11,7 @@ public record AuctionAdminSummaryResponse(
         String model,
         String imageUrl,
         Long sellerId,
+        String sellerName,
         BigDecimal currentPrice,
         Integer bidCount,
         AuctionStatus status,

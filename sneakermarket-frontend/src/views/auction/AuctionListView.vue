@@ -172,6 +172,7 @@
           </h5>
 
           <p class="card-text">品牌：{{ auction.brandName ?? "品牌資料未提供" }} ／ 分類：{{ auction.categoryName ?? "分類資料未提供" }}</p>
+          <p class="card-text">賣家：{{ auction.sellerName || "會員資料未提供" }}</p>
           <p class="card-text">型號：{{ auction.model }}</p>
 
           <p class="card-text">尺寸：{{ auction.size }}</p>

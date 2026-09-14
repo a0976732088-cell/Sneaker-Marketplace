@@ -54,11 +54,11 @@ test("admin view uses auction status wording and keeps required SFC order", () =
 });
 
 test("single action buttons follow visible removed and deleted states", () => {
-  assert.match(view, /v-if="isLegacyRemoved\(auction\)"[\s\S]*?>補登下架資訊<\/button>/);
-  assert.match(view, /v-else-if="!auction\.removedAt && !auction\.deletedAt"[\s\S]*?>下架<\/button>/);
-  assert.match(view, /v-if="canRestoreAuction\(auction\)"[\s\S]*?btn-success[\s\S]*?>恢復顯示<\/button>/);
-  assert.match(view, /v-if="auction\.removedAt && !auction\.deletedAt"[\s\S]*?btn-danger[\s\S]*?>刪除<\/button>/);
-  assert.match(view, /v-if="auction\.deletedAt"[\s\S]*?>已刪除<\/span>/);
+  assert.match(view, /v-if="isLegacyRemoved\(auction\)"[\s\S]*?>\s*補登下架資訊\s*<\/button\s*>/);
+  assert.match(view, /v-else-if="!auction\.removedAt && !auction\.deletedAt"[\s\S]*?>\s*下架\s*<\/button\s*>/);
+  assert.match(view, /v-if="canRestoreAuction\(auction\)"[\s\S]*?btn-success[\s\S]*?>\s*恢復顯示\s*<\/button\s*>/);
+  assert.match(view, /v-if="auction\.removedAt && !auction\.deletedAt"[\s\S]*?btn-danger[\s\S]*?>\s*刪除\s*<\/button\s*>/);
+  assert.match(view, /v-if="auction\.deletedAt"[\s\S]*?>\s*已刪除\s*<\/span\s*>/);
   assert.match(view, /\.action-button[\s\S]*?box-shadow/);
 });
 
@@ -75,11 +75,11 @@ test("action dialog requires confirmation and reasons only for remove or delete"
 });
 
 test("batch controls appear only after entering batch mode", () => {
-  assert.match(view, /v-if="!batchMode"[\s\S]*?@click="enterBatchMode"[\s\S]*?>批量操作<\/button>/);
-  assert.match(view, /<div v-else[\s\S]*?openBatchAction\('remove'\)[\s\S]*?>批量下架<\/button>/);
-  assert.match(view, /openBatchAction\('restore'\)[\s\S]*?>批量恢復顯示<\/button>/);
-  assert.match(view, /openBatchAction\('delete'\)[\s\S]*?>批量刪除<\/button>/);
-  assert.match(view, /@click="exitBatchMode"[\s\S]*?>結束批量操作<\/button>/);
+  assert.match(view, /v-if="!batchMode"[\s\S]*?@click="enterBatchMode"[\s\S]*?>\s*批量操作\s*<\/button\s*>/);
+  assert.match(view, /<div(?=[^>]*\bv-else\b)[^>]*>[\s\S]*?openBatchAction\('remove'\)[\s\S]*?>\s*批量下架\s*<\/button\s*>/);
+  assert.match(view, /openBatchAction\('restore'\)[\s\S]*?>\s*批量恢復顯示\s*<\/button\s*>/);
+  assert.match(view, /openBatchAction\('delete'\)[\s\S]*?>\s*批量刪除\s*<\/button\s*>/);
+  assert.match(view, /@click="exitBatchMode"[\s\S]*?>\s*結束批量操作\s*<\/button\s*>/);
   assert.match(view, /const restorableStatuses = new Set\(\["DRAFT", "SCHEDULED", "ACTIVE"\]\)/);
   assert.match(view, /const canBatchRestore = computed\([\s\S]*?every\(canRestoreAuction\)/);
   assert.match(view, /const canBatchDelete = computed\([\s\S]*?auction\.removedAt && !auction\.deletedAt/);
@@ -97,12 +97,16 @@ test("admin view prevents duplicate submissions and shows per-item batch results
 test("admin list shows clear selectors, thumbnails, detail links and 15-row numbering", () => {
   assert.ok(view.includes('class="form-check-input batch-checkbox"'));
   assert.ok(view.includes("border: 2px solid #334155"));
-  assert.ok(view.includes('v-if="auction.imageUrl && !brokenImageIds.has(auction.auctionId)"'));
+  assert.match(view, /v-if="\s*auction\.imageUrl && !brokenImageIds\.has\(auction\.auctionId\)\s*"/);
   assert.ok(view.includes(':src="resolveAuctionImageUrl(auction.imageUrl)"'));
   assert.ok(view.includes("name: 'admin-auction-detail'"));
   assert.ok(view.includes('v-for="(auction, index) in items"'));
   assert.ok(view.includes("pagination.page * pagination.size + index + 1"));
   assert.ok(view.includes("size: 15"));
+  assert.match(
+    view,
+    /auction\.sellerName\s*\|\|\s*"會員資料未提供"[\s\S]*?auction\.sellerId/,
+  );
 });
 
 test("admin detail remains available after moderation and resolves images against backend", () => {
@@ -110,6 +114,10 @@ test("admin detail remains available after moderation and resolves images agains
   assert.ok(detail.includes("getAdminAuctionDetail"));
   assert.ok(detail.includes("公開中、已下架及已刪除"));
   assert.ok(detail.includes("resolveAuctionImageUrl(imageUrl)"));
+  assert.match(
+    detail,
+    /賣家[\s\S]*?auction\.sellerName\s*\|\|\s*"會員資料未提供"[\s\S]*?賣家 ID[\s\S]*?auction\.sellerId/,
+  );
   assert.ok(imageUrl.includes('import httpClient from "@/service/httpClient"'));
   assert.ok(imageUrl.includes('replace(/\\/api\\/?$/, "")'));
   assert.ok(view.includes('@error="markThumbnailBroken(auction.auctionId)"'));

@@ -31,6 +31,9 @@ public record AuctionDetailResponse(
         // 商品名稱
         String productName,
 
+        // 賣家會員名稱
+        String sellerName,
+
         // 商品型號／系列
         String model,
 
