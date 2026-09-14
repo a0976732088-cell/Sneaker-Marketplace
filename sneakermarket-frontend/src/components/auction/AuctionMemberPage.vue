@@ -8,6 +8,8 @@
       <RouterLink class="btn btn-outline-primary" to="/auction-orders">我的競標訂單</RouterLink>
     </nav>
 
+    <slot name="view-switch" />
+
     <p v-if="loading" role="status">載入中…</p>
     <div v-else-if="errorMessage" class="alert alert-danger" role="alert">
       {{ errorMessage }}
@@ -34,6 +36,7 @@ const props = defineProps({
   title: { type: String, required: true },
   emptyMessage: { type: String, required: true },
   fetchPage: { type: Function, required: true },
+  errorMessageFallback: { type: String, default: "無法載入資料，請稍後重試" },
 });
 const router = useRouter();
 const items = ref([]);
@@ -63,7 +66,7 @@ async function loadPage(page = currentPage.value) {
     totalPages.value = 0;
     totalElements.value = 0;
     if (await handleAuctionAccessError(error, router)) return;
-    errorMessage.value = error.response?.data?.message ?? "無法載入資料，請稍後重試";
+    errorMessage.value = error.response?.data?.message ?? props.errorMessageFallback;
   } finally {
     if (version === requestVersion) loading.value = false;
   }

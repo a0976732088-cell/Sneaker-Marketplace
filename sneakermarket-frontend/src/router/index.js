@@ -89,6 +89,11 @@ const routes = [
     component: () => import("@/views/auction/AuctionOrderListView.vue"),
   },
   {
+    path: "/auction-orders/:orderNumber/payment",
+    name: "auction-order-payment",
+    component: () => import("@/views/auction/AuctionOrderPaymentView.vue"),
+  },
+  {
     path: "/auctions/:id",
     name: "auction-detail",
     component: () => import("@/views/auction/AuctionDetailView.vue"),

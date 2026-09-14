@@ -34,6 +34,7 @@ import com.project.sneakermarket.member.repository.MemberRepository;
 class AuctionMemberQueryIntegrationTests {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 11, 12, 0);
     @Autowired AuctionMemberQueryService service;
+    @Autowired AuctionOrderPaymentService payments;
     @Autowired AuctionRepository auctions;
     @Autowired AuctionProductRepository products;
     @Autowired AuctionBidRepository bids;
@@ -246,9 +247,61 @@ class AuctionMemberQueryIntegrationTests {
     }
 
     @Test
+    void salesAreSellerScopedPaginatedAndReuseOrderSummary() {
+        var old = order(auction(seller, AuctionStatus.SOLD, NOW), a, seller, NOW.minusDays(1));
+        var recent = order(auction(seller, AuctionStatus.SOLD, NOW), b, seller, NOW);
+        var otherSellerOrder = order(auction(a, AuctionStatus.SOLD, NOW), b, a, NOW.plusDays(1));
+        flush();
+
+        var firstPage = service.getMyAuctionSales(seller, 0, 1);
+        assertEquals(2, firstPage.totalElements());
+        assertEquals(2, firstPage.totalPages());
+        assertEquals(0, firstPage.page());
+        assertEquals(1, firstPage.size());
+        var row = firstPage.items().get(0);
+        assertEquals(recent.getOrderNumber(), row.orderNumber());
+        assertEquals(recent.getAuctionId(), row.auctionId());
+        assertEquals("Member query fixture", row.productName());
+        assertMoney("6500", row.finalPrice());
+        assertEquals("Transfer", row.paymentMethod());
+        assertEquals(AuctionPaymentStatus.PENDING, row.paymentStatus());
+        assertEquals(AuctionShippingStatus.NOT_SHIPPED, row.shippingStatus());
+        assertEquals(AuctionOrderStatus.PENDING_PAYMENT, row.orderStatus());
+        assertEquals(NOW, row.createdAt());
+        assertEquals(NOW, row.updatedAt());
+        assertEquals(old.getOrderNumber(), service.getMyAuctionSales(seller, 1, 1).items().get(0).orderNumber());
+
+        var buyerSales = service.getMyAuctionSales(a, 0, 10);
+        assertEquals(1, buyerSales.totalElements());
+        assertEquals(otherSellerOrder.getOrderNumber(), buyerSales.items().get(0).orderNumber());
+        assertTrue(buyerSales.items().stream().noneMatch(item -> item.orderNumber().equals(old.getOrderNumber())));
+        assertTrue(service.getMyAuctionSales(b, 0, 10).items().isEmpty());
+    }
+
+    @Test
+    void buyerPaymentIsImmediatelyVisibleInSellerOrdersWithoutSynchronization() {
+        var pending = order(auction(seller, AuctionStatus.SOLD, NOW), a, seller, NOW);
+        flush();
+
+        var beforePayment = service.getMyAuctionSales(seller, 0, 10).items().get(0);
+        assertEquals(AuctionPaymentStatus.PENDING, beforePayment.paymentStatus());
+        assertEquals(AuctionOrderStatus.PENDING_PAYMENT, beforePayment.orderStatus());
+
+        payments.pay(pending.getOrderNumber(), a);
+        flush();
+
+        var afterPayment = service.getMyAuctionSales(seller, 0, 10).items().get(0);
+        assertEquals(pending.getOrderNumber(), afterPayment.orderNumber());
+        assertEquals(AuctionPaymentStatus.PAID, afterPayment.paymentStatus());
+        assertEquals(AuctionOrderStatus.PAID, afterPayment.orderStatus());
+        assertEquals(AuctionShippingStatus.NOT_SHIPPED, afterPayment.shippingStatus());
+    }
+
+    @Test
     void emptyPagesAndBoundedSizesUseExistingPageContract() {
         for (var page : List.of(service.getMyBids(a, 0, 1000),
-                service.getMyListings(a, 0, 1000), service.getMyAuctionOrders(a, 0, 1000))) {
+                service.getMyListings(a, 0, 1000), service.getMyAuctionOrders(a, 0, 1000),
+                service.getMyAuctionSales(a, 0, 1000))) {
             assertEquals(100, page.size());
             assertEquals(0, page.page());
             assertEquals(0, page.totalElements());
@@ -261,6 +314,8 @@ class AuctionMemberQueryIntegrationTests {
         assertThrows(BusinessException.class, () -> service.getMyListings(a, 0, 0));
         assertThrows(BusinessException.class, () -> service.getMyAuctionOrders(a, -1, 10));
         assertThrows(BusinessException.class, () -> service.getMyAuctionOrders(a, 0, 0));
+        assertThrows(BusinessException.class, () -> service.getMyAuctionSales(a, -1, 10));
+        assertThrows(BusinessException.class, () -> service.getMyAuctionSales(a, 0, 0));
     }
 
     @Test
