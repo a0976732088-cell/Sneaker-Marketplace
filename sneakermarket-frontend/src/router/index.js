@@ -134,6 +134,33 @@ const routes = [
       requiresAdmin: true,
     },
   },
+  
+  {
+    path: "/admin/products",
+    name: "admin-products",
+    component: () => import("@/views/admin/AdminProductListView.vue"),
+    meta: {
+      requiresAdmin: true,
+    },
+  },
+
+    {
+    path: "/admin/products/new",
+    name: "admin-product-create",
+    component: () => import("@/views/admin/AdminProductFormView.vue"),
+    meta: {
+      requiresAdmin: true,
+    },
+  },
+  
+  {
+    path: "/admin/products/:id/edit",
+    name: "admin-product-edit",
+    component: () => import("@/views/admin/AdminProductFormView.vue"),
+    meta: {
+      requiresAdmin: true,
+    },
+  },
 
   {
     path: "/ads/storefront",

@@ -51,7 +51,7 @@ const adminModules = [
   {
     title: "一般商城",
     description: "商品、購物車、結帳與一般訂單。",
-    to: { name: "commerce" },
+    to: { name: "admin-products" },
   },
   {
     title: "廣告系統",
