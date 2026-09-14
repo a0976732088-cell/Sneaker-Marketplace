@@ -2,8 +2,10 @@
 import { VueDatePicker } from "@vuepic/vue-datepicker";
 import "@vuepic/vue-datepicker/dist/main.css";
 import { zhTW } from "date-fns/locale";
+import { ref, watch } from "vue";
+import AdvertisementTargetSelector from "./AdvertisementTargetSelector.vue";
 
-defineProps({
+const props = defineProps({
   show: {
     type: Boolean,
     required: true,
@@ -43,10 +45,41 @@ defineProps({
 });
 
 const emit = defineEmits(["close", "submit", "image-change"]);
+const showTargetSelector = ref(false);
+const selectedTarget = ref(null);
+
+watch(
+  () => props.show,
+  (isOpen) => {
+    if (isOpen) {
+      // 每次開啟建立／編輯抽屜，都清除前一次暫存在元件內的選取名稱。
+      selectedTarget.value = null;
+      showTargetSelector.value = false;
+    }
+  },
+);
+
+function handleTargetSelect(target) {
+  props.form.targetId = target.id;
+  props.form.targetUrl = null;
+  selectedTarget.value = target;
+  showTargetSelector.value = false;
+}
+
+function clearTarget() {
+  props.form.targetId = null;
+  props.form.targetUrl = "";
+  selectedTarget.value = null;
+  showTargetSelector.value = false;
+}
+
+function handleTargetTypeChange() {
+  clearTarget();
+}
 </script>
 
 <template>
-  <div v-if="show" class="drawer-backdrop" @click.self="emit('close')">
+  <div v-if="show" class="drawer-backdrop">
     <form class="create-drawer" @submit.prevent="emit('submit')">
       <header>
         <div>
@@ -143,7 +176,11 @@ const emit = defineEmits(["close", "submit", "image-change"]);
         <div class="form-grid">
           <label>
             導向類型
-            <select v-model="form.targetType" required>
+            <select
+              v-model="form.targetType"
+              required
+              @change="handleTargetTypeChange"
+            >
               <option value="PRODUCT">一般商品</option>
               <option value="AUCTION">競標商品</option>
               <!-- <option value="COUPON">優惠券</option> -->
@@ -174,6 +211,52 @@ const emit = defineEmits(["close", "submit", "image-change"]);
               />
             </label> -->
         </div>
+        <section class="target-picker">
+          <div class="target-picker-header">
+            <div>
+              <span>
+                指定{{
+                  form.targetType === "PRODUCT" ? "商品" : "競標商品"
+                }}（選填）
+              </span>
+
+              <small v-if="selectedTarget">
+                已選擇：{{ selectedTarget.name }}
+              </small>
+
+              <small v-else-if="form.targetId">
+                目前已設定目標編號：{{ form.targetId }}
+              </small>
+
+              <small v-else>
+                未指定時，廣告會前往{{
+                  form.targetType === "PRODUCT"
+                    ? "一般商城列表"
+                    : "競標商城列表"
+                }}。
+              </small>
+            </div>
+
+            <div class="target-picker-actions">
+              <button
+                v-if="form.targetId"
+                type="button"
+                class="clear-target-button"
+                @click="clearTarget"
+              >
+                清除
+              </button>
+
+              <button
+                type="button"
+                class="select-target-button"
+                @click="showTargetSelector = true"
+              >
+                選擇{{ form.targetType === "PRODUCT" ? "商品" : "競標商品" }}
+              </button>
+            </div>
+          </div>
+        </section>
         <label
           >廣告說明<textarea
             v-model="form.adDescription"
@@ -238,6 +321,12 @@ const emit = defineEmits(["close", "submit", "image-change"]);
         </button>
       </footer>
     </form>
+    <AdvertisementTargetSelector
+      v-if="showTargetSelector"
+      :target-type="form.targetType"
+      @select="handleTargetSelect"
+      @close="showTargetSelector = false"
+    />
   </div>
 </template>
 
@@ -342,7 +431,7 @@ const emit = defineEmits(["close", "submit", "image-change"]);
   border-radius: 7px;
   color: #596577;
   background: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 .create-drawer footer .submit {
@@ -494,5 +583,63 @@ const emit = defineEmits(["close", "submit", "image-change"]);
 
 .drawer-body label {
   font-size: 14px;
+}
+.target-picker {
+  margin: 0 0 17px;
+  padding: 12px;
+  border: 1px solid #e2e6ec;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.target-picker-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.target-picker-header span,
+.target-picker-header small {
+  display: block;
+}
+
+.target-picker-header span {
+  color: #495567;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.target-picker-header small {
+  margin-top: 4px;
+  color: #748092;
+  font-size: 14px;
+}
+
+.target-picker-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.select-target-button,
+.clear-target-button {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.select-target-button {
+  border: 0;
+  color: #fff;
+  background: #2563eb;
+}
+
+.clear-target-button {
+  border: 1px solid #cfd6df;
+  color: #5f6b7a;
+  background: #fff;
 }
 </style>

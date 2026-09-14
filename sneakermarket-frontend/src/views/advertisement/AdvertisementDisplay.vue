@@ -13,12 +13,27 @@ function goToAdvertisementTarget(ad) {
   if (!ad) return;
 
   if (ad.targetType === "PRODUCT") {
-    router.push("/products");
+    if (ad.targetId) {
+      router.push({
+        name: "product-detail",
+        params: { id: ad.targetId },
+      });
+    } else {
+      router.push({ name: "commerce" });
+    }
+
     return;
   }
 
   if (ad.targetType === "AUCTION") {
-    router.push("/auctions");
+    if (ad.targetId) {
+      router.push({
+        name: "auction-detail",
+        params: { id: ad.targetId },
+      });
+    } else {
+      router.push({ name: "auction" });
+    }
   }
 }
 const loading = ref(false);

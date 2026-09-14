@@ -121,25 +121,25 @@
 .small-block-ad img {
   width: 90px;
   height: 90px;
-  border: 4px solid white;
+  border: 2px solid white;
   border-radius: 50%;
   object-fit: cover;
-  box-shadow: 0 5px 18px rgb(0 0 0 / 30%);
+  box-shadow: 0 5px 18px rgb(0 0 0 / 10%);
   cursor: pointer;
 }
 
 /* SMALL_BLOCK 關閉按鈕 */
 .small-close {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -12px;
+  right: -12px;
   width: 28px;
   height: 28px;
   padding: 0;
-  border: 2px solid white;
+  border: 1px solid white;
   border-radius: 50%;
   color: white;
-  background-color: #495057;
+  background-color: #14171a;
   font-size: 18px;
 }
 
@@ -177,17 +177,17 @@
 /* POPUP 關閉按鈕 */
 .popup-close {
   position: absolute;
-  top: -15px;
-  right: -15px;
+  top: -40px;
+  right: -30px;
   z-index: 1;
   width: 38px;
   height: 38px;
   padding: 0;
-  border: 3px solid white;
+  border: 1px solid white;
   border-radius: 50%;
   color: white;
-  background-color: #495057;
-  font-size: 25px;
+  background-color: #14171a;
+  font-size: 20px;
 }
 
 /* 手機版調整
