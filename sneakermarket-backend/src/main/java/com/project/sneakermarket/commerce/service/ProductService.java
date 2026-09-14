@@ -114,6 +114,17 @@ public class ProductService {
             productVariantRepository.save(variant);
         }
 
+        if (request.getImages() != null) {
+            for (ProductImageRequest img : request.getImages()) {
+                ProductImage image = new ProductImage();
+                image.setImageUrl(img.getImageUrl());
+                image.setSortOrder(img.getSortOrder() != null ? img.getSortOrder() : 0);
+                image.setIsPrimary(img.getIsPrimary() != null ? img.getIsPrimary() : false);
+                image.setProduct(product);
+                productImageRepository.save(image);
+            }
+        }
+
         return getProductDetail(product.getProductId());
     }
 
@@ -176,6 +187,20 @@ public class ProductService {
             }
         }
 
+        // 圖片：不用比對新舊，直接整批刪除舊的，再存一份新的
+        productImageRepository.deleteByProductProductId(productId);
+
+        if (request.getImages() != null) {
+            for (ProductImageRequest img : request.getImages()) {
+                ProductImage image = new ProductImage();
+                image.setImageUrl(img.getImageUrl());
+                image.setSortOrder(img.getSortOrder() != null ? img.getSortOrder() : 0);
+                image.setIsPrimary(img.getIsPrimary() != null ? img.getIsPrimary() : false);
+                image.setProduct(product);
+                productImageRepository.save(image);
+            }
+        }
+        
         return getProductDetail(product.getProductId());
     }
 

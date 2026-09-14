@@ -15,4 +15,5 @@ public class CreateProductRequest {
     private String productName;
     private String description;
     private List<ProductVariantRequest> variants;
+    private List<ProductImageRequest> images;
 }
