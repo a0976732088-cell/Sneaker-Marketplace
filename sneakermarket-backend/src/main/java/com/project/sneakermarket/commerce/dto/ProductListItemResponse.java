@@ -16,4 +16,5 @@ public class ProductListItemResponse {
     private String status;
     private BigDecimal price;
     private String imageUrl;
+    private Integer totalStock;
 }

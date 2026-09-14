@@ -48,13 +48,18 @@ public class ProductService {
 
                     String imageUrl = images.isEmpty() ? null : images.get(0).getImageUrl();
 
+                    int totalStock = variants.stream()
+                            .mapToInt(ProductVariant::getStock)
+                            .sum();
+
                     return new ProductListItemResponse(
                             p.getProductId(),
                             p.getProductName(),
                             p.getBrand().getBrandName(),
                             p.getStatus(),
                             price,
-                            imageUrl);
+                            imageUrl,
+                            totalStock);
                 })
                 .collect(Collectors.toList());
     }
@@ -82,7 +87,9 @@ public class ProductService {
                 product.getStatus(),
                 product.getDescription(),
                 imageUrls,
-                variantResponses);
+                variantResponses,
+                product.getCategory().getCategoryId(),
+                product.getBrand().getBrandId());
     }
 
 
