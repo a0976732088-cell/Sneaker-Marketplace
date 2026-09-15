@@ -69,9 +69,11 @@ async function loadCurrentMember() {
 
   try {
     member.value = await getCurrentMember();
+
     console.log("目前登入會員：", member.value);
   } catch (error) {
     console.error("取得會員資料失敗：", error);
+
     await router.replace("/login");
   } finally {
     loading.value = false;
@@ -84,8 +86,11 @@ function startEdit() {
 
   editForm.value = {
     name: member.value?.name || "",
+
     email: member.value?.email || "",
+
     phone: member.value?.phone || "",
+
     address: member.value?.address || "",
   };
 
@@ -94,6 +99,7 @@ function startEdit() {
 
 function cancelEdit() {
   isEditing.value = false;
+
   errorMessage.value = "";
   successMessage.value = "";
 }
@@ -103,32 +109,40 @@ async function saveMember() {
   successMessage.value = "";
 
   const cleanName = editForm.value.name.trim();
+
   const cleanEmail = editForm.value.email.trim();
+
   const cleanPhone = editForm.value.phone.trim();
+
   const cleanAddress = editForm.value.address.trim();
 
   if (!cleanName) {
     errorMessage.value = "姓名不可以空白";
+
     return;
   }
 
   if (!cleanEmail) {
     errorMessage.value = "Email 不可以空白";
+
     return;
   }
 
   if (!isValidEmail(cleanEmail)) {
     errorMessage.value = "Email 格式不正確";
+
     return;
   }
 
   if (!cleanPhone) {
     errorMessage.value = "手機號碼不可以空白";
+
     return;
   }
 
   if (!isValidPhone(cleanPhone)) {
     errorMessage.value = "手機格式錯誤，需為 09 開頭後接 8 個數字";
+
     return;
   }
 
@@ -137,16 +151,22 @@ async function saveMember() {
   try {
     const response = await updateMyProfile({
       name: cleanName,
+
       email: cleanEmail,
+
       phone: cleanPhone,
+
       address: cleanAddress,
     });
 
     member.value = response.data;
+
     successMessage.value = "會員資料修改成功";
+
     isEditing.value = false;
   } catch (error) {
     console.error("修改會員失敗：", error);
+
     errorMessage.value = getApiErrorMessage(error, "會員資料修改失敗");
   } finally {
     savingProfile.value = false;
@@ -156,7 +176,9 @@ async function saveMember() {
 function resetPasswordForm() {
   passwordForm.value = {
     currentPassword: "",
+
     newPassword: "",
+
     confirmPassword: "",
   };
 }
@@ -167,24 +189,25 @@ async function handleChangePassword() {
 
   if (!passwordForm.value.currentPassword) {
     errorMessage.value = "請輸入目前密碼";
+
     return;
   }
 
   if (!passwordForm.value.newPassword) {
     errorMessage.value = "請輸入新密碼";
+
     return;
   }
 
   if (passwordForm.value.newPassword.length < 8) {
     errorMessage.value = "新密碼至少需要 8 碼";
+
     return;
   }
 
-  if (
-    passwordForm.value.newPassword !==
-    passwordForm.value.confirmPassword
-  ) {
+  if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
     errorMessage.value = "兩次輸入的新密碼不一致";
+
     return;
   }
 
@@ -194,10 +217,13 @@ async function handleChangePassword() {
     await changeMyPassword(passwordForm.value);
 
     successMessage.value = "密碼修改成功";
+
     showPasswordForm.value = false;
+
     resetPasswordForm();
   } catch (error) {
     console.error("修改密碼失敗：", error);
+
     errorMessage.value = getApiErrorMessage(error, "密碼修改失敗");
   } finally {
     changingPassword.value = false;
@@ -210,11 +236,12 @@ async function handleDeleteAccount() {
 
   if (member.value?.role === "ROLE_ADMIN") {
     errorMessage.value = "管理員不可刪除自己的管理員帳號";
+
     return;
   }
 
   const confirmed = window.confirm(
-    `確定要刪除帳號「${member.value?.account}」嗎？\n刪除後將無法復原。`
+    `確定要刪除帳號「${member.value?.account}」嗎？\n刪除後將無法復原。`,
   );
 
   if (!confirmed) {
@@ -225,9 +252,11 @@ async function handleDeleteAccount() {
     await deleteMyAccount();
 
     alert("帳號已刪除");
+
     await router.replace("/login");
   } catch (error) {
     console.error("刪除帳號失敗：", error);
+
     errorMessage.value = getApiErrorMessage(error, "刪除帳號失敗");
   }
 }
@@ -239,32 +268,62 @@ onMounted(() => {
 
 <template>
   <div class="member-page">
+    <!-- =========================================
+         Loading
+    ========================================== -->
+
     <div v-if="loading" class="loading-area">會員資料載入中...</div>
 
     <template v-else-if="member">
+      <!-- =========================================
+           會員中心導覽列
+      ========================================== -->
+
       <nav class="member-nav">
-        <router-link to="/member">個人檔案</router-link>
-        <a href="#" @click.prevent>訂單</a>
-        <a href="#" @click.prevent>競標</a>
-        <a href="#security" @click.prevent>設定</a>
+        <router-link to="/member"> 個人檔案 </router-link>
+
+        <router-link to="/coupons"> 我的折價券 </router-link>
+
+        <a href="#" @click.prevent> 訂單 </a>
+
+        <a href="#" @click.prevent> 競標 </a>
       </nav>
+
+      <!-- =========================================
+           會員基本資料
+      ========================================== -->
 
       <main class="profile-container">
         <div class="avatar">
-          <span>{{ member.name?.charAt(0) || "M" }}</span>
+          <span>
+            {{ member.name?.charAt(0) || "M" }}
+          </span>
         </div>
 
         <div class="profile-info">
-          <h1>{{ member.name }}</h1>
-          <p class="member-account">{{ member.account }}</p>
-          <p>{{ member.email }}</p>
+          <h1>
+            {{ member.name }}
+          </h1>
+
+          <p class="member-account">
+            {{ member.account }}
+          </p>
+
+          <p>
+            {{ member.email }}
+          </p>
         </div>
       </main>
+
+      <!-- =========================================
+           個人資料
+      ========================================== -->
 
       <section class="profile-detail-section">
         <div class="section-header">
           <div>
             <h2>個人檔案</h2>
+
             <p class="section-description">修改姓名與聯絡資料</p>
           </div>
 
@@ -291,22 +350,38 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- 成功訊息 -->
+
         <div v-if="successMessage" class="message success-message">
           {{ successMessage }}
         </div>
+
+        <!-- 錯誤訊息 -->
 
         <div v-if="errorMessage" class="message error-message">
           {{ errorMessage }}
         </div>
 
+        <!-- =========================================
+             個人資料欄位
+        ========================================== -->
+
         <div class="profile-details">
-          <div class="detail-item">
-            <span class="detail-label">帳號</span>
-            <span>{{ member.account }}</span>
-          </div>
+          <!-- 帳號 -->
 
           <div class="detail-item">
-            <span class="detail-label">姓名</span>
+            <span class="detail-label"> 帳號 </span>
+
+            <span>
+              {{ member.account }}
+            </span>
+          </div>
+
+          <!-- 姓名 -->
+
+          <div class="detail-item">
+            <span class="detail-label"> 姓名 </span>
+
             <input
               v-if="isEditing"
               v-model="editForm.name"
@@ -315,11 +390,17 @@ onMounted(() => {
               placeholder="請輸入姓名"
               :disabled="savingProfile"
             />
-            <span v-else>{{ member.name }}</span>
+
+            <span v-else>
+              {{ member.name }}
+            </span>
           </div>
 
+          <!-- Email -->
+
           <div class="detail-item">
-            <span class="detail-label">Email</span>
+            <span class="detail-label"> Email </span>
+
             <input
               v-if="isEditing"
               v-model="editForm.email"
@@ -328,11 +409,17 @@ onMounted(() => {
               placeholder="請輸入 Email"
               :disabled="savingProfile"
             />
-            <span v-else>{{ member.email }}</span>
+
+            <span v-else>
+              {{ member.email }}
+            </span>
           </div>
 
+          <!-- 手機 -->
+
           <div class="detail-item">
-            <span class="detail-label">手機</span>
+            <span class="detail-label"> 手機 </span>
+
             <input
               v-if="isEditing"
               v-model="editForm.phone"
@@ -342,11 +429,17 @@ onMounted(() => {
               placeholder="0912345678"
               :disabled="savingProfile"
             />
-            <span v-else>{{ member.phone }}</span>
+
+            <span v-else>
+              {{ member.phone }}
+            </span>
           </div>
 
+          <!-- 地址 -->
+
           <div class="detail-item">
-            <span class="detail-label">地址</span>
+            <span class="detail-label"> 地址 </span>
+
             <input
               v-if="isEditing"
               v-model="editForm.address"
@@ -355,21 +448,28 @@ onMounted(() => {
               placeholder="請輸入地址"
               :disabled="savingProfile"
             />
-            <span v-else>{{ member.address || "尚未填寫" }}</span>
-          </div>
 
-          <div class="detail-item">
-            <span class="detail-label">會員角色</span>
-            <span>{{ member.role }}</span>
+            <span v-else>
+              {{ member.address || "尚未填寫" }}
+            </span>
           </div>
         </div>
       </section>
 
-      <section id="security" class="security-section">
+      <!-- =========================================
+           帳號安全設定
+      ========================================== -->
+
+      <section class="security-section">
+        <!-- =====================================
+             修改密碼
+        ====================================== -->
+
         <div class="security-card">
           <div class="security-header">
             <div>
               <h2>密碼設定</h2>
+
               <p>修改密碼前需輸入目前密碼。</p>
             </div>
 
@@ -382,8 +482,11 @@ onMounted(() => {
           </div>
 
           <div v-if="showPasswordForm" class="password-form">
+            <!-- 目前密碼 -->
+
             <div class="form-group">
-              <label>目前密碼</label>
+              <label> 目前密碼 </label>
+
               <input
                 v-model="passwordForm.currentPassword"
                 type="password"
@@ -392,8 +495,11 @@ onMounted(() => {
               />
             </div>
 
+            <!-- 新密碼 -->
+
             <div class="form-group">
-              <label>新密碼</label>
+              <label> 新密碼 </label>
+
               <input
                 v-model="passwordForm.newPassword"
                 type="password"
@@ -403,8 +509,11 @@ onMounted(() => {
               />
             </div>
 
+            <!-- 確認密碼 -->
+
             <div class="form-group">
-              <label>確認新密碼</label>
+              <label> 確認新密碼 </label>
+
               <input
                 v-model="passwordForm.confirmPassword"
                 type="password"
@@ -425,16 +534,20 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- =====================================
+             刪除帳號
+        ====================================== -->
+
         <div class="security-card danger-card">
           <div class="security-header">
             <div>
               <h2>刪除帳號</h2>
+
               <p v-if="member.role !== 'ROLE_ADMIN'">
-                刪除後無法復原，請確認後再操作。
+                刪除後無法復原， 請確認後再操作。
               </p>
-              <p v-else>
-                管理員帳號不可從自己的會員頁面刪除。
-              </p>
+
+              <p v-else>管理員帳號不可從自己的會員頁面刪除。</p>
             </div>
 
             <button
@@ -464,54 +577,99 @@ onMounted(() => {
   font-size: 18px;
 }
 
+/* =========================================
+   會員中心導覽列
+========================================= */
+
 .member-nav {
   display: flex;
+
   justify-content: center;
+
   gap: 35px;
+
   padding: 30px 20px;
+
   border-bottom: 1px solid #eee;
 }
 
 .member-nav a {
   color: #111;
+
   text-decoration: none;
+
   font-weight: 600;
 }
 
+.member-nav a:hover {
+  color: #666;
+}
+
+/* Vue Router 當前頁面 */
+
+.member-nav a.router-link-active {
+  text-decoration: underline;
+
+  text-underline-offset: 6px;
+}
+
+/* =========================================
+   Profile
+========================================= */
+
 .profile-container {
   display: flex;
+
   align-items: center;
+
   gap: 25px;
+
   padding: 55px 50px 35px;
 }
 
 .avatar {
   width: 90px;
+
   height: 90px;
+
   border-radius: 50%;
+
   background: #e5e5e5;
+
   display: flex;
+
   align-items: center;
+
   justify-content: center;
+
   font-size: 30px;
+
   font-weight: 600;
 }
 
 .profile-info h1 {
   margin: 0 0 8px;
+
   font-size: 30px;
+
   font-weight: 500;
 }
 
 .profile-info p {
   margin: 4px 0;
+
   color: #666;
 }
 
 .member-account {
   font-weight: 600;
+
   color: #333 !important;
 }
+
+/* =========================================
+   個人資料 / 安全設定
+========================================= */
 
 .profile-detail-section,
 .security-section {
@@ -521,33 +679,46 @@ onMounted(() => {
 .section-header,
 .security-header {
   display: flex;
+
   align-items: center;
+
   justify-content: space-between;
+
   gap: 24px;
 }
 
 .section-header h2,
 .security-header h2 {
   margin: 0;
+
   font-size: 28px;
 }
 
 .section-description,
 .security-header p {
   margin: 8px 0 0;
+
   color: #777;
 }
 
+/* =========================================
+   Buttons
+========================================= */
+
 .edit-button {
   border: none;
+
   background: none;
+
   font-weight: 600;
+
   cursor: pointer;
 }
 
 .edit-actions,
 .password-actions {
   display: flex;
+
   gap: 12px;
 }
 
@@ -556,78 +727,114 @@ onMounted(() => {
 .outline-button,
 .delete-button {
   padding: 9px 18px;
+
   border-radius: 5px;
+
   cursor: pointer;
+
   font-weight: 600;
 }
 
 .cancel-button,
 .outline-button {
   border: 1px solid #999;
+
   background: #fff;
 }
 
 .save-button {
   border: 1px solid #111;
+
   background: #111;
+
   color: #fff;
 }
 
 .delete-button {
   border: 1px solid #c62828;
+
   background: #fff;
+
   color: #c62828;
 }
 
 .delete-button:disabled {
   opacity: 0.45;
+
   cursor: not-allowed;
 }
 
+/* =========================================
+   Profile Details
+========================================= */
+
 .profile-details {
   display: grid;
+
   grid-template-columns: repeat(2, minmax(0, 1fr));
+
   gap: 28px 60px;
+
   margin-top: 35px;
 }
 
 .detail-item,
 .form-group {
   display: flex;
+
   flex-direction: column;
+
   gap: 8px;
 }
 
 .detail-label,
 .form-group label {
   color: #777;
+
   font-size: 14px;
 }
 
 .edit-input {
   width: 100%;
+
   max-width: 420px;
+
   padding: 10px 12px;
+
   border: 1px solid #ccc;
+
   border-radius: 4px;
+
   font-size: 16px;
 }
 
+/* =========================================
+   Message
+========================================= */
+
 .message {
   margin-top: 20px;
+
   padding: 12px 14px;
+
   border-radius: 4px;
 }
 
 .success-message {
   background: #e8f5e9;
+
   color: #256029;
 }
 
 .error-message {
   background: #fdecea;
+
   color: #b42318;
 }
+
+/* =========================================
+   Security
+========================================= */
 
 .security-section {
   border-top: 1px solid #eee;
@@ -635,14 +842,19 @@ onMounted(() => {
 
 .security-card {
   padding: 28px;
+
   border: 1px solid #e5e5e5;
+
   border-radius: 8px;
+
   margin-bottom: 22px;
 }
 
 .password-form {
   display: grid;
+
   gap: 18px;
+
   margin-top: 28px;
 }
 
@@ -650,9 +862,14 @@ onMounted(() => {
   border-color: #f1c7c7;
 }
 
+/* =========================================
+   Responsive
+========================================= */
+
 @media (max-width: 768px) {
   .member-nav {
     justify-content: flex-start;
+
     overflow-x: auto;
   }
 
@@ -660,6 +877,7 @@ onMounted(() => {
   .profile-detail-section,
   .security-section {
     padding-left: 20px;
+
     padding-right: 20px;
   }
 
@@ -670,6 +888,7 @@ onMounted(() => {
   .section-header,
   .security-header {
     align-items: flex-start;
+
     flex-direction: column;
   }
 }
