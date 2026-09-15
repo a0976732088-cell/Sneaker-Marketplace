@@ -8,7 +8,9 @@ import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementStatusRequ
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementPlacement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
+import com.project.sneakermarket.advertisement.entity.AdvertisementTargetType;
 import com.project.sneakermarket.advertisement.repository.AdvertisementRepository;
+import com.project.sneakermarket.commerce.repository.CategoryRepository;
 import com.project.sneakermarket.common.exception.BusinessException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -35,11 +37,12 @@ import java.util.Objects;
 public class AdvertisementService {
 
 
-
     private final AdvertisementRepository adRepo;
 
     // 用來讀取及驗證已上傳的廣告圖片
     private final AdvertisementImageStorageService adImageService;
+
+    private final CategoryRepository categoryRepo;
 
 
     public Advertisement insertAdvertisement(CreateAdvertisementRequest request) {
@@ -52,6 +55,7 @@ public class AdvertisementService {
                 request.getImageUrl(),
                 request.getAdPlacement()
         );
+        validateAdvertisementTarget(request.getTargetType(), request.getTargetId());
 
         advertisement.setCreatedBy(request.getCreatedBy());
         advertisement.setAdName(request.getAdName());
@@ -82,7 +86,7 @@ public class AdvertisementService {
                 .toList();
     }
 
-    public List<AdvertisementResponse> getPublicActiveAdvertisements(){
+    public List<AdvertisementResponse> getPublicActiveAdvertisements() {
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Taipei"));
 
         return adRepo
@@ -165,8 +169,9 @@ public class AdvertisementService {
                 request.getImageUrl(),
                 request.getAdPlacement()
         );
+        validateAdvertisementTarget(request.getTargetType(), request.getTargetId());
 
-        if (advertisement.getAdStatus() ==AdvertisementStatus.DRAFT){
+        if (advertisement.getAdStatus() == AdvertisementStatus.DRAFT) {
             validateDraftStartAtNotInPast(request.getStartAt());
         }
 
@@ -208,7 +213,6 @@ public class AdvertisementService {
         advertisement.setTargetUrl(request.getTargetUrl());
 
         advertisement.setSortOrder((request.getSortOrder() == null ? 0 : request.getSortOrder()));
-
 
 
         return adRepo.save(advertisement);
@@ -342,9 +346,9 @@ public class AdvertisementService {
 
         List<Advertisement> expiredAds = adRepo.findByAdStatusInAndEndAtBefore(
                 List.of(
-                AdvertisementStatus.ACTIVE,
-                AdvertisementStatus.INACTIVE
-        ), now);
+                        AdvertisementStatus.ACTIVE,
+                        AdvertisementStatus.INACTIVE
+                ), now);
 
         expiredAds.forEach(advertisement ->
                 advertisement.setAdStatus(AdvertisementStatus.EXPIRED)
@@ -354,7 +358,6 @@ public class AdvertisementService {
 
         return expiredAds.size();
     }
-
 
 
     private void ensureAdvertisementIsEditable(Advertisement advertisement) {
@@ -375,15 +378,15 @@ public class AdvertisementService {
         }
     }
 
-    private void validateDraftStartAtNotInPast(LocalDateTime startAt){
-        if (startAt == null){
+    private void validateDraftStartAtNotInPast(LocalDateTime startAt) {
+        if (startAt == null) {
             return;
         }
 
         LocalDateTime currentMinute = LocalDateTime.now(ZoneId.of("Asia/Taipei"))
                 .withSecond(0)
                 .withNano(0);
-        if (startAt.isBefore(currentMinute)){
+        if (startAt.isBefore(currentMinute)) {
             throw new BusinessException("開始時間不可早於目前分鐘");
         }
     }
@@ -391,7 +394,7 @@ public class AdvertisementService {
     private void validateStatusTransition(
             Advertisement ad,
             AdvertisementStatus newStatus
-    ){
+    ) {
         AdvertisementStatus currentStatus = ad.getAdStatus();
 
         boolean validTransition = (currentStatus == AdvertisementStatus.DRAFT
@@ -401,19 +404,19 @@ public class AdvertisementService {
                 || (currentStatus == AdvertisementStatus.INACTIVE
                 && newStatus == AdvertisementStatus.ACTIVE);
 
-        if (!validTransition){
+        if (!validTransition) {
             throw new BusinessException("不允許此廣告狀態轉換");
         }
 
-        if(newStatus == AdvertisementStatus.ACTIVE){
+        if (newStatus == AdvertisementStatus.ACTIVE) {
             validateAdvertisementCanBeActivated(ad);
             validatePlacementAvailability(ad);
 
         }
     }
 
-    private void validateAdvertisementCanBeActivated(Advertisement ad){
-        if (ad.getStartAt() == null || ad.getEndAt() == null){
+    private void validateAdvertisementCanBeActivated(Advertisement ad) {
+        if (ad.getStartAt() == null || ad.getEndAt() == null) {
             throw new BusinessException("上架前必須設定開始與結束時間");
         }
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Taipei"));
@@ -425,8 +428,7 @@ public class AdvertisementService {
 
     /**
      * 檢查廣告版位的投放時段是否可以使用。
-     *
-     * BANNER 可以同時存在多則廣告，因為前端會輪播。
+     * BANNER、CATEGORY_CARD 可以同時存在多則廣告，因為前端會輪播。
      * POPUP、SMALL_BLOCK 同一時段只能有一則。
      */
     private void validatePlacementAvailability(
@@ -436,7 +438,7 @@ public class AdvertisementService {
                 advertisement.getAdPlacement();
 
         // BANNER 可以同時投放多則，不需要檢查時段重疊
-        if (placement == AdvertisementPlacement.BANNER) {
+        if (placement == AdvertisementPlacement.BANNER || placement == AdvertisementPlacement.CATEGORY_CARD) {
             return;
         }
 
@@ -478,9 +480,9 @@ public class AdvertisementService {
     }
 
     @Transactional
-    public AdvertisementResponse updateAdvertisementStatus(Long adId, UpdateAdvertisementStatusRequest request){
+    public AdvertisementResponse updateAdvertisementStatus(Long adId, UpdateAdvertisementStatusRequest request) {
         Advertisement ad = adRepo.findById(adId)
-                .orElseThrow(()->
+                .orElseThrow(() ->
                         new ResourceNotFoundException("找不到指定的廣告"));
 
         ensureAdvertisementIsNotExpired(ad);
@@ -495,5 +497,20 @@ public class AdvertisementService {
         return toResponse(saveAd);
     }
 
+    private void validateAdvertisementTarget(
+            AdvertisementTargetType targetType,
+            Long targetId
+    ) {
+        if (targetType != AdvertisementTargetType.CATEGORY) {
+            return;
+        }
 
+        if (targetId == null){
+            throw new BusinessException("分類卡片必須選擇商品分類");
+        }
+
+        if(!categoryRepo.existsById(targetId)){
+            throw new BusinessException("找不到指定的商品分類");
+        }
+    }
 }

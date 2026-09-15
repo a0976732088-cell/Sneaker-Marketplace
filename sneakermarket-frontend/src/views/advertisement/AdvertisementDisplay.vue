@@ -6,6 +6,17 @@ import {
   resolveAdvertisementImageUrl,
 } from "@/service/advertisementService";
 
+const props = defineProps({
+  placements: {
+    type: Array,
+    default: () => ["BANNER", "POPUP", "SMALL_BLOCK"],
+  },
+});
+
+function hasPlacement(placement) {
+  return props.placements.includes(placement);
+}
+
 const ads = ref([]);
 const router = useRouter();
 
@@ -172,7 +183,7 @@ onUnmounted(() => {
       {{ errorMessage }}
     </div>
     <template v-else>
-      <section v-if="currentBanner" class="banner-ad">
+      <section v-if="hasPlacement('BANNER') && currentBanner" class="banner-ad">
         <img
           :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
           :alt="currentBanner.adName"
@@ -208,9 +219,16 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <p v-else class="empty-ad">目前沒有上架中的 BANNER 廣告</p>
+      <p v-else-if="hasPlacement('BANNER')" class="empty-ad">
+        目前沒有上架中的 BANNER 廣告
+      </p>
 
-      <aside v-if="showSmallBlock && currentSmallBlock" class="small-block-ad">
+      <aside
+        v-if="
+          hasPlacement('SMALL_BLOCK') && showSmallBlock && currentSmallBlock
+        "
+        class="small-block-ad"
+      >
         <button
           type="button"
           class="small-close"
@@ -226,7 +244,10 @@ onUnmounted(() => {
         />
       </aside>
 
-      <div v-if="showPopup && currentPopup" class="popup-background">
+      <div
+        v-if="hasPlacement('POPUP') && showPopup && currentPopup"
+        class="popup-background"
+      >
         <article class="popup-ad">
           <button type="button" class="popup-close" @click="showPopup = false">
             ×

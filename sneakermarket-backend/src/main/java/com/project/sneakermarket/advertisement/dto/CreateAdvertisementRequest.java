@@ -47,6 +47,7 @@ public class CreateAdvertisementRequest {
     @NotNull(message = "導向類型不可為空")
     private AdvertisementTargetType targetType;
 
+    @Positive(message = "導向目標編號必須大於 0")
     private Long targetId;
 
     @Size(max = 500, message = "導向網址不可超過 500 個字元")

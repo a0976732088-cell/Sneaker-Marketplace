@@ -26,7 +26,7 @@
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <!-- 首頁 -->
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/"> 首頁 </RouterLink>
+            <RouterLink class="nav-link" to="/ads/storefront"> 首頁 </RouterLink>
           </li>
 
           <!-- 一般商城 -->
