@@ -128,6 +128,7 @@ function fetchActiveOrders(params) {
 
 function sellerPaymentText(order) {
   if (order.paymentStatus === "PAID") return "買家已付款";
+  if (order.orderStatus === "ABANDONED") return "買家逾期未付款";
   if (order.paymentStatus === "FAILED") return "付款失敗";
   if (order.paymentStatus === "PENDING" && order.orderStatus === "PENDING_PAYMENT") {
     return "等待買家付款";
@@ -138,7 +139,11 @@ function sellerPaymentText(order) {
 
 function sellerPaymentBadgeClass(order) {
   if (order.paymentStatus === "PAID") return "text-bg-success";
-  if (order.paymentStatus === "FAILED" || order.orderStatus === "CANCELLED") {
+  if (
+    order.paymentStatus === "FAILED" ||
+    order.orderStatus === "CANCELLED" ||
+    order.orderStatus === "ABANDONED"
+  ) {
     return "text-bg-danger";
   }
   if (order.paymentStatus === "PENDING" && order.orderStatus === "PENDING_PAYMENT") {

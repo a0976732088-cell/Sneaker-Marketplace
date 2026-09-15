@@ -40,6 +40,7 @@ import com.project.sneakermarket.member.repository.MemberRepository;
 class AuctionOrderIntegrationTests {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 10, 12, 0);
     @Autowired private AuctionOrderService service;
+    @Autowired private AuctionOrderPaymentDeadlineService deadlines;
     @Autowired private AuctionLifecycleService lifecycle;
     @Autowired private AuctionAdminMutationService adminMutations;
     @Autowired private AuctionOrderRepository orders;
@@ -104,12 +105,41 @@ class AuctionOrderIntegrationTests {
         assertEquals(AuctionOrderStatus.PENDING_PAYMENT, order.getOrderStatus());
         assertEquals(NOW, order.getCreatedAt());
         assertEquals(NOW, order.getUpdatedAt());
+        assertEquals(NOW.plusHours(24), order.getPaymentDueAt());
+        assertNull(order.getAbandonedAt());
         assertNull(order.getPaidAt());
         assertNull(order.getShippedAt());
         assertNull(order.getCompletedAt());
         assertEquals(1, orderCount(id));
         assertEquals(auctionBefore, auctionRow(id));
         assertEquals(resultBefore, resultRow(id));
+    }
+
+    @Test
+    void overdueOrderBecomesAbandonedWithoutRewritingSoldAuctionOrResult() {
+        Long id = fixture(true);
+        service.createOrderForAuction(id);
+        AuctionOrder order = orders.findByAuctionId(id).orElseThrow();
+        var auctionBefore = auctionRow(id);
+        var resultBefore = resultRow(id);
+        LocalDateTime expiredAt = NOW.plusHours(24);
+        doReturn(expiredAt).when(time).now();
+
+        deadlines.expireOverdueOrder(order.getAuctionOrderId());
+        deadlines.expireOverdueOrder(order.getAuctionOrderId());
+
+        AuctionOrder persisted = orders.findByAuctionId(id).orElseThrow();
+        assertEquals(AuctionPaymentStatus.PENDING, persisted.getPaymentStatus());
+        assertEquals(AuctionOrderStatus.ABANDONED, persisted.getOrderStatus());
+        assertEquals(AuctionShippingStatus.NOT_SHIPPED, persisted.getShippingStatus());
+        assertEquals(NOW.plusHours(24), persisted.getPaymentDueAt());
+        assertEquals(expiredAt, persisted.getAbandonedAt());
+        assertEquals(expiredAt, persisted.getUpdatedAt());
+        assertNull(persisted.getPaidAt());
+        assertEquals(auctionBefore, auctionRow(id));
+        assertEquals(resultBefore, resultRow(id));
+        assertEquals(AuctionStatus.SOLD, auctions.findById(id).orElseThrow().getStatus());
+        assertEquals(AuctionResultStatus.SOLD, results.findByAuctionId(id).orElseThrow().getResultStatus());
     }
 
     @Test

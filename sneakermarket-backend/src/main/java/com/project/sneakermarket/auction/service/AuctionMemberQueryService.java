@@ -132,7 +132,8 @@ public class AuctionMemberQueryService {
                 product.getShippingMethod(), order.getPaymentMethod(),
                 order.getPaymentStatus(), order.getShippingStatus(), order.getOrderStatus(),
                 order.getReceiverName(), order.getReceiverPhone(), order.getShippingAddress(),
-                order.getCreatedAt(), order.getPaidAt(), order.getUpdatedAt());
+                order.getCreatedAt(), order.getPaymentDueAt(), order.getAbandonedAt(),
+                order.getPaidAt(), order.getUpdatedAt());
     }
 
     private PageRequest pageRequest(int page, int size, Sort sort) {

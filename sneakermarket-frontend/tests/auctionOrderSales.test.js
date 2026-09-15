@@ -93,6 +93,14 @@ test("seller payment statuses use seller-specific wording and safe fallbacks", (
   assert.equal(h.sellerPaymentText({ paymentStatus: "PAID", orderStatus: "PAID" }), "買家已付款");
   assert.equal(h.sellerPaymentBadgeClass({ paymentStatus: "PAID", orderStatus: "PAID" }), "text-bg-success");
   assert.equal(h.sellerPaymentText({ paymentStatus: "FAILED", orderStatus: "PENDING_PAYMENT" }), "付款失敗");
+  assert.equal(
+    h.sellerPaymentText({ paymentStatus: "PENDING", orderStatus: "ABANDONED" }),
+    "買家逾期未付款",
+  );
+  assert.equal(
+    h.sellerPaymentBadgeClass({ paymentStatus: "PENDING", orderStatus: "ABANDONED" }),
+    "text-bg-danger",
+  );
   assert.equal(h.sellerPaymentText({ paymentStatus: "UNKNOWN", orderStatus: "UNKNOWN" }), "UNKNOWN");
 });
 

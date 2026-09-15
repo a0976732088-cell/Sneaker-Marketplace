@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { computed, ref } from "vue";
 import { formatTwd } from "../src/utils/auctionMoney.js";
-import { formatAuctionTime } from "../src/utils/auctionTime.js";
+import { formatAuctionTime, parseAuctionTime } from "../src/utils/auctionTime.js";
 import { formatAuctionOrderStatus } from "../src/utils/auctionMemberStatus.js";
 
 const routerSource = await readFile(
@@ -23,6 +23,8 @@ const orderListSource = await readFile(
   new URL("../src/views/auction/AuctionOrderListView.vue", import.meta.url),
   "utf8",
 );
+const DEFAULT_NOW_MS = Date.parse("2026-09-15T12:00:18Z");
+const DEFAULT_PAYMENT_DUE_AT = "2026-09-16T20:00:00";
 
 function evaluateAuctionService() {
   const requests = [];
@@ -75,7 +77,9 @@ function detail(overrides = {}) {
     receiverPhone: "0912345678",
     shippingAddress: "台北市測試路 1 號",
     createdAt: "2026-09-14T10:00:00",
+    paymentDueAt: DEFAULT_PAYMENT_DUE_AT,
     paidAt: null,
+    abandonedAt: null,
     updatedAt: "2026-09-14T10:00:00",
     ...overrides,
   };
@@ -111,6 +115,8 @@ function paymentViewHarness({
   detailOutcomes = [detail()],
   payImplementation = async () => ({ data: { data: {} } }),
   confirmResult = true,
+  confirmImplementation,
+  nowMs = DEFAULT_NOW_MS,
 } = {}) {
   const script = paymentViewSource
     .match(/<script setup>([\s\S]*?)<\/script>/)[1]
@@ -119,10 +125,15 @@ function paymentViewHarness({
   let mounted;
   let unmounted;
   let detailIndex = 0;
+  let currentNowMs = nowMs;
+  let intervalCallback;
+  let nextTimerId = 1;
   const requestedOrderNumbers = [];
   const paidOrderNumbers = [];
   const replacedRoutes = [];
   const confirmationMessages = [];
+  const intervalDelays = [];
+  const clearedTimerIds = [];
   const route = {
     params: { orderNumber: "AO-123456" },
     fullPath: "/auction-orders/AO-123456/payment",
@@ -150,8 +161,9 @@ function paymentViewHarness({
         Math.min(detailIndex, detailOutcomes.length - 1)
       ];
       detailIndex += 1;
-      if (outcome instanceof Error) throw outcome;
-      return { data: { data: outcome } };
+      const resolvedOutcome = await outcome;
+      if (resolvedOutcome instanceof Error) throw resolvedOutcome;
+      return { data: { data: resolvedOutcome } };
     },
     payAuctionOrder: async (orderNumber) => {
       paidOrderNumbers.push(orderNumber);
@@ -164,11 +176,28 @@ function paymentViewHarness({
     },
     formatTwd,
     formatAuctionTime,
+    parseAuctionTime,
     formatAuctionOrderStatus,
     resolveAuctionImageUrl: (url) => (url ? "resolved:" + url : ""),
+    Date: {
+      now: () => currentNowMs,
+    },
+    setInterval: (callback, delay) => {
+      intervalCallback = callback;
+      intervalDelays.push(delay);
+      return nextTimerId++;
+    },
+    clearInterval: (timerId) => {
+      clearedTimerIds.push(timerId);
+    },
     window: {
       confirm: (message) => {
         confirmationMessages.push(message);
+        if (confirmImplementation) {
+          return confirmImplementation(message, (value) => {
+            currentNowMs = value;
+          });
+        }
         return confirmResult;
       },
     },
@@ -178,9 +207,13 @@ function paymentViewHarness({
     script +
       "\nglobalThis.subject = { order, loading, paying, errorMessage, " +
       "paymentErrorMessage, paymentSuccessMessage, imageLoadFailed, " +
-      "isPendingPayment, isPaid, isFailed, paymentStatusText, paymentStatusClass, " +
+      "currentTimeMs, isPendingPayment, isPaid, isFailed, isAbandoned, " +
+      "paymentDeadlineMs, hasPaymentDeadline, isPaymentDeadlineReached, canPay, " +
+      "remainingPaymentTimeText, paymentStatusText, headlineStatusText, headlineStatusClass, " +
       "productImageUrl, displayValue, detailErrorMessage, paymentRequestErrorMessage, " +
-      "loadOrder, refreshOrderDetail, reconcilePaymentState, confirmAndPay };",
+      "loadOrder, refreshOrderDetail, refreshExpiredOrderOnce, tickPaymentDeadline, " +
+      "startPaymentDeadlineTimer, stopPaymentDeadlineTimer, isCurrentPaymentView, " +
+      "reconcilePaymentState, confirmAndPay };",
     context,
   );
 
@@ -192,6 +225,16 @@ function paymentViewHarness({
     paidOrderNumbers,
     replacedRoutes,
     confirmationMessages,
+    intervalDelays,
+    clearedTimerIds,
+    setNow: (value) => {
+      currentNowMs = value;
+    },
+    setRouteOrderNumber: (orderNumber) => {
+      route.params.orderNumber = orderNumber;
+      route.fullPath = `/auction-orders/${orderNumber}/payment`;
+    },
+    tick: async () => intervalCallback?.(),
   };
 }
 
@@ -246,16 +289,161 @@ test("pending order enables payment UI while paid order exposes no payment actio
   await h.mount();
 
   assert.equal(h.isPendingPayment.value, true);
+  assert.equal(h.canPay.value, true);
   assert.equal(h.paying.value, false);
   assert.match(paymentViewSource, /v-if="isPendingPayment"/);
-  assert.match(paymentViewSource, /:disabled="paying \|\| !isPendingPayment"/);
+  assert.match(paymentViewSource, /:disabled="paying \|\| !canPay"/);
   assert.match(paymentViewSource, /@click="confirmAndPay"/);
   assert.doesNotMatch(paymentViewSource, /payment-coming-soon|付款功能準備中/);
 
   h.order.value = paidDetail();
   assert.equal(h.isPendingPayment.value, false);
   assert.equal(h.isPaid.value, true);
+  assert.equal(h.canPay.value, false);
   assert.equal(h.paymentStatusText.value, "已付款");
+});
+
+test("future deadline uses Taipei time, shows a deterministic countdown and permits payment", async () => {
+  const h = paymentViewHarness();
+  await h.mount();
+
+  assert.match(formatAuctionTime(h.order.value.paymentDueAt), /2026\/09\/16.*20:00/);
+  assert.equal(h.hasPaymentDeadline.value, true);
+  assert.equal(h.isPaymentDeadlineReached.value, false);
+  assert.equal(h.remainingPaymentTimeText.value, "23:59:42");
+  assert.equal(h.canPay.value, true);
+  assert.match(paymentViewSource, />付款期限</);
+  assert.match(paymentViewSource, />剩餘付款時間</);
+});
+
+for (const [label, nowMs] of [
+  ["exactly at", Date.parse("2026-09-16T12:00:00Z")],
+  ["after", Date.parse("2026-09-16T12:00:01Z")],
+]) {
+  test(label + " the deadline disables payment without sending a request", async () => {
+    const h = paymentViewHarness({ nowMs });
+    await h.mount();
+
+    assert.equal(h.isPendingPayment.value, true);
+    assert.equal(h.isPaymentDeadlineReached.value, true);
+    assert.equal(h.canPay.value, false);
+    await h.confirmAndPay();
+    assert.deepEqual(h.confirmationMessages, []);
+    assert.deepEqual(h.paidOrderNumbers, []);
+    assert.match(paymentViewSource, /付款期限已到，系統正在更新訂單狀態。/);
+  });
+}
+
+test("deadline crossing refreshes order detail once without polling", async () => {
+  const dueAt = "2026-09-15T20:00:20";
+  const pendingAtDeadline = detail({ paymentDueAt: dueAt });
+  const h = paymentViewHarness({
+    detailOutcomes: [pendingAtDeadline, pendingAtDeadline],
+  });
+  await h.mount();
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456"]);
+
+  h.setNow(Date.parse("2026-09-15T12:00:20Z"));
+  await h.tick();
+  assert.equal(h.isPaymentDeadlineReached.value, true);
+  assert.equal(h.canPay.value, false);
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456", "AO-123456"]);
+
+  h.setNow(Date.parse("2026-09-15T12:00:30Z"));
+  await h.tick();
+  await h.tick();
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456", "AO-123456"]);
+});
+
+test("an initially overdue pending order refreshes once and then stops", async () => {
+  const overdue = detail({ paymentDueAt: "2026-09-15T20:00:00" });
+  const h = paymentViewHarness({
+    detailOutcomes: [overdue, overdue],
+    nowMs: Date.parse("2026-09-15T12:00:05Z"),
+  });
+
+  await h.mount();
+
+  assert.equal(h.loading.value, false);
+  assert.equal(h.isPaymentDeadlineReached.value, true);
+  assert.equal(h.canPay.value, false);
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456", "AO-123456"]);
+
+  await h.tick();
+  await h.tick();
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456", "AO-123456"]);
+});
+
+test("crossing the deadline inside confirmation blocks POST and performs one expiry sync", async () => {
+  const dueAt = "2026-09-15T20:00:20";
+  const pendingAtDeadline = detail({ paymentDueAt: dueAt });
+  const h = paymentViewHarness({
+    detailOutcomes: [pendingAtDeadline, pendingAtDeadline],
+    confirmImplementation: (_message, setNow) => {
+      setNow(Date.parse("2026-09-15T12:00:20Z"));
+      return true;
+    },
+  });
+  await h.mount();
+
+  await h.confirmAndPay();
+
+  assert.equal(h.confirmationMessages.length, 1);
+  assert.deepEqual(h.paidOrderNumbers, []);
+  assert.equal(h.paymentErrorMessage.value, "競標訂單付款期限已過");
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456", "AO-123456"]);
+
+  await h.tick();
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456", "AO-123456"]);
+});
+
+test("abandoned order shows deadline and abandoned time with no payment action", async () => {
+  const h = paymentViewHarness({
+    detailOutcomes: [
+      detail({
+        orderStatus: "ABANDONED",
+        paymentStatus: "PENDING",
+        abandonedAt: "2026-09-16T20:00:05",
+      }),
+    ],
+    nowMs: Date.parse("2026-09-16T12:00:05Z"),
+  });
+  await h.mount();
+
+  assert.equal(h.isAbandoned.value, true);
+  assert.equal(h.isPendingPayment.value, false);
+  assert.equal(h.canPay.value, false);
+  assert.equal(h.paymentStatusText.value, "等待付款");
+  assert.equal(h.headlineStatusText.value, "已棄標（逾期未付款）");
+  assert.equal(h.headlineStatusClass.value, "text-bg-danger");
+  assert.match(formatAuctionTime(h.order.value.abandonedAt), /2026\/09\/16.*20:00/);
+  assert.match(paymentViewSource, /v-if="order\.abandonedAt"/);
+  assert.match(paymentViewSource, /已棄標（逾期未付款），此訂單已無法再完成付款。/);
+});
+
+test("legacy order with null deadline remains payable and countdown-safe", async () => {
+  const h = paymentViewHarness({
+    detailOutcomes: [detail({ paymentDueAt: null })],
+    nowMs: Date.parse("2030-01-01T00:00:00Z"),
+  });
+  await assert.doesNotReject(h.mount);
+
+  assert.equal(h.hasPaymentDeadline.value, false);
+  assert.equal(h.isPaymentDeadlineReached.value, false);
+  assert.equal(h.remainingPaymentTimeText.value, "—");
+  assert.equal(h.canPay.value, true);
+  await assert.doesNotReject(h.tick);
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456"]);
+});
+
+test("payment deadline timer is one-second local UX state and is cleared on unmount", async () => {
+  const h = paymentViewHarness();
+  await h.mount();
+
+  assert.deepEqual(h.intervalDelays, [1000]);
+  assert.deepEqual(h.clearedTimerIds, []);
+  h.unmount();
+  assert.deepEqual(h.clearedTimerIds, [1]);
 });
 
 test("confirmed payment POSTs once then reloads detail and renders PAID", async () => {
@@ -302,12 +490,73 @@ test("paying state disables repeat submission until the first request settles", 
   await h.confirmAndPay();
   assert.deepEqual(h.paidOrderNumbers, ["AO-123456"]);
   assert.equal(h.confirmationMessages.length, 1);
-  assert.match(paymentViewSource, /paying \? "付款處理中\.\.\." : "立即付款"/);
+  assert.match(
+    paymentViewSource,
+    /paying \? "付款處理中\.\.\." : isPaymentDeadlineReached \? "付款期限已到" : "立即付款"/,
+  );
 
   pendingPayment.resolve({ data: { data: {} } });
   await first;
   assert.equal(h.paying.value, false);
   assert.equal(h.order.value.paymentStatus, "PAID");
+});
+
+test("a payment settling after route change cannot refresh or overwrite the next order", async () => {
+  const pendingPayment = deferred();
+  const nextOrderDetail = deferred();
+  const h = paymentViewHarness({
+    detailOutcomes: [
+      detail(),
+      nextOrderDetail.promise,
+      paidDetail(),
+    ],
+    payImplementation: () => pendingPayment.promise,
+  });
+  await h.mount();
+
+  const payment = h.confirmAndPay();
+  await Promise.resolve();
+  h.setRouteOrderNumber("AO-654321");
+  const nextLoad = h.loadOrder();
+  await Promise.resolve();
+
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456", "AO-654321"]);
+  assert.equal(h.loading.value, true);
+
+  pendingPayment.resolve({ data: { data: {} } });
+  await payment;
+
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456", "AO-654321"]);
+  assert.equal(h.paymentSuccessMessage.value, "");
+  assert.equal(h.paymentErrorMessage.value, "");
+  assert.equal(h.loading.value, true);
+
+  nextOrderDetail.resolve(detail({ orderNumber: "AO-654321" }));
+  await nextLoad;
+
+  assert.equal(h.loading.value, false);
+  assert.equal(h.order.value.orderNumber, "AO-654321");
+});
+
+test("a payment failure settling after unmount cannot reconcile or write stale state", async () => {
+  const pendingPayment = deferred();
+  const h = paymentViewHarness({
+    detailOutcomes: [detail(), detail({ orderStatus: "CANCELLED" })],
+    payImplementation: () => pendingPayment.promise,
+  });
+  await h.mount();
+
+  const payment = h.confirmAndPay();
+  await Promise.resolve();
+  h.unmount();
+  pendingPayment.reject(httpError(409));
+  await payment;
+
+  assert.deepEqual(h.requestedOrderNumbers, ["AO-123456"]);
+  assert.equal(h.paymentSuccessMessage.value, "");
+  assert.equal(h.paymentErrorMessage.value, "");
+  assert.deepEqual(h.replacedRoutes, []);
+  assert.equal(h.paying.value, false);
 });
 
 test("409 shows a useful message and reloads backend detail", async () => {

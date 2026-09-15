@@ -43,4 +43,7 @@ public interface AuctionBidRepository
     List<AuctionBid> findByAuctionIdOrderByCreatedAtDesc(
             Long auctionId
     );
+
+    /** 管理員詳情需在 DATETIME2(0) 同秒出價時仍維持確定的最新到最舊順序。 */
+    List<AuctionBid> findByAuctionIdOrderByCreatedAtDescBidIdDesc(Long auctionId);
 }

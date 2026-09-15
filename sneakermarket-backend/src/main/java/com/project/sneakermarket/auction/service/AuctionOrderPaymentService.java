@@ -53,6 +53,9 @@ public class AuctionOrderPaymentService {
         }
 
         LocalDateTime paidAt = time.now();
+        if (order.getPaymentDueAt() != null && !paidAt.isBefore(order.getPaymentDueAt())) {
+            throw new AuctionConflictException("競標訂單付款期限已過");
+        }
         order.setPaymentStatus(AuctionPaymentStatus.PAID);
         order.setOrderStatus(AuctionOrderStatus.PAID);
         order.setPaidAt(paidAt);

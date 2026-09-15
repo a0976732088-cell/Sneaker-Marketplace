@@ -180,6 +180,85 @@ class AuctionEmailIntegrationTests {
     }
 
     @Test
+    void abandonedQueueCreatesBuyerAndSellerExactlyOnceFromPersistedMembers() {
+        Long id = closed(true, true);
+        markAbandonedAndQueue(id, true, false);
+
+        var rows = logs.findByAuctionId(id);
+        assertEquals(2, rows.size());
+        assertRecipient(rows, winner, AuctionEmailType.ORDER_ABANDONED_BUYER, AuctionEmailRecipientRole.WINNER);
+        assertRecipient(rows, seller, AuctionEmailType.ORDER_ABANDONED_SELLER, AuctionEmailRecipientRole.SELLER);
+        String buyerEmail = members.findById(winner).orElseThrow().getEmail();
+        String sellerEmail = members.findById(seller).orElseThrow().getEmail();
+        assertEquals(buyerEmail, rows.stream()
+                .filter(e -> e.getEmailType() == AuctionEmailType.ORDER_ABANDONED_BUYER)
+                .findFirst().orElseThrow().getRecipientEmail());
+        assertEquals(sellerEmail, rows.stream()
+                .filter(e -> e.getEmailType() == AuctionEmailType.ORDER_ABANDONED_SELLER)
+                .findFirst().orElseThrow().getRecipientEmail());
+        assertTrue(rows.stream().allMatch(e -> e.getSendStatus() == AuctionEmailSendStatus.PENDING));
+        assertTrue(rows.stream().allMatch(e -> e.getRetryCount() == 0));
+        assertTrue(rows.stream().allMatch(e -> NOW.equals(e.getCreatedAt()) && NOW.equals(e.getUpdatedAt())));
+    }
+
+    @Test
+    void abandonedLogsDispatchOnlyAfterCommitThroughExistingEventListener() {
+        Long id = closed(true, true);
+        for (Long logId : emails.ensureEmailLogsForAuction(id)) dispatch.sendEmailLog(logId);
+        clearInvocations(sender);
+
+        markAbandonedAndQueue(id, false, true);
+
+        verify(sender, times(2)).send(any(SimpleMailMessage.class));
+        var abandonedRows = logs.findByAuctionId(id).stream()
+                .filter(e -> e.getEmailType() == AuctionEmailType.ORDER_ABANDONED_BUYER
+                        || e.getEmailType() == AuctionEmailType.ORDER_ABANDONED_SELLER)
+                .toList();
+        assertEquals(2, abandonedRows.size());
+        assertTrue(abandonedRows.stream().allMatch(e -> e.getSendStatus() == AuctionEmailSendStatus.SENT));
+    }
+
+    @Test
+    void disabledAbandonedQueueDoesNotBlockOrderState() {
+        Long id = closed(true, true);
+        when(settings.enabled()).thenReturn(false);
+
+        markAbandonedAndQueue(id, false, false);
+
+        AuctionOrder order = orders.findByAuctionId(id).orElseThrow();
+        assertEquals(AuctionOrderStatus.ABANDONED, order.getOrderStatus());
+        assertEquals(NOW, order.getAbandonedAt());
+        assertTrue(logs.findByAuctionId(id).isEmpty());
+        verifyNoInteractions(sender);
+    }
+
+    @Test
+    void abandonedSmtpFailureLeavesOrderCommittedAndRetryCanSucceed() {
+        Long id = closed(true, true);
+        markAbandonedAndQueue(id, false, false);
+        Long logId = logs.findByAuctionId(id).stream()
+                .filter(e -> e.getEmailType() == AuctionEmailType.ORDER_ABANDONED_BUYER)
+                .findFirst().orElseThrow().getEmailLogId();
+        var orderBefore = jdbc.queryForMap("SELECT * FROM dbo.auction_orders WHERE auction_id=?", id);
+        doThrow(new MailSendException("fixture")).when(sender).send(any(SimpleMailMessage.class));
+
+        dispatch.sendEmailLog(logId);
+
+        AuctionEmailLog row = logs.findById(logId).orElseThrow();
+        assertEquals(AuctionEmailSendStatus.FAILED, row.getSendStatus());
+        assertEquals(1, row.getRetryCount());
+        assertEquals(AuctionOrderStatus.ABANDONED, orders.findByAuctionId(id).orElseThrow().getOrderStatus());
+        assertEquals(orderBefore, jdbc.queryForMap("SELECT * FROM dbo.auction_orders WHERE auction_id=?", id));
+
+        doNothing().when(sender).send(any(SimpleMailMessage.class));
+        dispatch.sendEmailLog(logId);
+        row = logs.findById(logId).orElseThrow();
+        assertEquals(AuctionEmailSendStatus.SENT, row.getSendStatus());
+        assertEquals(1, row.getRetryCount());
+        assertEquals(orderBefore, jdbc.queryForMap("SELECT * FROM dbo.auction_orders WHERE auction_id=?", id));
+    }
+
+    @Test
     void smtpSuccessUsesSnapshotAndExpectedRoleLinks() {
         Long id = closed(true, true);
         for (Long logId : emails.ensureEmailLogsForAuction(id)) dispatch.sendEmailLog(logId);
@@ -463,6 +542,20 @@ class AuctionEmailIntegrationTests {
         when(source.findEmailReadinessCandidateIds()).thenReturn(readyIds);
         when(pending.findDispatchCandidateIds(null, 3)).thenReturn(retryIds);
         return new AuctionEmailRecoveryScheduler(source, pending, emails, dispatch, settings);
+    }
+
+    private void markAbandonedAndQueue(Long auctionId, boolean repeatQueue, boolean publishEvent) {
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            AuctionOrder order = orders.findByAuctionId(auctionId).orElseThrow();
+            order.setPaymentDueAt(NOW.minusMinutes(1));
+            order.setOrderStatus(AuctionOrderStatus.ABANDONED);
+            order.setAbandonedAt(NOW);
+            order.setUpdatedAt(NOW);
+            emails.ensureAbandonedEmailLogs(order);
+            if (repeatQueue) emails.ensureAbandonedEmailLogs(order);
+            if (publishEvent) events.publishEvent(new AuctionEmailReadyEvent(auctionId));
+            verifyNoInteractions(sender);
+        });
     }
 
     private void assertRecipient(List<AuctionEmailLog> rows, Long id, AuctionEmailType type, AuctionEmailRecipientRole role) {

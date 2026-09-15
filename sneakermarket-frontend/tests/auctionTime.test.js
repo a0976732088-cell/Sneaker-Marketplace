@@ -4,6 +4,11 @@ import { parseAuctionTime, formatAuctionTime } from "../src/utils/auctionTime.js
 
 test("台北表單時間在不同主機時區代表相同時刻", () => {
   assert.equal(parseAuctionTime("2026-09-07T12:00").toISOString(), "2026-09-07T04:00:00.000Z");
+  assert.equal(
+    parseAuctionTime("2026-09-16T20:00:00").toISOString(),
+    "2026-09-16T12:00:00.000Z",
+  );
+  assert.match(formatAuctionTime("2026-09-16T20:00:00"), /2026\/09\/16.*20:00/);
 });
 test("含 offset 的時間不會重複加八小時", () => {
   assert.equal(parseAuctionTime("2026-09-07T04:00:00Z").toISOString(), "2026-09-07T04:00:00.000Z");

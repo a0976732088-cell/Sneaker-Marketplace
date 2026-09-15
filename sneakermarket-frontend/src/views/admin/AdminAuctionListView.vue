@@ -18,8 +18,10 @@
     <section class="card shadow-sm mb-4">
       <div class="card-body">
         <form class="row g-3 align-items-end" @submit.prevent="applyFilters">
-          <div class="col-12 col-lg-4">
-            <label class="form-label" for="admin-auction-keyword"
+          <div class="col-12 col-xl-4">
+            <label
+              class="form-label filter-field-label"
+              for="admin-auction-keyword"
               >商品名稱或型號</label
             >
             <input
@@ -29,8 +31,10 @@
               type="search"
             />
           </div>
-          <div class="col-6 col-lg-3">
-            <label class="form-label" for="admin-auction-status"
+          <div class="col-12 col-md-4 col-xl-2">
+            <label
+              class="form-label filter-field-label"
+              for="admin-auction-status"
               >競標狀態</label
             >
             <select
@@ -44,8 +48,31 @@
               </option>
             </select>
           </div>
-          <div class="col-6 col-lg-3">
-            <label class="form-label" for="admin-management-state"
+          <div class="col-12 col-md-4 col-xl-2">
+            <label
+              class="form-label filter-field-label"
+              for="admin-order-status"
+              >訂單狀態</label
+            >
+            <select
+              id="admin-order-status"
+              v-model="filters.orderStatus"
+              class="form-select"
+            >
+              <option value="">全部</option>
+              <option
+                v-for="status in orderStatuses"
+                :key="status"
+                :value="status"
+              >
+                {{ formatAuctionOrderStatus(status) }}
+              </option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4 col-xl-2">
+            <label
+              class="form-label filter-field-label"
+              for="admin-management-state"
               >管理狀態</label
             >
             <select
@@ -59,7 +86,7 @@
               <option value="DELETED">已刪除</option>
             </select>
           </div>
-          <div class="col-12 col-lg-2 d-grid">
+          <div class="col-12 col-xl-2 d-grid">
             <button
               class="btn btn-dark"
               type="submit"
@@ -161,7 +188,7 @@
       </div>
 
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table admin-auction-table table-hover align-middle mb-0">
           <thead class="table-light">
             <tr>
               <th v-if="batchMode" class="selection-column">
@@ -177,13 +204,14 @@
                 />
               </th>
               <th class="number-column">序號</th>
-              <th>商品</th>
-              <th>賣家</th>
-              <th>價格／出價</th>
-              <th>競標狀態</th>
-              <th>管理狀態</th>
-              <th>時間</th>
-              <th class="text-end">操作</th>
+              <th class="product-column">商品</th>
+              <th class="seller-column">賣家</th>
+              <th class="price-column">價格／出價</th>
+              <th class="status-column">競標狀態</th>
+              <th class="status-column">訂單狀態</th>
+              <th class="management-column">管理狀態</th>
+              <th class="time-column">時間</th>
+              <th class="action-column text-end">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -216,8 +244,10 @@
                   @change="toggleSelection(auction)"
                 />
               </td>
-              <td class="fw-semibold text-secondary">{{ rowNumber(index) }}</td>
-              <td>
+              <td class="number-column fw-semibold text-secondary">
+                {{ rowNumber(index) }}
+              </td>
+              <td class="product-column">
                 <div class="d-flex align-items-center gap-3 product-cell">
                   <img
                     v-if="
@@ -257,22 +287,33 @@
                   </div>
                 </div>
               </td>
-              <td>
+              <td class="seller-column">
                 <div>{{ auction.sellerName || "會員資料未提供" }}</div>
-                <div class="small text-secondary">ID #{{ auction.sellerId }}</div>
+                <div class="small text-secondary">
+                  ID #{{ auction.sellerId }}
+                </div>
               </td>
-              <td>
+              <td class="price-column">
                 <div>{{ formatMoney(auction.currentPrice) }}</div>
                 <div class="small text-secondary">
                   {{ auction.bidCount }} 次出價
                 </div>
               </td>
-              <td>
+              <td class="status-column">
                 <span class="badge text-bg-secondary">{{
                   formatStatus(auction.status)
                 }}</span>
               </td>
-              <td>
+              <td class="status-column">
+                <span
+                  v-if="auction.orderStatus"
+                  class="badge text-bg-light border text-dark"
+                >
+                  {{ formatAuctionOrderStatus(auction.orderStatus) }}
+                </span>
+                <span v-else class="text-secondary">—</span>
+              </td>
+              <td class="management-column">
                 <span
                   class="badge"
                   :class="managementBadge(auction.managementState)"
@@ -294,17 +335,20 @@
                   刪除：{{ auction.deleteReason }}
                 </div>
               </td>
-              <td class="small text-secondary">
-                <div>建立 {{ formatDateTime(auction.createdAt) }}</div>
+              <td class="time-column small text-secondary">
+                <div>建立 {{ formatAuctionTime(auction.createdAt) }}</div>
                 <div v-if="auction.removedAt">
-                  下架 {{ formatDateTime(auction.removedAt) }}
+                  下架 {{ formatAuctionTime(auction.removedAt) }}
                 </div>
                 <div v-if="auction.deletedAt">
-                  刪除 {{ formatDateTime(auction.deletedAt) }}
+                  刪除 {{ formatAuctionTime(auction.deletedAt) }}
                 </div>
               </td>
-              <td>
-                <div v-if="!batchMode" class="d-flex justify-content-end gap-2">
+              <td class="action-column">
+                <div
+                  v-if="!batchMode"
+                  class="d-flex flex-nowrap justify-content-end gap-2"
+                >
                   <button
                     v-if="isLegacyRemoved(auction)"
                     class="btn btn-sm btn-warning fw-semibold action-button"
@@ -345,7 +389,7 @@
                     >已刪除</span
                   >
                 </div>
-                <div v-else class="text-end small text-secondary">
+                <div v-else class="text-end text-nowrap small text-secondary">
                   請使用批量操作列
                 </div>
               </td>
@@ -500,6 +544,11 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { resolveAuctionImageUrl } from "@/utils/auctionImageUrl";
 import {
+  formatAuctionOrderStatus,
+  formatMemberAuctionStatus,
+} from "@/utils/auctionMemberStatus";
+import { formatAuctionTime, parseAuctionTime } from "@/utils/auctionTime";
+import {
   deleteAdminAuction,
   deleteAdminAuctionsBatch,
   getAdminAuctions,
@@ -518,8 +567,22 @@ const statuses = [
   "CANCELLED",
   "REMOVED",
 ];
+// const orderStatuses = [
+//   "PENDING_PAYMENT",
+//   "PAID",
+//   "SHIPPED",
+//   "COMPLETED",
+//   "CANCELLED",
+//   "ABANDONED",
+// ];
+const orderStatuses = ["PENDING_PAYMENT", "PAID", "ABANDONED"];
 const restorableStatuses = new Set(["DRAFT", "SCHEDULED", "ACTIVE"]);
-const filters = reactive({ keyword: "", status: "", managementState: "" });
+const filters = reactive({
+  keyword: "",
+  status: "",
+  orderStatus: "",
+  managementState: "",
+});
 const items = ref([]);
 const MAX_BATCH_SELECTION = 100;
 const selectedAuctionMap = ref(new Map());
@@ -549,7 +612,7 @@ const dialog = reactive({
 });
 let requestSequence = 0;
 
-const tableColumnCount = computed(() => (batchMode.value ? 9 : 8));
+const tableColumnCount = computed(() => (batchMode.value ? 10 : 9));
 const currentSelectableAuctions = computed(() =>
   items.value.filter((auction) => !auction.deletedAt),
 );
@@ -782,10 +845,7 @@ function canRestoreAuction(auction) {
     return false;
   if (auction.status === "DRAFT") return true;
   if (!auction.endAt) return false;
-  const value = /(?:Z|[+-]\d{2}:\d{2})$/.test(auction.endAt)
-    ? auction.endAt
-    : `${auction.endAt}+08:00`;
-  const endAt = Date.parse(value);
+  const endAt = parseAuctionTime(auction.endAt).getTime();
   return !Number.isNaN(endAt) && Date.now() < endAt;
 }
 
@@ -922,34 +982,8 @@ function formatMoney(value) {
     : "—";
 }
 
-function formatDateTime(value) {
-  if (!value) return "—";
-  const date = new Date(`${value}+08:00`);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat("zh-TW", {
-        timeZone: "Asia/Taipei",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(date);
-}
-
 function formatStatus(status) {
-  return (
-    {
-      DRAFT: "草稿",
-      SCHEDULED: "尚未開始",
-      ACTIVE: "競標中",
-      SOLD: "已成交",
-      UNSOLD: "已流標",
-      CANCELLED: "已取消",
-      REMOVED: "廢標",
-    }[status] || status
-  );
+  return status ? formatMemberAuctionStatus(status) : "—";
 }
 
 function formatManagementState(state) {
@@ -975,6 +1009,14 @@ onMounted(() => loadAuctions(0));
 .admin-auctions {
   max-width: 1500px;
 }
+.filter-field-label,
+.admin-auction-table thead th {
+  white-space: nowrap;
+  word-break: keep-all;
+}
+.admin-auction-table {
+  min-width: 1380px;
+}
 .selection-column,
 .selection-cell {
   width: 3.5rem;
@@ -983,6 +1025,36 @@ onMounted(() => loadAuctions(0));
 }
 .number-column {
   width: 4rem;
+  white-space: nowrap;
+}
+.product-column {
+  min-width: 20rem;
+}
+.seller-column {
+  min-width: 9rem;
+  white-space: nowrap;
+}
+.price-column {
+  min-width: 8rem;
+  white-space: nowrap;
+}
+.status-column {
+  min-width: 6.5rem;
+  white-space: nowrap;
+}
+.management-column {
+  min-width: 8rem;
+}
+.management-column .badge {
+  white-space: nowrap;
+}
+.time-column {
+  min-width: 12rem;
+  white-space: nowrap;
+}
+.action-column {
+  min-width: 11rem;
+  white-space: nowrap;
 }
 .batch-checkbox {
   width: 1.2rem;
@@ -1007,6 +1079,7 @@ onMounted(() => loadAuctions(0));
 }
 .product-info {
   min-width: 0;
+  max-width: 22rem;
 }
 .auction-thumbnail {
   width: 4rem;
@@ -1025,6 +1098,8 @@ onMounted(() => loadAuctions(0));
   background: #f8f9fa;
 }
 .auction-name-link {
+  overflow-wrap: anywhere;
+  word-break: normal;
   color: var(--bs-link-color);
   text-decoration: none;
 }
@@ -1040,6 +1115,7 @@ onMounted(() => loadAuctions(0));
 }
 .action-button {
   min-width: 4.5rem;
+  white-space: nowrap;
   box-shadow: 0 0.125rem 0.35rem rgba(0, 0, 0, 0.18);
 }
 .action-dialog-overlay {

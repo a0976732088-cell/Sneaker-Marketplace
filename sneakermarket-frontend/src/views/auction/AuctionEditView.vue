@@ -342,7 +342,8 @@
 
                 <input
                   v-model="form.startAt"
-                  type="datetime-local" title="台北時間（UTC+8）"
+                  type="datetime-local"
+                  title="台北時間（UTC+8）"
                   class="form-control"
                   required
                   :disabled="!editable || auctionStatus === 'ACTIVE'"
@@ -359,7 +360,8 @@
 
                 <input
                   v-model="form.endAt"
-                  type="datetime-local" title="台北時間（UTC+8）"
+                  type="datetime-local"
+                  title="台北時間（UTC+8）"
                   class="form-control"
                   required
                   :disabled="!editable"
@@ -395,7 +397,11 @@
 
 <script setup>
 import { parseAuctionTime } from "@/utils/auctionTime";
-import { getAuctionOptions, requireAuctionSession, handleAuctionAccessError } from "@/service/auctionService";
+import {
+  getAuctionOptions,
+  requireAuctionSession,
+  handleAuctionAccessError,
+} from "@/service/auctionService";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -551,8 +557,10 @@ function fillForm(auction) {
   form.endAt = toDateTimeLocal(auction.endAt);
 
   canManage.value = auction.canManage;
-  auctionStatus.value = auction.hasStarted && auction.status === "SCHEDULED"
-    ? "ACTIVE" : auction.status;
+  auctionStatus.value =
+    auction.hasStarted && auction.status === "SCHEDULED"
+      ? "ACTIVE"
+      : auction.status;
   bidCount.value = auction.bidCount;
   isOwner.value = auction.isOwner;
 
@@ -576,7 +584,8 @@ async function loadAuction() {
 
     await requireAuctionSession();
     const [response, optionsResponse] = await Promise.all([
-      getAuctionDetail(auctionId), getAuctionOptions(),
+      getAuctionDetail(auctionId),
+      getAuctionOptions(),
     ]);
     brands.value = optionsResponse.data.data.brands;
     categories.value = optionsResponse.data.data.categories;
@@ -634,7 +643,11 @@ function validateForm() {
 
   const endAt = parseAuctionTime(form.endAt);
 
-  if (!Number.isFinite(startAt.getTime()) || !Number.isFinite(endAt.getTime()) || endAt <= startAt) {
+  if (
+    !Number.isFinite(startAt.getTime()) ||
+    !Number.isFinite(endAt.getTime()) ||
+    endAt <= startAt
+  ) {
     errorMessage.value = "競標結束時間必須晚於開始時間";
 
     return false;
@@ -727,7 +740,7 @@ function formatStatus(status) {
   const statusMap = {
     SCHEDULED: "尚未開始",
     ACTIVE: "競標中",
-    SOLD: "已成交",
+    SOLD: "已結標",
     UNSOLD: "流標",
     CANCELLED: "已取消",
     REMOVED: "廢標",

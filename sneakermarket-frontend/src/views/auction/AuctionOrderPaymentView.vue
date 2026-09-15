@@ -5,8 +5,8 @@
         <p class="text-uppercase text-muted small fw-semibold mb-1">Auction order</p>
         <h1 class="h2 mb-0">競標訂單付款</h1>
       </div>
-      <span v-if="order" class="badge rounded-pill fs-6 px-3 py-2" :class="paymentStatusClass">
-        {{ paymentStatusText }}
+      <span v-if="order" class="badge rounded-pill fs-6 px-3 py-2" :class="headlineStatusClass">
+        {{ headlineStatusText }}
       </span>
     </header>
 
@@ -134,13 +134,33 @@
             <dd class="col-sm-8 col-lg-9">{{ paymentStatusText }}</dd>
             <dt class="col-sm-4 col-lg-3">訂單狀態</dt>
             <dd class="col-sm-8 col-lg-9">{{ formatAuctionOrderStatus(order.orderStatus) }}</dd>
+            <dt class="col-sm-4 col-lg-3">付款期限</dt>
+            <dd class="col-sm-8 col-lg-9">{{ formatAuctionTime(order.paymentDueAt) }}</dd>
+            <template v-if="isPendingPayment && hasPaymentDeadline && !isPaymentDeadlineReached">
+              <dt class="col-sm-4 col-lg-3">剩餘付款時間</dt>
+              <dd class="col-sm-8 col-lg-9">{{ remainingPaymentTimeText }}</dd>
+            </template>
             <template v-if="order.paidAt">
               <dt class="col-sm-4 col-lg-3">付款時間</dt>
-              <dd class="col-sm-8 col-lg-9 mb-0">{{ formatAuctionTime(order.paidAt) }}</dd>
+              <dd class="col-sm-8 col-lg-9">{{ formatAuctionTime(order.paidAt) }}</dd>
+            </template>
+            <template v-if="order.abandonedAt">
+              <dt class="col-sm-4 col-lg-3">棄標時間</dt>
+              <dd class="col-sm-8 col-lg-9 mb-0">{{ formatAuctionTime(order.abandonedAt) }}</dd>
             </template>
           </dl>
 
-          <div v-if="isPendingPayment" class="alert alert-warning mt-4 mb-0" role="status">
+          <div v-if="isAbandoned" class="alert alert-danger mt-4 mb-0" role="status">
+            已棄標（逾期未付款），此訂單已無法再完成付款。
+          </div>
+          <div
+            v-else-if="isPendingPayment && isPaymentDeadlineReached"
+            class="alert alert-danger mt-4 mb-0"
+            role="status"
+          >
+            付款期限已到，系統正在更新訂單狀態。
+          </div>
+          <div v-else-if="isPendingPayment" class="alert alert-warning mt-4 mb-0" role="status">
             此訂單尚待付款；請確認訂單資料後完成付款。
           </div>
           <div v-else-if="isPaid" class="alert alert-success mt-4 mb-0" role="status">
@@ -163,10 +183,10 @@
           v-if="isPendingPayment"
           type="button"
           class="btn btn-dark"
-          :disabled="paying || !isPendingPayment"
+          :disabled="paying || !canPay"
           @click="confirmAndPay"
         >
-          {{ paying ? "付款處理中..." : "立即付款" }}
+          {{ paying ? "付款處理中..." : isPaymentDeadlineReached ? "付款期限已到" : "立即付款" }}
         </button>
       </div>
     </template>
@@ -184,7 +204,7 @@ import {
 import { formatTwd } from "@/utils/auctionMoney";
 import { resolveAuctionImageUrl } from "@/utils/auctionImageUrl";
 import { formatAuctionOrderStatus } from "@/utils/auctionMemberStatus";
-import { formatAuctionTime } from "@/utils/auctionTime";
+import { formatAuctionTime, parseAuctionTime } from "@/utils/auctionTime";
 
 const route = useRoute();
 const router = useRouter();
@@ -195,7 +215,11 @@ const errorMessage = ref("");
 const paymentErrorMessage = ref("");
 const paymentSuccessMessage = ref("");
 const imageLoadFailed = ref(false);
+const currentTimeMs = ref(Date.now());
 let requestVersion = 0;
+let viewVersion = 0;
+let countdownTimer = null;
+let deadlineRefreshOrderNumber = null;
 
 const isPendingPayment = computed(
   () =>
@@ -204,10 +228,40 @@ const isPendingPayment = computed(
 );
 const isPaid = computed(() => order.value?.paymentStatus === "PAID");
 const isFailed = computed(() => order.value?.paymentStatus === "FAILED");
+const isAbandoned = computed(() => order.value?.orderStatus === "ABANDONED");
+const paymentDeadlineMs = computed(() => {
+  if (!order.value?.paymentDueAt) return null;
+  const timestamp = parseAuctionTime(order.value.paymentDueAt).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+});
+const hasPaymentDeadline = computed(() => paymentDeadlineMs.value !== null);
+const isPaymentDeadlineReached = computed(
+  () =>
+    hasPaymentDeadline.value &&
+    currentTimeMs.value >= paymentDeadlineMs.value,
+);
+const canPay = computed(
+  () => isPendingPayment.value && !isPaymentDeadlineReached.value,
+);
+const remainingPaymentTimeText = computed(() => {
+  if (!hasPaymentDeadline.value) return "—";
+  const remainingMs = Math.max(0, paymentDeadlineMs.value - currentTimeMs.value);
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+});
 const paymentStatusText = computed(() =>
   formatAuctionOrderStatus(order.value?.paymentStatus),
 );
-const paymentStatusClass = computed(() => {
+const headlineStatusText = computed(() =>
+  isAbandoned.value ? "已棄標（逾期未付款）" : paymentStatusText.value,
+);
+const headlineStatusClass = computed(() => {
+  if (isAbandoned.value) return "text-bg-danger";
   if (isPaid.value) return "text-bg-success";
   if (isFailed.value) return "text-bg-danger";
   if (isPendingPayment.value) return "text-bg-warning";
@@ -230,7 +284,11 @@ function detailErrorMessage(error) {
 }
 
 async function loadOrder() {
+  const activeViewVersion = ++viewVersion;
   const version = ++requestVersion;
+  const orderNumber = String(route.params.orderNumber || "");
+  deadlineRefreshOrderNumber = null;
+  currentTimeMs.value = Date.now();
   loading.value = true;
   errorMessage.value = "";
   paymentErrorMessage.value = "";
@@ -239,11 +297,24 @@ async function loadOrder() {
   imageLoadFailed.value = false;
 
   try {
-    const response = await getAuctionOrderDetail(route.params.orderNumber);
-    if (version !== requestVersion) return;
+    const response = await getAuctionOrderDetail(orderNumber);
+    if (
+      version !== requestVersion ||
+      activeViewVersion !== viewVersion ||
+      String(route.params.orderNumber) !== orderNumber
+    ) {
+      return;
+    }
     order.value = response.data.data;
+    currentTimeMs.value = Date.now();
+    await refreshExpiredOrderOnce();
   } catch (error) {
-    if (version !== requestVersion) return;
+    if (
+      activeViewVersion !== viewVersion ||
+      String(route.params.orderNumber) !== orderNumber
+    ) {
+      return;
+    }
     if (
       error.response?.status === 401 &&
       (await handleAuctionAccessError(error, router))
@@ -252,7 +323,12 @@ async function loadOrder() {
     }
     errorMessage.value = detailErrorMessage(error);
   } finally {
-    if (version === requestVersion) loading.value = false;
+    if (
+      activeViewVersion === viewVersion &&
+      String(route.params.orderNumber) === orderNumber
+    ) {
+      loading.value = false;
+    }
   }
 }
 
@@ -266,8 +342,47 @@ async function refreshOrderDetail(orderNumber) {
     return false;
   }
   order.value = response.data.data;
+  currentTimeMs.value = Date.now();
   imageLoadFailed.value = false;
   return true;
+}
+
+async function refreshExpiredOrderOnce() {
+  if (!isPendingPayment.value || !isPaymentDeadlineReached.value) return false;
+
+  const orderNumber = String(
+    order.value?.orderNumber || route.params.orderNumber || "",
+  );
+  if (!orderNumber || deadlineRefreshOrderNumber === orderNumber) return false;
+  deadlineRefreshOrderNumber = orderNumber;
+
+  try {
+    return await refreshOrderDetail(orderNumber);
+  } catch (error) {
+    if (error.response?.status === 401) {
+      await handleAuctionAccessError(error, router);
+    }
+    return false;
+  }
+}
+
+async function tickPaymentDeadline() {
+  currentTimeMs.value = Date.now();
+  if (isPaymentDeadlineReached.value) {
+    await refreshExpiredOrderOnce();
+  }
+}
+
+function startPaymentDeadlineTimer() {
+  if (countdownTimer !== null) clearInterval(countdownTimer);
+  currentTimeMs.value = Date.now();
+  countdownTimer = setInterval(tickPaymentDeadline, 1000);
+}
+
+function stopPaymentDeadlineTimer() {
+  if (countdownTimer === null) return;
+  clearInterval(countdownTimer);
+  countdownTimer = null;
 }
 
 function paymentRequestErrorMessage(error) {
@@ -275,9 +390,19 @@ function paymentRequestErrorMessage(error) {
   if (status === 403) return "你沒有權限付款此訂單";
   if (status === 404) return "找不到此競標訂單";
   if (status === 409) {
+    if (error.response?.data?.message?.includes("付款期限")) {
+      return "競標訂單付款期限已過";
+    }
     return "目前訂單狀態無法付款，請重新整理後確認訂單狀態。";
   }
   return "付款處理失敗，請稍後再試。";
+}
+
+function isCurrentPaymentView(orderNumber, activeViewVersion) {
+  return (
+    activeViewVersion === viewVersion &&
+    String(route.params.orderNumber) === String(orderNumber)
+  );
 }
 
 async function reconcilePaymentState(orderNumber) {
@@ -297,9 +422,15 @@ async function reconcilePaymentState(orderNumber) {
 }
 
 async function confirmAndPay() {
-  if (paying.value || !isPendingPayment.value) return;
+  currentTimeMs.value = Date.now();
+  if (paying.value) return;
+  if (!canPay.value) {
+    await refreshExpiredOrderOnce();
+    return;
+  }
 
   const orderNumber = String(order.value.orderNumber || route.params.orderNumber);
+  const activeViewVersion = viewVersion;
   const confirmed = window.confirm(
     [
       "確認付款",
@@ -313,12 +444,21 @@ async function confirmAndPay() {
   );
   if (!confirmed) return;
 
+  currentTimeMs.value = Date.now();
+  if (!isCurrentPaymentView(orderNumber, activeViewVersion)) return;
+  if (!canPay.value) {
+    paymentErrorMessage.value = "競標訂單付款期限已過";
+    await refreshExpiredOrderOnce();
+    return;
+  }
+
   paying.value = true;
   paymentErrorMessage.value = "";
   paymentSuccessMessage.value = "";
 
   try {
     await payAuctionOrder(orderNumber);
+    if (!isCurrentPaymentView(orderNumber, activeViewVersion)) return;
     try {
       const refreshed = await refreshOrderDetail(orderNumber);
       if (!refreshed) return;
@@ -339,6 +479,7 @@ async function confirmAndPay() {
         "付款已送出，但無法取得最新訂單狀態，請重新載入確認。";
     }
   } catch (error) {
+    if (!isCurrentPaymentView(orderNumber, activeViewVersion)) return;
     if (
       error.response?.status === 401 &&
       (await handleAuctionAccessError(error, router))
@@ -359,12 +500,20 @@ async function confirmAndPay() {
 watch(
   () => route.params.orderNumber,
   (orderNumber, previousOrderNumber) => {
-    if (orderNumber !== previousOrderNumber) loadOrder();
+    if (orderNumber !== previousOrderNumber) {
+      currentTimeMs.value = Date.now();
+      loadOrder();
+    }
   },
 );
 
-onMounted(loadOrder);
+onMounted(() => {
+  startPaymentDeadlineTimer();
+  return loadOrder();
+});
 onUnmounted(() => {
+  stopPaymentDeadlineTimer();
+  viewVersion++;
   requestVersion++;
 });
 </script>

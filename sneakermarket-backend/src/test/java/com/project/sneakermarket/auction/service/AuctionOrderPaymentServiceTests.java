@@ -67,6 +67,56 @@ class AuctionOrderPaymentServiceTests {
     }
 
     @Test
+    void buyerPaysImmediatelyBeforeDeadline() {
+        order.setPaymentDueAt(PAYMENT_AT.plusNanos(1));
+        when(time.now()).thenReturn(PAYMENT_AT);
+
+        assertEquals(AuctionPaymentStatus.PAID,
+                service.pay("AO-PAY-001", 10L).paymentStatus());
+        assertEquals(AuctionOrderStatus.PAID, order.getOrderStatus());
+    }
+
+    @Test
+    void exactDeadlineIsConflictAndCannotBecomePaid() {
+        order.setPaymentDueAt(PAYMENT_AT);
+        when(time.now()).thenReturn(PAYMENT_AT);
+        var before = snapshot(order);
+
+        AuctionConflictException error = assertThrows(AuctionConflictException.class,
+                () -> service.pay("AO-PAY-001", 10L));
+
+        assertEquals("競標訂單付款期限已過", error.getMessage());
+        assertEquals(before, snapshot(order));
+        verify(orders, never()).save(any());
+        verify(time).now();
+    }
+
+    @Test
+    void afterDeadlineIsConflictAndCannotBecomePaid() {
+        order.setPaymentDueAt(PAYMENT_AT.minusSeconds(1));
+        when(time.now()).thenReturn(PAYMENT_AT);
+        var before = snapshot(order);
+
+        AuctionConflictException error = assertThrows(AuctionConflictException.class,
+                () -> service.pay("AO-PAY-001", 10L));
+
+        assertEquals("競標訂單付款期限已過", error.getMessage());
+        assertEquals(before, snapshot(order));
+        verify(orders, never()).save(any());
+    }
+
+    @Test
+    void legacyNullDeadlineKeepsExistingPaymentBehavior() {
+        order.setPaymentDueAt(null);
+        when(time.now()).thenReturn(PAYMENT_AT);
+
+        var response = service.pay("AO-PAY-001", 10L);
+
+        assertEquals(AuctionPaymentStatus.PAID, response.paymentStatus());
+        assertEquals(PAYMENT_AT, response.paidAt());
+    }
+
+    @Test
     void secondCallAfterSuccessfulPaymentKeepsOriginalTimestamps() {
         when(time.now()).thenReturn(PAYMENT_AT, PAYMENT_AT.plusMinutes(5));
 
@@ -129,6 +179,17 @@ class AuctionOrderPaymentServiceTests {
     }
 
     @Test
+    void abandonedOrderIsConflict() {
+        order.setOrderStatus(AuctionOrderStatus.ABANDONED);
+        order.setAbandonedAt(PAYMENT_AT);
+        var before = snapshot(order);
+        assertThrows(AuctionConflictException.class, () -> service.pay("AO-PAY-001", 10L));
+        assertEquals(before, snapshot(order));
+        verify(orders, never()).save(any());
+        verifyNoInteractions(time);
+    }
+
+    @Test
     void inconsistentPendingPaymentAndShippedOrderIsConflict() {
         order.setOrderStatus(AuctionOrderStatus.SHIPPED);
         var before = snapshot(order);
@@ -158,6 +219,7 @@ class AuctionOrderPaymentServiceTests {
         order.setOrderStatus(state);
         order.setPaidAt(originalPaidAt);
         order.setUpdatedAt(originalUpdatedAt);
+        order.setPaymentDueAt(PAYMENT_AT.minusDays(1));
 
         var response = service.pay("AO-PAY-001", 10L);
 
@@ -187,6 +249,7 @@ class AuctionOrderPaymentServiceTests {
         value.setShippingAddress("台北市測試路 1 號");
         value.setCreatedAt(CREATED_AT);
         value.setUpdatedAt(CREATED_AT);
+        value.setPaymentDueAt(PAYMENT_AT.plusMinutes(1));
         return value;
     }
 
@@ -194,7 +257,8 @@ class AuctionOrderPaymentServiceTests {
         return new PaymentSnapshot(
                 value.getPaymentMethod(), value.getPaymentStatus(), value.getOrderStatus(),
                 value.getShippingStatus(), value.getPaidAt(), value.getUpdatedAt(),
-                value.getShippedAt(), value.getCompletedAt(), value.getFinalPrice());
+                value.getShippedAt(), value.getCompletedAt(), value.getPaymentDueAt(),
+                value.getAbandonedAt(), value.getFinalPrice());
     }
 
     private record PaymentSnapshot(
@@ -206,6 +270,8 @@ class AuctionOrderPaymentServiceTests {
             LocalDateTime updatedAt,
             LocalDateTime shippedAt,
             LocalDateTime completedAt,
+            LocalDateTime paymentDueAt,
+            LocalDateTime abandonedAt,
             BigDecimal finalPrice) {
     }
 }

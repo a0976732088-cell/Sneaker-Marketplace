@@ -39,7 +39,12 @@ class AuctionHibernateSchemaTests {
 
     @Test
     void existingDevelopmentSchemaRemainsCompatible() {
-        assertSchema(new JdbcTemplate(dataSource));
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        assertSchema(jdbc);
+        assertOnlyCanonicalCheckForColumn(
+                jdbc, "dbo.auction_orders", "order_status", "CK_auction_orders_order_status");
+        assertOnlyCanonicalCheckForColumn(
+                jdbc, "dbo.auction_email_logs", "email_type", "CK_auction_email_logs_type");
     }
 
     @Test
@@ -99,6 +104,22 @@ class AuctionHibernateSchemaTests {
                 }
                 resultId = result.getResultId();
                 persistScalarOrder(factory, auctionId, winnerId);
+                assertNull(jdbc.queryForObject(
+                        "SELECT payment_due_at FROM dbo.auction_orders WHERE order_number='AO-schema'",
+                        LocalDateTime.class));
+                assertNull(jdbc.queryForObject(
+                        "SELECT abandoned_at FROM dbo.auction_orders WHERE order_number='AO-schema'",
+                        LocalDateTime.class));
+                assertEquals(1, jdbc.update("""
+                        UPDATE dbo.auction_orders
+                        SET order_status='ABANDONED',
+                            payment_due_at='2026-09-11T12:00:00',
+                            abandoned_at='2026-09-11T12:00:00'
+                        WHERE order_number='AO-schema'
+                        """));
+                assertEquals("ABANDONED", jdbc.queryForObject(
+                        "SELECT order_status FROM dbo.auction_orders WHERE order_number='AO-schema'",
+                        String.class));
                 assertNotNull(resultId);
                 assertEquals(winnerId, jdbc.queryForObject(
                         "SELECT winner_id FROM dbo.auction_results WHERE result_id = ?", Long.class, resultId));
@@ -147,6 +168,11 @@ class AuctionHibernateSchemaTests {
                         "SELECT delete_reason FROM dbo.auctions WHERE auction_id=?", String.class, auctionId));
                 assertEquals("收件快照", jdbc.queryForObject(
                         "SELECT receiver_name FROM dbo.auction_orders WHERE order_number = 'AO-schema'", String.class));
+                assertEquals("ABANDONED", jdbc.queryForObject(
+                        "SELECT order_status FROM dbo.auction_orders WHERE order_number = 'AO-schema'", String.class));
+                assertEquals(LocalDateTime.of(2026, 9, 11, 12, 0), jdbc.queryForObject(
+                        "SELECT abandoned_at FROM dbo.auction_orders WHERE order_number = 'AO-schema'",
+                        LocalDateTime.class));
                 try (var session = factory.openSession()) {
                     AuctionResult persisted = session.find(AuctionResult.class, resultId);
                     assertEquals(AuctionResultStatus.UNSOLD, persisted.getResultStatus());
@@ -206,6 +232,29 @@ class AuctionHibernateSchemaTests {
                 """, Integer.class));
         assertIndex(jdbc, "IX_auctions_status_start_at", List.of("status", "start_at"));
         assertIndex(jdbc, "IX_auctions_status_end_at", List.of("status", "end_at"));
+    }
+
+    private void assertOnlyCanonicalCheckForColumn(
+            JdbcTemplate jdbc, String table, String column, String canonicalConstraint) {
+        assertEquals(List.of(canonicalConstraint), jdbc.queryForList("""
+                SELECT cc.name
+                FROM sys.check_constraints AS cc
+                JOIN sys.columns AS col
+                  ON col.object_id = cc.parent_object_id
+                 AND col.name = ?
+                WHERE cc.parent_object_id = OBJECT_ID(?)
+                  AND (
+                      cc.parent_column_id = col.column_id
+                      OR EXISTS (
+                          SELECT 1
+                          FROM sys.sql_expression_dependencies AS sed
+                          WHERE sed.referencing_id = cc.object_id
+                            AND sed.referenced_id = cc.parent_object_id
+                            AND sed.referenced_minor_id = col.column_id
+                      )
+                  )
+                ORDER BY cc.name
+                """, String.class, column, table));
     }
 
     private void assertAuctionModerationSchema(JdbcTemplate jdbc) {
@@ -340,10 +389,19 @@ class AuctionHibernateSchemaTests {
                       AND ic.key_ordinal > 0 ORDER BY ic.key_ordinal
                     """, String.class, "IX_auction_orders_" + owner + "_created_at"));
         }
+        assertEquals(List.of("payment_status", "order_status", "payment_due_at"), jdbc.queryForList("""
+                SELECT c.name FROM sys.indexes i
+                JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+                JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                WHERE i.object_id = OBJECT_ID('dbo.auction_orders')
+                  AND i.name = 'IX_auction_orders_payment_deadline' AND i.is_disabled = 0
+                  AND ic.key_ordinal > 0 ORDER BY ic.key_ordinal
+                """, String.class));
         var states = java.util.Map.of(
                 "payment_status", List.of("PENDING", "PAID", "FAILED"),
                 "shipping_status", List.of("NOT_SHIPPED", "SHIPPED", "DELIVERED"),
-                "order_status", List.of("PENDING_PAYMENT", "PAID", "SHIPPED", "COMPLETED", "CANCELLED"));
+                "order_status", List.of(
+                        "PENDING_PAYMENT", "PAID", "SHIPPED", "COMPLETED", "CANCELLED", "ABANDONED"));
         states.forEach((column, values) -> {
             String definition = jdbc.queryForObject("""
                     SELECT definition FROM sys.check_constraints
@@ -375,17 +433,20 @@ class AuctionHibernateSchemaTests {
                 SELECT CONCAT(TYPE_NAME(user_type_id), ':', precision, ':', scale) FROM sys.columns
                 WHERE object_id = OBJECT_ID('dbo.auction_orders') AND name = 'final_price'
                 """, String.class));
-        for (String column : List.of("created_at", "updated_at", "paid_at", "shipped_at", "completed_at")) {
+        for (String column : List.of(
+                "created_at", "updated_at", "payment_due_at", "abandoned_at",
+                "paid_at", "shipped_at", "completed_at")) {
             assertEquals("datetime2:0", jdbc.queryForObject("""
                     SELECT CONCAT(TYPE_NAME(user_type_id), ':', scale) FROM sys.columns
                     WHERE object_id = OBJECT_ID('dbo.auction_orders') AND name = ?
                     """, String.class, column));
         }
-        assertEquals(List.of("completed_at", "paid_at", "shipped_at"), jdbc.queryForList("""
+        assertEquals(List.of("abandoned_at", "completed_at", "paid_at", "payment_due_at", "shipped_at"),
+                jdbc.queryForList("""
                 SELECT name FROM sys.columns
                 WHERE object_id = OBJECT_ID('dbo.auction_orders') AND is_nullable = 1 ORDER BY name
                 """, String.class));
-        assertEquals(18, jdbc.queryForObject("""
+        assertEquals(20, jdbc.queryForObject("""
                 SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID('dbo.auction_orders')
                 """, Integer.class));
     }
@@ -449,7 +510,8 @@ class AuctionHibernateSchemaTests {
                 """, Integer.class, table));
         var values = java.util.Map.of(
                 "role", List.of("SELLER", "WINNER", "BIDDER"),
-                "type", List.of("SOLD_SELLER", "UNSOLD_SELLER", "WON", "LOST"),
+                "type", List.of("SOLD_SELLER", "UNSOLD_SELLER", "WON", "LOST",
+                        "ORDER_ABANDONED_BUYER", "ORDER_ABANDONED_SELLER"),
                 "status", List.of("PENDING", "SENT", "FAILED"));
         values.forEach((name, expected) -> {
             String definition = jdbc.queryForObject("""
@@ -524,6 +586,21 @@ class AuctionHibernateSchemaTests {
                 transaction.commit();
             }
             assertNotNull(email.getEmailLogId());
+            for (String[] abandoned : List.of(
+                    new String[]{"ORDER_ABANDONED_BUYER", "WINNER"},
+                    new String[]{"ORDER_ABANDONED_SELLER", "SELLER"})) {
+                assertEquals(1, jdbc.update("""
+                        INSERT INTO dbo.auction_email_logs
+                        (auction_id,recipient_member_id,recipient_email,recipient_role,email_type,
+                         subject,send_status,retry_count,created_at,updated_at)
+                        VALUES (?,?,N'snapshot@example.invalid',?,?,N'棄標 constraint 驗證',
+                                'PENDING',0,'2026-09-12T12:00:00','2026-09-12T12:00:00')
+                        """, auctionId, memberId, abandoned[1], abandoned[0]));
+            }
+            assertEquals(2, jdbc.queryForObject("""
+                    SELECT COUNT(*) FROM dbo.auction_email_logs
+                    WHERE email_type IN ('ORDER_ABANDONED_BUYER','ORDER_ABANDONED_SELLER')
+                    """, Integer.class));
             Long tableId = jdbc.queryForObject("SELECT OBJECT_ID('dbo.auction_email_logs')", Long.class);
             var before = jdbc.queryForMap("SELECT * FROM dbo.auction_email_logs WHERE email_log_id=?", email.getEmailLogId());
             try (var factory = updateSchema(isolated)) {
@@ -532,14 +609,14 @@ class AuctionHibernateSchemaTests {
                 assertEquals(tableId, jdbc.queryForObject("SELECT OBJECT_ID('dbo.auction_email_logs')", Long.class));
                 assertEquals(before, jdbc.queryForMap(
                         "SELECT * FROM dbo.auction_email_logs WHERE email_log_id=?", email.getEmailLogId()));
-                assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM dbo.auction_email_logs", Integer.class));
+                assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM dbo.auction_email_logs", Integer.class));
             }
             // 正式 validate 模式接受 Entity 建立的 Schema，不需要人工建表。
             try (var factory = schemaConfiguration(isolated, "validate").buildSessionFactory()) {
                 try (var session = factory.openSession()) {
-                    assertEquals("snapshot@example.invalid", session.createQuery(
-                            "from AuctionEmailLog", com.project.sneakermarket.auction.entity.AuctionEmailLog.class)
-                            .getSingleResult().getRecipientEmail());
+                    assertEquals("snapshot@example.invalid", session.find(
+                            com.project.sneakermarket.auction.entity.AuctionEmailLog.class,
+                            email.getEmailLogId()).getRecipientEmail());
                 }
             }
         } finally {

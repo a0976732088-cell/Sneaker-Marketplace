@@ -143,8 +143,9 @@ test("bid outcomes distinguish leading, outbid, won and lost without depending o
   assert.equal(formatMemberPublicDetailNotice("REMOVED"), "已由平台下架，公開詳細頁不可查看");
   assert.equal(formatMemberPublicDetailNotice("DELETED"), "已由平台刪除，公開詳細頁不可查看");
   assert.equal(formatMemberAuctionStatus(null), "尚未結標");
-  assert.equal(formatAuctionOrderStatus("PENDING_PAYMENT"), "待付款");
+  assert.equal(formatAuctionOrderStatus("PENDING_PAYMENT"), "等待付款");
   assert.equal(formatAuctionOrderStatus("NOT_SHIPPED"), "未出貨");
+  assert.equal(formatAuctionOrderStatus("ABANDONED"), "已棄標");
 });
 
 test("member views wire the shared page and use existing money/time formatters", async () => {

@@ -70,6 +70,7 @@ class AuctionOrderDetailTests {
         order.setShippingAddress("台北市測試路 1 號");
         order.setCreatedAt(LocalDateTime.of(2026, 9, 14, 10, 0));
         order.setUpdatedAt(LocalDateTime.of(2026, 9, 14, 10, 0));
+        order.setPaymentDueAt(LocalDateTime.of(2026, 9, 15, 10, 0));
 
         auction = new Auction();
         auction.setAuctionId(7L);
@@ -118,6 +119,8 @@ class AuctionOrderDetailTests {
                 .andExpect(jsonPath("$.data.receiverPhone").value("0912345678"))
                 .andExpect(jsonPath("$.data.shippingAddress").value("台北市測試路 1 號"))
                 .andExpect(jsonPath("$.data.createdAt").value("2026-09-14T10:00:00"))
+                .andExpect(jsonPath("$.data.paymentDueAt").value("2026-09-15T10:00:00"))
+                .andExpect(jsonPath("$.data.abandonedAt").doesNotExist())
                 .andExpect(jsonPath("$.data.updatedAt").value("2026-09-14T10:00:00"))
                 .andExpect(jsonPath("$.data.buyerId").doesNotExist())
                 .andExpect(jsonPath("$.data.sellerId").doesNotExist());
@@ -169,6 +172,25 @@ class AuctionOrderDetailTests {
                 .andExpect(jsonPath("$.data.finalPrice").value(6500.00))
                 .andExpect(jsonPath("$.data.shippingFee").value(120.00))
                 .andExpect(jsonPath("$.data.totalAmount").value(6620.00));
+    }
+
+    @Test
+    void abandonedDetailIncludesDeadlineAndAbandonedTimestampWithoutIdentityLeak() throws Exception {
+        order.setOrderStatus(AuctionOrderStatus.ABANDONED);
+        order.setAbandonedAt(LocalDateTime.of(2026, 9, 15, 10, 0));
+        order.setUpdatedAt(order.getAbandonedAt());
+        stubDetail();
+
+        mvc.perform(get("/api/auction-orders/AO-123456").session(activeSession(10L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderStatus").value("ABANDONED"))
+                .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.paymentDueAt").value("2026-09-15T10:00:00"))
+                .andExpect(jsonPath("$.data.abandonedAt").value("2026-09-15T10:00:00"))
+                .andExpect(jsonPath("$.data.buyerId").doesNotExist())
+                .andExpect(jsonPath("$.data.sellerId").doesNotExist())
+                .andExpect(jsonPath("$.data.buyerEmail").doesNotExist())
+                .andExpect(jsonPath("$.data.sellerEmail").doesNotExist());
     }
 
     @Test

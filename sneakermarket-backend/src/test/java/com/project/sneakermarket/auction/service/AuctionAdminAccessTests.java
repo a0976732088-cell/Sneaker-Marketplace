@@ -16,7 +16,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.project.sneakermarket.auction.controller.AuctionAdminController;
 import com.project.sneakermarket.auction.dto.AuctionAdminBatchResponse;
+import com.project.sneakermarket.auction.dto.AuctionAdminManagementState;
 import com.project.sneakermarket.auction.dto.PageData;
+import com.project.sneakermarket.auction.entity.AuctionOrderStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.exception.AuctionExceptionHandler;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
@@ -56,6 +58,9 @@ class AuctionAdminAccessTests {
         mvc.perform(get("/api/admin/auctions/12"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false));
+        mvc.perform(get("/api/admin/auctions"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
         verifyNoInteractions(mutations, queries, batches, references);
     }
 
@@ -64,10 +69,16 @@ class AuctionAdminAccessTests {
         MockHttpSession session = session(8L);
         doThrow(new ForbiddenException("需要管理員權限")).when(references).requireAdminMember(8L);
 
+        mvc.perform(get("/api/admin/auctions/12").session(session))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("需要管理員權限"));
+        mvc.perform(get("/api/admin/auctions").session(session))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("需要管理員權限"));
         mvc.perform(put("/api/admin/auctions/12/restore").session(session))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("需要管理員權限"));
-        verifyNoInteractions(mutations);
+        verifyNoInteractions(mutations, queries);
     }
 
     @Test
@@ -91,7 +102,8 @@ class AuctionAdminAccessTests {
                 .thenReturn(new AuctionAdminBatchResponse(2, 2, 0, List.of()));
 
         mvc.perform(get("/api/admin/auctions").session(session)
-                        .param("keyword", "Jordan").param("managementState", "REMOVED"))
+                        .param("keyword", "Jordan").param("managementState", "REMOVED")
+                        .param("orderStatus", "ABANDONED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.page").value(0));
         mvc.perform(get("/api/admin/auctions/12").session(session))
@@ -118,6 +130,11 @@ class AuctionAdminAccessTests {
                 .andExpect(jsonPath("$.data.successCount").value(2));
 
         verify(queries).detail(12L);
+        verify(queries).search(argThat(criteria ->
+                "Jordan".equals(criteria.getKeyword())
+                        && criteria.getManagementState() == AuctionAdminManagementState.REMOVED
+                        && criteria.getOrderStatus() == AuctionOrderStatus.ABANDONED),
+                any());
         verify(mutations).removeAuction(12L, 7L, "下架原因");
         verify(mutations).restoreAuction(12L, 7L);
         verify(mutations).deleteAuction(12L, 7L, "刪除原因");

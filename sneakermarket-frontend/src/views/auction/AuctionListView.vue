@@ -1,11 +1,18 @@
 <template>
   <div class="container py-4">
     <h1 class="mb-4">競標商城</h1>
-    <nav class="d-flex flex-wrap gap-2 mb-4" aria-label="我的競標導覽">
-      <RouterLink class="btn btn-outline-primary" to="/auctions/me/bids">我的出價</RouterLink>
-      <RouterLink class="btn btn-outline-primary" to="/auctions/me/listings">我的刊登</RouterLink>
-      <RouterLink class="btn btn-outline-primary" to="/auction-orders">我的競標訂單</RouterLink>
-    </nav>
+    <nav aria-label="我的競標導覽"></nav>
+    <!-- <nav class="d-flex flex-wrap gap-2 mb-4" aria-label="我的競標導覽">
+      <RouterLink class="btn btn-outline-primary" to="/auctions/me/bids"
+        >我的出價</RouterLink
+      >
+      <RouterLink class="btn btn-outline-primary" to="/auctions/me/listings"
+        >我的刊登</RouterLink
+      >
+      <RouterLink class="btn btn-outline-primary" to="/auction-orders"
+        >我的競標訂單</RouterLink
+      >
+    </nav> -->
 
     <form class="row g-2 mb-4" @submit.prevent="searchAuctions">
       <!-- 關鍵字搜尋 -->
@@ -60,13 +67,21 @@
       <div class="col-md-2">
         <select v-model="brandId" class="form-select" aria-label="品牌篩選">
           <option value="">全部品牌</option>
-          <option v-for="brand in brands" :key="brand.id" :value="brand.id">{{ brand.name }}</option>
+          <option v-for="brand in brands" :key="brand.id" :value="brand.id">
+            {{ brand.name }}
+          </option>
         </select>
       </div>
       <div class="col-md-2">
         <select v-model="categoryId" class="form-select" aria-label="分類篩選">
           <option value="">全部分類</option>
-          <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+          <option
+            v-for="category in categories"
+            :key="category.id"
+            :value="category.id"
+          >
+            {{ category.name }}
+          </option>
         </select>
       </div>
       <p v-if="optionsError" class="text-danger">{{ optionsError }}</p>
@@ -76,7 +91,7 @@
           <option value="">全部狀態</option>
           <option value="ACTIVE">競標中</option>
           <option value="SCHEDULED">尚未開始</option>
-          <option value="SOLD">已成交</option>
+          <option value="SOLD">已結標</option>
           <option value="UNSOLD">流標</option>
         </select>
       </div>
@@ -171,8 +186,14 @@
             {{ auction.productName }}
           </h5>
 
-          <p class="card-text">品牌：{{ auction.brandName ?? "品牌資料未提供" }} ／ 分類：{{ auction.categoryName ?? "分類資料未提供" }}</p>
-          <p class="card-text">賣家：{{ auction.sellerName || "會員資料未提供" }}</p>
+          <p class="card-text">
+            品牌：{{ auction.brandName ?? "品牌資料未提供" }} ／ 分類：{{
+              auction.categoryName ?? "分類資料未提供"
+            }}
+          </p>
+          <p class="card-text">
+            賣家：{{ auction.sellerName || "會員資料未提供" }}
+          </p>
           <p class="card-text">型號：{{ auction.model }}</p>
 
           <p class="card-text">尺寸：{{ auction.size }}</p>
@@ -181,7 +202,9 @@
             商品狀況：{{ formatCondition(auction.condition) }}
           </p>
 
-          <p class="card-text">目前價格：{{ formatTwd(auction.currentPrice) }}</p>
+          <p class="card-text">
+            目前價格：{{ formatTwd(auction.currentPrice) }}
+          </p>
 
           <p class="card-text">出價次數：{{ auction.bidCount }}</p>
 
@@ -345,7 +368,7 @@ function formatStatus(status) {
   const statusMap = {
     SCHEDULED: "尚未開始",
     ACTIVE: "競標中",
-    SOLD: "已成交",
+    SOLD: "已結標",
     UNSOLD: "流標",
     CANCELLED: "已取消",
     REMOVED: "廢標",
@@ -459,12 +482,14 @@ async function changePage(page) {
 // 頁面載入完成後自動取得競標列表
 onMounted(() => {
   loadAuctions();
-  getAuctionOptions().then((response) => {
-    brands.value = response.data.data.brands;
-    categories.value = response.data.data.categories;
-  }).catch(() => {
-    optionsError.value = "品牌與分類選項暫時無法載入，仍可使用其他搜尋條件。";
-  });
+  getAuctionOptions()
+    .then((response) => {
+      brands.value = response.data.data.brands;
+      categories.value = response.data.data.categories;
+    })
+    .catch(() => {
+      optionsError.value = "品牌與分類選項暫時無法載入，仍可使用其他搜尋條件。";
+    });
 
   // 每分鐘更新一次列表上的剩餘時間
   countdownTimer = setInterval(() => {

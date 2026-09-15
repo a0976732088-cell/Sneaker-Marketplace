@@ -82,7 +82,11 @@
         <div v-else class="text-muted">目前沒有商品圖片。</div>
       </div>
 
-      <p>品牌：{{ auction.brandName ?? "品牌資料未提供" }} ／ 分類：{{ auction.categoryName ?? "分類資料未提供" }}</p>
+      <p>
+        品牌：{{ auction.brandName ?? "品牌資料未提供" }} ／ 分類：{{
+          auction.categoryName ?? "分類資料未提供"
+        }}
+      </p>
       <!-- 商品資訊 -->
       <div class="card mb-4">
         <div class="card-header">商品資訊</div>
@@ -158,9 +162,13 @@
         <div class="card-header">我要出價</div>
 
         <div class="card-body">
-          <p class="mb-2">目前價格：<strong>{{ formatTwd(auction.currentPrice) }}</strong></p>
+          <p class="mb-2">
+            目前價格：<strong>{{ formatTwd(auction.currentPrice) }}</strong>
+          </p>
 
-          <p class="mb-2">最低加價：<strong>{{ formatTwd(auction.minIncrement) }}</strong></p>
+          <p class="mb-2">
+            最低加價：<strong>{{ formatTwd(auction.minIncrement) }}</strong>
+          </p>
 
           <p class="mb-3">
             目前最低可出價：
@@ -176,7 +184,9 @@
               <button
                 type="button"
                 class="btn btn-outline-secondary"
-                :disabled="!canPlaceBid || submittingBid || isCandidateAtMinimum"
+                :disabled="
+                  !canPlaceBid || submittingBid || isCandidateAtMinimum
+                "
                 aria-label="減少一個最低加價級距"
                 @click="decreaseCandidateBid"
               >
@@ -316,12 +326,7 @@ import {
 } from "@/service/auctionService";
 
 const STATUS_POLL_INTERVAL_MS = 12000;
-const TERMINAL_STATUSES = new Set([
-  "SOLD",
-  "UNSOLD",
-  "CANCELLED",
-  "REMOVED",
-]);
+const TERMINAL_STATUSES = new Set(["SOLD", "UNSOLD", "CANCELLED", "REMOVED"]);
 
 // 取得目前路由資訊
 const route = useRoute();
@@ -482,16 +487,12 @@ async function refreshAuctionStatus() {
       }
     }
 
-    if (
-      TERMINAL_STATUSES.has(latestStatus.status) &&
-      !bidHistorySyncPending
-    ) {
+    if (TERMINAL_STATUSES.has(latestStatus.status) && !bidHistorySyncPending) {
       stopStatusPolling();
     }
   } catch (error) {
     console.error("同步競標最新狀態失敗：", error);
-    statusSyncMessage.value =
-      "最新競標狀態暫時同步失敗，將自動重試。";
+    statusSyncMessage.value = "最新競標狀態暫時同步失敗，將自動重試。";
   } finally {
     refreshingStatus = false;
   }
@@ -520,7 +521,10 @@ function startStatusPolling() {
  * 最終權限與 bidCount 判斷仍由後端重新確認。
  */
 const canOwnerManageAuction = computed(() => {
-  if (!auction.value?.canManage || parseAuctionTime(auction.value.endAt) <= new Date()) {
+  if (
+    !auction.value?.canManage ||
+    parseAuctionTime(auction.value.endAt) <= new Date()
+  ) {
     return false;
   }
 
@@ -608,7 +612,8 @@ const ownerManageMessage = computed(() => {
     return "此競標已有出價紀錄，無法再修改或自行取消。";
   }
 
-  if (parseAuctionTime(auction.value.endAt) <= new Date()) return "此競標已到截止時間，無法修改或取消。";
+  if (parseAuctionTime(auction.value.endAt) <= new Date())
+    return "此競標已到截止時間，無法修改或取消。";
 
   const statusMessageMap = {
     SOLD: "此競標已成交，無法再修改或取消。",
@@ -721,7 +726,7 @@ function formatStatus(status) {
   const statusMap = {
     SCHEDULED: "尚未開始",
     ACTIVE: "競標中",
-    SOLD: "已成交",
+    SOLD: "已結標",
     UNSOLD: "流標",
     CANCELLED: "已取消",
     REMOVED: "廢標",

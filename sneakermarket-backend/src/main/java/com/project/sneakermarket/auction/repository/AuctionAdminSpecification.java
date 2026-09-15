@@ -9,6 +9,7 @@ import org.springframework.util.StringUtils;
 import com.project.sneakermarket.auction.dto.AuctionAdminManagementState;
 import com.project.sneakermarket.auction.dto.AuctionAdminSearchCriteria;
 import com.project.sneakermarket.auction.entity.Auction;
+import com.project.sneakermarket.auction.entity.AuctionOrder;
 import com.project.sneakermarket.auction.entity.AuctionProduct;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 
@@ -27,6 +28,14 @@ public final class AuctionAdminSpecification {
 
             if (criteria != null && criteria.getStatus() != null) {
                 predicates.add(builder.equal(root.get("status"), criteria.getStatus()));
+            }
+
+            if (criteria != null && criteria.getOrderStatus() != null) {
+                Subquery<Long> orderAuctions = query.subquery(Long.class);
+                Root<AuctionOrder> order = orderAuctions.from(AuctionOrder.class);
+                orderAuctions.select(order.get("auctionId")).where(
+                        builder.equal(order.get("orderStatus"), criteria.getOrderStatus()));
+                predicates.add(root.get("auctionId").in(orderAuctions));
             }
 
             AuctionAdminManagementState state = criteria == null ? null : criteria.getManagementState();

@@ -3,6 +3,7 @@ package com.project.sneakermarket.auction.dto;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.project.sneakermarket.auction.entity.AuctionOrderStatus;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 
 public record AuctionAdminSummaryResponse(
@@ -25,6 +26,7 @@ public record AuctionAdminSummaryResponse(
         LocalDateTime deletedAt,
         Long deletedByMemberId,
         String deleteReason,
+        AuctionOrderStatus orderStatus,
         AuctionAdminManagementState managementState
 ) {
 }
