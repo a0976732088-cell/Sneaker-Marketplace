@@ -12,6 +12,10 @@ const detailSource = await readFile(
   new URL("../src/views/auction/AuctionDetailView.vue", import.meta.url),
   "utf8",
 );
+const editSource = await readFile(
+  new URL("../src/views/auction/AuctionEditView.vue", import.meta.url),
+  "utf8",
+);
 
 function section(source, startMarker, endMarker) {
   const start = source.indexOf(startMarker);
@@ -111,6 +115,13 @@ const detailInfo = section(detailSource, "<!-- 競標資訊 -->", "<!-- 出價�
 const bidHistory = section(detailSource, "<!-- 出價紀錄 -->", "</template>");
 const legacyBidField = ["masked", "Bidder"].join("");
 const legacyFallback = ["匿名", "會員"].join("");
+
+test("public and member auction views do not present DRAFT as a supported status", () => {
+  const draftLabel = /DRAFT\s*:\s*["']草稿["']/;
+  assert.doesNotMatch(listSource, draftLabel);
+  assert.doesNotMatch(detailSource, draftLabel);
+  assert.doesNotMatch(editSource, draftLabel);
+});
 
 test("auction list binds the seller label to sellerName from its API response", async () => {
   const [auction] = await loadListFromApi([{ sellerName: "王小明" }]);

@@ -511,7 +511,6 @@ import {
 
 const router = useRouter();
 const statuses = [
-  "DRAFT",
   "SCHEDULED",
   "ACTIVE",
   "SOLD",

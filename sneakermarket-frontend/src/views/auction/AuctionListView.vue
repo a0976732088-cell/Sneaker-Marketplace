@@ -343,7 +343,6 @@ async function loadAuctions() {
  */
 function formatStatus(status) {
   const statusMap = {
-    DRAFT: "草稿",
     SCHEDULED: "尚未開始",
     ACTIVE: "競標中",
     SOLD: "已成交",

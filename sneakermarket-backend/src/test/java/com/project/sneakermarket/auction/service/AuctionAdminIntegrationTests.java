@@ -220,7 +220,7 @@ class AuctionAdminIntegrationTests {
     void batchRemoveRestoreAndDeleteUseDistinctIdsAndKeepPartialSuccess() {
         Long first = fixture(AuctionStatus.DRAFT, false, "批次一");
         Long second = fixture(AuctionStatus.DRAFT, false, "批次二");
-        Long stillVisible = fixture(AuctionStatus.DRAFT, false, "批次三");
+        Long untouched = fixture(AuctionStatus.DRAFT, false, "批次三");
         Long missing = Long.MAX_VALUE - 12345;
 
         AuctionAdminBatchResponse remove = batches.removeAuctions(
@@ -238,18 +238,18 @@ class AuctionAdminIntegrationTests {
         assertEquals(1, restore.failureCount());
         assertNull(persisted(first).getRemovedAt());
         assertNull(persisted(second).getRemovedAt());
-        assertPubliclyVisible(first);
-        assertPubliclyVisible(second);
+        assertPubliclyHidden(first);
+        assertPubliclyHidden(second);
 
         batches.removeAuctions(List.of(first, second), adminId, "刪除前下架");
         AuctionAdminBatchResponse delete = batches.deleteAuctions(
-                List.of(first, stillVisible, missing, first), adminId, "批次刪除");
+                List.of(first, untouched, missing, first), adminId, "批次刪除");
         assertEquals(3, delete.totalCount());
         assertEquals(1, delete.successCount());
         assertEquals(2, delete.failureCount());
         assertNotNull(persisted(first).getDeletedAt());
-        assertNull(persisted(stillVisible).getRemovedAt());
-        assertNull(persisted(stillVisible).getDeletedAt());
+        assertNull(persisted(untouched).getRemovedAt());
+        assertNull(persisted(untouched).getDeletedAt());
         assertNotNull(persisted(second).getRemovedAt());
         assertNull(persisted(second).getDeletedAt());
 

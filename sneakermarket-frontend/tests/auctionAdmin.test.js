@@ -53,6 +53,13 @@ test("admin view uses auction status wording and keeps required SFC order", () =
   assert.doesNotMatch(view, /假刪除/);
 });
 
+test("admin status filter excludes reserved DRAFT while defensive handling remains", () => {
+  const statusFilter = view.match(/const statuses = \[([\s\S]*?)\];/)?.[1] ?? "";
+  assert.doesNotMatch(statusFilter, /["']DRAFT["']/);
+  assert.match(view, /DRAFT:\s*["']草稿["']/);
+  assert.match(view, /const restorableStatuses = new Set\(\["DRAFT", "SCHEDULED", "ACTIVE"\]\)/);
+});
+
 test("single action buttons follow visible removed and deleted states", () => {
   assert.match(view, /v-if="isLegacyRemoved\(auction\)"[\s\S]*?>\s*補登下架資訊\s*<\/button\s*>/);
   assert.match(view, /v-else-if="!auction\.removedAt && !auction\.deletedAt"[\s\S]*?>\s*下架\s*<\/button\s*>/);

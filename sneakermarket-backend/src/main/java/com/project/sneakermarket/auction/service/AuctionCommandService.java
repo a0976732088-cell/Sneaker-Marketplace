@@ -699,6 +699,7 @@ public class AuctionCommandService {
         );
 
         /*
+         * DRAFT 為 Reserved / 未啟用狀態，正常建立流程不產生。
          * 未來開始 → SCHEDULED
          * 已到開始時間 → ACTIVE
          */

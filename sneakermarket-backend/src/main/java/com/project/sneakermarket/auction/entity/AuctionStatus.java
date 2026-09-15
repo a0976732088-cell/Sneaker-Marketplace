@@ -6,7 +6,7 @@ package com.project.sneakermarket.auction.entity;
  */
 public enum AuctionStatus {
 
-    // 草稿，尚未公開
+    // Reserved / 未啟用狀態；目前正常建立流程不產生，公開查詢一律排除。
     DRAFT,
 
     // 已設定競標時間，但尚未開始

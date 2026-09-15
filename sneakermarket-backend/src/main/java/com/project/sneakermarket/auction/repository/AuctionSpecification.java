@@ -37,12 +37,15 @@ public final class AuctionSpecification {
 
             List<Predicate> predicates = new ArrayList<>();
 
-            // 公開商城一律排除已下架、已 Soft Delete與舊版僅有 REMOVED status 的資料。
+            // 公開商城一律排除未啟用、已下架、已 Soft Delete 與舊版僅有 REMOVED status 的資料。
             predicates.add(criteriaBuilder.isNull(root.get("removedAt")));
             predicates.add(criteriaBuilder.isNull(root.get("deletedAt")));
             predicates.add(criteriaBuilder.notEqual(
                     root.get("status"),
                     com.project.sneakermarket.auction.entity.AuctionStatus.REMOVED));
+            predicates.add(criteriaBuilder.notEqual(
+                    root.get("status"),
+                    com.project.sneakermarket.auction.entity.AuctionStatus.DRAFT));
 
             // 競標狀態
             if (criteria.getStatus() != null) {
