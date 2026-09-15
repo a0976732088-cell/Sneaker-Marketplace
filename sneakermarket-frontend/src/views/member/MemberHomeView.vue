@@ -3,6 +3,7 @@ import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 
 import { getCurrentMember } from "@/service/authService";
+
 import {
   updateMyProfile,
   changeMyPassword,
@@ -11,15 +12,22 @@ import {
 
 const router = useRouter();
 
+// =====================================================
+// 目前登入會員
+// =====================================================
 const member = ref(null);
+
 const loading = ref(true);
+
 const errorMessage = ref("");
+
 const successMessage = ref("");
 
 // =====================================================
 // 個人資料修改
 // =====================================================
 const isEditing = ref(false);
+
 const savingProfile = ref(false);
 
 const editForm = ref({
@@ -33,6 +41,7 @@ const editForm = ref({
 // 密碼修改
 // =====================================================
 const showPasswordForm = ref(false);
+
 const changingPassword = ref(false);
 
 const passwordForm = ref({
@@ -41,6 +50,9 @@ const passwordForm = ref({
   confirmPassword: "",
 });
 
+// =====================================================
+// API Error
+// =====================================================
 function getApiErrorMessage(error, fallbackMessage) {
   const data = error.response?.data;
 
@@ -55,33 +67,57 @@ function getApiErrorMessage(error, fallbackMessage) {
   return fallbackMessage;
 }
 
+// =====================================================
+// Email 驗證
+// =====================================================
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+// =====================================================
+// 手機驗證
+// =====================================================
 function isValidPhone(phone) {
   return /^09\d{8}$/.test(phone);
 }
 
+// =====================================================
+// 載入目前登入會員
+// =====================================================
 async function loadCurrentMember() {
   loading.value = true;
+
   errorMessage.value = "";
 
   try {
+    /*
+     * GET /api/auth/me
+     *
+     * 後端會根據 Session
+     * 回傳目前登入會員。
+     */
     member.value = await getCurrentMember();
 
     console.log("目前登入會員：", member.value);
   } catch (error) {
     console.error("取得會員資料失敗：", error);
 
+    /*
+     * 沒登入
+     * 或會員已被 Soft Delete
+     */
     await router.replace("/login");
   } finally {
     loading.value = false;
   }
 }
 
+// =====================================================
+// 開始修改會員資料
+// =====================================================
 function startEdit() {
   errorMessage.value = "";
+
   successMessage.value = "";
 
   editForm.value = {
@@ -97,15 +133,23 @@ function startEdit() {
   isEditing.value = true;
 }
 
+// =====================================================
+// 取消修改
+// =====================================================
 function cancelEdit() {
   isEditing.value = false;
 
   errorMessage.value = "";
+
   successMessage.value = "";
 }
 
+// =====================================================
+// 儲存會員資料
+// =====================================================
 async function saveMember() {
   errorMessage.value = "";
+
   successMessage.value = "";
 
   const cleanName = editForm.value.name.trim();
@@ -116,12 +160,18 @@ async function saveMember() {
 
   const cleanAddress = editForm.value.address.trim();
 
+  // -------------------------
+  // 姓名
+  // -------------------------
   if (!cleanName) {
     errorMessage.value = "姓名不可以空白";
 
     return;
   }
 
+  // -------------------------
+  // Email
+  // -------------------------
   if (!cleanEmail) {
     errorMessage.value = "Email 不可以空白";
 
@@ -134,6 +184,9 @@ async function saveMember() {
     return;
   }
 
+  // -------------------------
+  // 手機
+  // -------------------------
   if (!cleanPhone) {
     errorMessage.value = "手機號碼不可以空白";
 
@@ -173,6 +226,9 @@ async function saveMember() {
   }
 }
 
+// =====================================================
+// 重設密碼表單
+// =====================================================
 function resetPasswordForm() {
   passwordForm.value = {
     currentPassword: "",
@@ -183,8 +239,12 @@ function resetPasswordForm() {
   };
 }
 
+// =====================================================
+// 修改密碼
+// =====================================================
 async function handleChangePassword() {
   errorMessage.value = "";
+
   successMessage.value = "";
 
   if (!passwordForm.value.currentPassword) {
@@ -230,10 +290,19 @@ async function handleChangePassword() {
   }
 }
 
+// =====================================================
+// 刪除自己的會員帳號
+//
+// 後端現在使用 Soft Delete。
+// =====================================================
 async function handleDeleteAccount() {
   errorMessage.value = "";
+
   successMessage.value = "";
 
+  /*
+   * Admin 不可以從會員中心刪除自己。
+   */
   if (member.value?.role === "ROLE_ADMIN") {
     errorMessage.value = "管理員不可刪除自己的管理員帳號";
 
@@ -241,7 +310,7 @@ async function handleDeleteAccount() {
   }
 
   const confirmed = window.confirm(
-    `確定要刪除帳號「${member.value?.account}」嗎？\n刪除後將無法復原。`,
+    `確定要刪除帳號「${member.value?.account}」嗎？\n刪除後將無法再使用此會員身分登入。`,
   );
 
   if (!confirmed) {
@@ -249,10 +318,21 @@ async function handleDeleteAccount() {
   }
 
   try {
+    /*
+     * DELETE /api/members/me
+     *
+     * 後端：
+     *
+     * deleted_at = 現在時間
+     */
     await deleteMyAccount();
 
     alert("帳號已刪除");
 
+    /*
+     * 後端 Session
+     * 已經 invalidate。
+     */
     await router.replace("/login");
   } catch (error) {
     console.error("刪除帳號失敗：", error);
@@ -261,6 +341,9 @@ async function handleDeleteAccount() {
   }
 }
 
+// =====================================================
+// 初始化
+// =====================================================
 onMounted(() => {
   loadCurrentMember();
 });
@@ -268,38 +351,57 @@ onMounted(() => {
 
 <template>
   <div class="member-page">
-    <!-- =========================================
+    <!-- ==================================================
          Loading
-    ========================================== -->
-
+    =================================================== -->
     <div v-if="loading" class="loading-area">會員資料載入中...</div>
 
     <template v-else-if="member">
-      <!-- =========================================
+      <!-- ==================================================
            會員中心導覽列
-      ========================================== -->
-
+      =================================================== -->
       <nav class="member-nav">
-        <router-link to="/member"> 個人檔案 </router-link>
+        <!-- 個人檔案 -->
+        <RouterLink
+          :to="{
+            name: 'member',
+          }"
+        >
+          個人檔案
+        </RouterLink>
 
-        <router-link to="/coupons"> 我的折價券 </router-link>
+        <!-- 我的折價券 -->
+        <RouterLink
+          :to="{
+            name: 'coupons',
+          }"
+        >
+          我的折價券
+        </RouterLink>
 
-        <a href="#" @click.prevent> 訂單 </a>
+        <RouterLink to="/member/orders"> 訂單 </RouterLink>
 
-        <a href="#" @click.prevent> 競標 </a>
+        <RouterLink
+          :to="{
+            name: 'auction-my-bids',
+          }"
+        >
+          競標
+        </RouterLink>
       </nav>
 
-      <!-- =========================================
+      <!-- ==================================================
            會員基本資料
-      ========================================== -->
-
+      =================================================== -->
       <main class="profile-container">
+        <!-- Avatar -->
         <div class="avatar">
           <span>
             {{ member.name?.charAt(0) || "M" }}
           </span>
         </div>
 
+        <!-- 基本會員資料 -->
         <div class="profile-info">
           <h1>
             {{ member.name }}
@@ -315,10 +417,9 @@ onMounted(() => {
         </div>
       </main>
 
-      <!-- =========================================
+      <!-- ==================================================
            個人資料
-      ========================================== -->
-
+      =================================================== -->
       <section class="profile-detail-section">
         <div class="section-header">
           <div>
@@ -327,10 +428,12 @@ onMounted(() => {
             <p class="section-description">修改姓名與聯絡資料</p>
           </div>
 
+          <!-- 編輯 -->
           <button v-if="!isEditing" class="edit-button" @click="startEdit">
             編輯
           </button>
 
+          <!-- 修改模式 -->
           <div v-else class="edit-actions">
             <button
               class="cancel-button"
@@ -350,25 +453,25 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 成功訊息 -->
-
+        <!-- ==================================================
+             成功訊息
+        =================================================== -->
         <div v-if="successMessage" class="message success-message">
           {{ successMessage }}
         </div>
 
-        <!-- 錯誤訊息 -->
-
+        <!-- ==================================================
+             錯誤訊息
+        =================================================== -->
         <div v-if="errorMessage" class="message error-message">
           {{ errorMessage }}
         </div>
 
-        <!-- =========================================
+        <!-- ==================================================
              個人資料欄位
-        ========================================== -->
-
+        =================================================== -->
         <div class="profile-details">
           <!-- 帳號 -->
-
           <div class="detail-item">
             <span class="detail-label"> 帳號 </span>
 
@@ -378,7 +481,6 @@ onMounted(() => {
           </div>
 
           <!-- 姓名 -->
-
           <div class="detail-item">
             <span class="detail-label"> 姓名 </span>
 
@@ -397,7 +499,6 @@ onMounted(() => {
           </div>
 
           <!-- Email -->
-
           <div class="detail-item">
             <span class="detail-label"> Email </span>
 
@@ -416,7 +517,6 @@ onMounted(() => {
           </div>
 
           <!-- 手機 -->
-
           <div class="detail-item">
             <span class="detail-label"> 手機 </span>
 
@@ -436,7 +536,6 @@ onMounted(() => {
           </div>
 
           <!-- 地址 -->
-
           <div class="detail-item">
             <span class="detail-label"> 地址 </span>
 
@@ -456,15 +555,13 @@ onMounted(() => {
         </div>
       </section>
 
-      <!-- =========================================
+      <!-- ==================================================
            帳號安全設定
-      ========================================== -->
-
+      =================================================== -->
       <section class="security-section">
-        <!-- =====================================
+        <!-- =================================================
              修改密碼
-        ====================================== -->
-
+        ================================================== -->
         <div class="security-card">
           <div class="security-header">
             <div>
@@ -481,9 +578,9 @@ onMounted(() => {
             </button>
           </div>
 
+          <!-- 密碼表單 -->
           <div v-if="showPasswordForm" class="password-form">
             <!-- 目前密碼 -->
-
             <div class="form-group">
               <label> 目前密碼 </label>
 
@@ -496,7 +593,6 @@ onMounted(() => {
             </div>
 
             <!-- 新密碼 -->
-
             <div class="form-group">
               <label> 新密碼 </label>
 
@@ -510,7 +606,6 @@ onMounted(() => {
             </div>
 
             <!-- 確認密碼 -->
-
             <div class="form-group">
               <label> 確認新密碼 </label>
 
@@ -534,17 +629,16 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- =====================================
-             刪除帳號
-        ====================================== -->
-
+        <!-- =================================================
+             Soft Delete 帳號
+        ================================================== -->
         <div class="security-card danger-card">
           <div class="security-header">
             <div>
               <h2>刪除帳號</h2>
 
               <p v-if="member.role !== 'ROLE_ADMIN'">
-                刪除後無法復原， 請確認後再操作。
+                刪除後將無法再使用此會員身分登入， 請確認後再操作。
               </p>
 
               <p v-else>管理員帳號不可從自己的會員頁面刪除。</p>
@@ -565,21 +659,29 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* =====================================================
+   整體
+===================================================== */
+
 .member-page {
   min-height: 100vh;
+
   background: #fff;
+
   color: #111;
 }
 
 .loading-area {
   padding: 80px;
+
   text-align: center;
+
   font-size: 18px;
 }
 
-/* =========================================
+/* =====================================================
    會員中心導覽列
-========================================= */
+===================================================== */
 
 .member-nav {
   display: flex;
@@ -605,17 +707,18 @@ onMounted(() => {
   color: #666;
 }
 
-/* Vue Router 當前頁面 */
-
+/*
+ * Vue Router 當前頁面
+ */
 .member-nav a.router-link-active {
   text-decoration: underline;
 
   text-underline-offset: 6px;
 }
 
-/* =========================================
+/* =====================================================
    Profile
-========================================= */
+===================================================== */
 
 .profile-container {
   display: flex;
@@ -667,9 +770,9 @@ onMounted(() => {
   color: #333 !important;
 }
 
-/* =========================================
+/* =====================================================
    個人資料 / 安全設定
-========================================= */
+===================================================== */
 
 .profile-detail-section,
 .security-section {
@@ -701,9 +804,9 @@ onMounted(() => {
   color: #777;
 }
 
-/* =========================================
+/* =====================================================
    Buttons
-========================================= */
+===================================================== */
 
 .edit-button {
   border: none;
@@ -764,9 +867,9 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* =========================================
+/* =====================================================
    Profile Details
-========================================= */
+===================================================== */
 
 .profile-details {
   display: grid;
@@ -808,9 +911,9 @@ onMounted(() => {
   font-size: 16px;
 }
 
-/* =========================================
+/* =====================================================
    Message
-========================================= */
+===================================================== */
 
 .message {
   margin-top: 20px;
@@ -832,9 +935,9 @@ onMounted(() => {
   color: #b42318;
 }
 
-/* =========================================
+/* =====================================================
    Security
-========================================= */
+===================================================== */
 
 .security-section {
   border-top: 1px solid #eee;
@@ -862,9 +965,9 @@ onMounted(() => {
   border-color: #f1c7c7;
 }
 
-/* =========================================
+/* =====================================================
    Responsive
-========================================= */
+===================================================== */
 
 @media (max-width: 768px) {
   .member-nav {

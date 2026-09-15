@@ -14,6 +14,11 @@ const routes = [
     component: () => import("@/views/member/MemberHomeView.vue"),
   },
   {
+    path: "/member/orders",
+    name: "member-orders",
+    component: () => import("@/views/member/MemberOrderListView.vue"),
+  },
+  {
     path: "/login",
     name: "login",
     component: () => import("@/views/member/LoginView.vue"),
@@ -26,8 +31,7 @@ const routes = [
   {
     path: "/coupons",
     name: "coupons",
-    component: () =>
-      import("@/views/coupon/CouponView.vue"),
+    component: () => import("@/views/coupon/CouponView.vue"),
   },
   {
     path: "/products",
@@ -140,7 +144,7 @@ const routes = [
       requiresAdmin: true,
     },
   },
-  
+
   {
     path: "/admin/products",
     name: "admin-products",
@@ -150,7 +154,7 @@ const routes = [
     },
   },
 
-    {
+  {
     path: "/admin/products/new",
     name: "admin-product-create",
     component: () => import("@/views/admin/AdminProductFormView.vue"),
@@ -158,7 +162,7 @@ const routes = [
       requiresAdmin: true,
     },
   },
-  
+
   {
     path: "/admin/products/:id/edit",
     name: "admin-product-edit",

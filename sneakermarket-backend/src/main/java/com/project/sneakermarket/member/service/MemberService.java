@@ -1,5 +1,6 @@
 package com.project.sneakermarket.member.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,44 +17,65 @@ import com.project.sneakermarket.member.dto.LoginRequest;
 import com.project.sneakermarket.member.dto.MemberCreateRequest;
 import com.project.sneakermarket.member.dto.MemberResponse;
 import com.project.sneakermarket.member.dto.MemberUpdateRequest;
+
 import com.project.sneakermarket.member.entity.Member;
 import com.project.sneakermarket.member.repository.MemberRepository;
 
 import lombok.RequiredArgsConstructor;
 
+
 @Service
 @RequiredArgsConstructor
 public class MemberService {
+
+
+    // =====================================================
+    // Repository / Service
+    // =====================================================
 
     private final MemberRepository memberRepository;
 
     private final PasswordEncoder passwordEncoder;
 
-    // ==========================================
-    // 新增：Coupon Service
-    // ==========================================
+
+    /*
+     * ★ Coupon 功能
+     *
+     * 用來在會員註冊成功之後
+     * 自動發放新會員 100 元折價券。
+     */
     private final CouponService couponService;
 
 
+
     // =====================================================
-    // CREATE / 註冊會員
+    // CREATE / 會員註冊
     // =====================================================
     @Transactional
     public MemberResponse createMember(
             MemberCreateRequest request
     ) {
 
+
+        // =================================================
+        // 清理輸入資料
+        // =================================================
+
         String account =
                 request.getAccount().trim();
+
 
         String email =
                 request.getEmail().trim();
 
+
         String phone =
                 request.getPhone().trim();
 
+
         String name =
                 request.getName().trim();
+
 
         String address =
                 normalizeNullableText(
@@ -62,9 +84,28 @@ public class MemberService {
 
 
         // =================================================
-        // 檢查帳號是否重複
+        // 帳號重複檢查
+        //
+        // ★ Soft Delete 規則
+        //
+        // 只檢查 deleted_at IS NULL 的會員。
+        //
+        // 例如：
+        //
+        // member_id = 10
+        // account = 789
+        // deleted_at = 2026-09-15
+        //
+        // 這筆不算目前有效會員，
+        // 所以 789 可以重新註冊。
         // =================================================
-        if (memberRepository.existsByAccount(account)) {
+
+        if (
+                memberRepository
+                        .existsByAccountAndDeletedAtIsNull(
+                                account
+                        )
+        ) {
 
             throw new BusinessException(
                     "帳號已存在"
@@ -73,9 +114,17 @@ public class MemberService {
 
 
         // =================================================
-        // 檢查 Email 是否重複
+        // Email 重複檢查
+        //
+        // 同樣只檢查有效會員。
         // =================================================
-        if (memberRepository.existsByEmail(email)) {
+
+        if (
+                memberRepository
+                        .existsByEmailAndDeletedAtIsNull(
+                                email
+                        )
+        ) {
 
             throw new BusinessException(
                     "Email 已存在"
@@ -84,16 +133,23 @@ public class MemberService {
 
 
         // =================================================
-        // 驗證手機格式
+        // 手機驗證
         // =================================================
-        validatePhone(phone);
+
+        validatePhone(
+                phone
+        );
 
 
         // =================================================
-        // 密碼至少 8 碼
+        // 密碼驗證
         // =================================================
-        if (request.getPassword() == null
-                || request.getPassword().length() < 8) {
+
+        if (
+                request.getPassword() == null
+                        ||
+                request.getPassword().length() < 8
+        ) {
 
             throw new BusinessException(
                     "密碼至少需要 8 碼"
@@ -102,40 +158,100 @@ public class MemberService {
 
 
         // =================================================
-        // 建立會員 Entity
+        // 建立新的 Member Entity
+        //
+        // ★ 即使 account 曾經使用過，
+        //    Soft Delete 後重新註冊
+        //    仍然會建立「新的 member_id」。
         // =================================================
+
         Member member =
                 Member.builder()
-                        .account(account)
+
+                        .account(
+                                account
+                        )
+
                         .passwordHash(
                                 passwordEncoder.encode(
                                         request.getPassword()
                                 )
                         )
-                        .name(name)
-                        .email(email)
-                        .phone(phone)
-                        .address(address)
-                        .role("ROLE_MEMBER")
+
+                        .name(
+                                name
+                        )
+
+                        .email(
+                                email
+                        )
+
+                        .phone(
+                                phone
+                        )
+
+                        .address(
+                                address
+                        )
+
+                        .role(
+                                "ROLE_MEMBER"
+                        )
+
+                        /*
+                         * 新會員一定是有效會員
+                         */
+                        .deletedAt(
+                                null
+                        )
+
                         .build();
 
 
+
         // =================================================
-        // 儲存會員
+        // 儲存新會員
         // =================================================
+
         Member savedMember =
-                memberRepository.save(member);
+                memberRepository.save(
+                        member
+                );
+
 
 
         // =================================================
-        // 新增功能：
-        // 會員註冊成功後
-        // 自動發送「新會員 $100 折價券」
+        // ★★★★★ 這就是這次漏掉的地方 ★★★★★
+        //
+        // 會員註冊成功之後，
+        // 自動發放一張：
+        //
+        // 新會員 100 元折價券
+        //
+        // Coupon 會綁定：
+        //
+        // savedMember.memberId
+        //
+        // 而不是綁 account。
+        //
+        // 所以：
+        //
+        // 舊 789 → member_id = 10
+        //
+        // 新 789 → member_id = 12
+        //
+        // 新 Coupon 會屬於 member_id = 12。
         // =================================================
+
         couponService.issueWelcomeCoupon(
                 savedMember
         );
 
+
+
+        // =================================================
+        // 回傳新會員
+        // =================================================
 
         return MemberResponse.from(
                 savedMember
@@ -143,78 +259,130 @@ public class MemberService {
     }
 
 
+
     // =====================================================
     // READ ALL
+    //
+    // ADMIN 查全部會員
+    //
+    // ★ 只顯示 deleted_at IS NULL
     // =====================================================
     @Transactional(readOnly = true)
     public List<MemberResponse> getAllMembers() {
 
+
         return memberRepository
-                .findAll()
+
+                .findAllByDeletedAtIsNullOrderByMemberIdAsc()
+
                 .stream()
-                .map(MemberResponse::from)
+
+                .map(
+                        MemberResponse::from
+                )
+
                 .toList();
     }
 
 
+
     // =====================================================
     // READ ONE
+    //
+    // 只允許取得有效會員
     // =====================================================
     @Transactional(readOnly = true)
     public MemberResponse getMember(
             Long id
     ) {
 
+
+        Member member =
+                findActiveMemberOrThrow(
+                        id
+                );
+
+
         return MemberResponse.from(
-                findMemberOrThrow(id)
+                member
         );
     }
+
 
 
     // =====================================================
     // UPDATE
     //
     // Admin 修改會員
-    // 或會員修改自己的資料
+    // 或
+    // 會員修改自己的資料
     // =====================================================
     @Transactional
     public MemberResponse updateMember(
+
             Long id,
+
             MemberUpdateRequest request
     ) {
 
+
+        /*
+         * 只能修改有效會員。
+         */
         Member member =
-                findMemberOrThrow(id);
+                findActiveMemberOrThrow(
+                        id
+                );
 
 
         // =================================================
-        // 修改姓名
+        // 姓名
         // =================================================
-        if (request.getName() != null) {
+
+        if (
+                request.getName() != null
+        ) {
+
 
             String name =
-                    request.getName().trim();
+                    request.getName()
+                            .trim();
 
-            if (name.isBlank()) {
+
+            if (
+                    name.isBlank()
+            ) {
 
                 throw new BusinessException(
                         "姓名不可空白"
                 );
             }
 
-            member.setName(name);
+
+            member.setName(
+                    name
+            );
         }
 
 
+
         // =================================================
-        // 修改 Email
+        // Email
         // =================================================
-        if (request.getEmail() != null) {
+
+        if (
+                request.getEmail() != null
+        ) {
+
 
             String email =
-                    request.getEmail().trim();
+                    request.getEmail()
+                            .trim();
 
-            if (email.isBlank()) {
+
+            if (
+                    email.isBlank()
+            ) {
 
                 throw new BusinessException(
                         "Email 不可空白"
@@ -222,11 +390,26 @@ public class MemberService {
             }
 
 
-            if (!email.equalsIgnoreCase(
-                    member.getEmail()
-            )
-                    && memberRepository
-                            .existsByEmail(email)) {
+            /*
+             * 修改 Email 時，
+             *
+             * 只跟目前有效會員比較。
+             *
+             * 已 Soft Delete 的會員
+             * 不會阻止 Email 再次使用。
+             */
+            if (
+                    !email.equalsIgnoreCase(
+                            member.getEmail()
+                    )
+
+                            &&
+
+                    memberRepository
+                            .existsByEmailAndDeletedAtIsNull(
+                                    email
+                            )
+            ) {
 
                 throw new BusinessException(
                         "Email 已被其他會員使用"
@@ -234,41 +417,64 @@ public class MemberService {
             }
 
 
-            member.setEmail(email);
+            member.setEmail(
+                    email
+            );
         }
 
 
+
         // =================================================
-        // 修改手機
+        // 手機
         // =================================================
-        if (request.getPhone() != null) {
+
+        if (
+                request.getPhone() != null
+        ) {
+
 
             String phone =
-                    request.getPhone().trim();
+                    request.getPhone()
+                            .trim();
 
-            validatePhone(phone);
 
-            member.setPhone(phone);
+            validatePhone(
+                    phone
+            );
+
+
+            member.setPhone(
+                    phone
+            );
         }
 
 
+
         // =================================================
-        // 修改地址
+        // 地址
         // =================================================
-        if (request.getAddress() != null) {
+
+        if (
+                request.getAddress() != null
+        ) {
+
 
             member.setAddress(
+
                     normalizeNullableText(
                             request.getAddress()
                     )
+
             );
         }
+
 
 
         return MemberResponse.from(
                 member
         );
     }
+
 
 
     // =====================================================
@@ -276,23 +482,34 @@ public class MemberService {
     // =====================================================
     @Transactional
     public void changePassword(
+
             Long memberId,
+
             ChangePasswordRequest request
     ) {
 
+
+        /*
+         * 已刪除會員不能修改密碼。
+         */
         Member member =
-                findMemberOrThrow(
+                findActiveMemberOrThrow(
                         memberId
                 );
 
 
         // =================================================
-        // 確認目前密碼
+        // 驗證舊密碼
         // =================================================
-        if (!passwordEncoder.matches(
-                request.getCurrentPassword(),
-                member.getPasswordHash()
-        )) {
+
+        if (
+                !passwordEncoder.matches(
+
+                        request.getCurrentPassword(),
+
+                        member.getPasswordHash()
+                )
+        ) {
 
             throw new BusinessException(
                     "目前密碼不正確"
@@ -300,12 +517,19 @@ public class MemberService {
         }
 
 
+
         // =================================================
         // 新密碼至少 8 碼
         // =================================================
-        if (request.getNewPassword() == null
-                || request.getNewPassword()
-                        .length() < 8) {
+
+        if (
+                request.getNewPassword() == null
+
+                        ||
+
+                request.getNewPassword()
+                        .length() < 8
+        ) {
 
             throw new BusinessException(
                     "新密碼至少需要 8 碼"
@@ -313,13 +537,17 @@ public class MemberService {
         }
 
 
+
         // =================================================
-        // 確認兩次新密碼一致
+        // 確認兩次密碼
         // =================================================
-        if (!request.getNewPassword()
-                .equals(
-                        request.getConfirmPassword()
-                )) {
+
+        if (
+                !request.getNewPassword()
+                        .equals(
+                                request.getConfirmPassword()
+                        )
+        ) {
 
             throw new BusinessException(
                     "兩次輸入的新密碼不一致"
@@ -327,44 +555,106 @@ public class MemberService {
         }
 
 
+
         // =================================================
-        // 更新密碼
+        // 更新 BCrypt 密碼
         // =================================================
+
         member.setPasswordHash(
+
                 passwordEncoder.encode(
                         request.getNewPassword()
                 )
+
         );
     }
 
 
+
     // =====================================================
-    // DELETE
+    // DELETE / Soft Delete
+    //
+    // ★ 不真的 DELETE Member。
     // =====================================================
     @Transactional
     public void deleteMember(
             Long id
     ) {
 
-        Member member =
-                findMemberOrThrow(id);
 
-        memberRepository.delete(
+        /*
+         * 只能刪除目前有效的會員。
+         */
+        Member member =
+                findActiveMemberOrThrow(
+                        id
+                );
+
+
+        // =================================================
+        // ★ Soft Delete
+        //
+        // 原本錯誤作法：
+        //
+        // memberRepository.delete(member);
+        //
+        //
+        // 現在：
+        //
+        // 只紀錄刪除時間。
+        // =================================================
+
+        member.setDeletedAt(
+                LocalDateTime.now()
+        );
+
+
+        /*
+         * 注意：
+         *
+         * ★ 不要在這裡呼叫：
+         *
+         * couponService.deleteCouponsByMemberId(id);
+         *
+         *
+         * 因為現在我們是 Soft Delete。
+         *
+         * 舊 Member / Coupon 都應該保留下來，
+         * 避免歷史資料、訂單、競標資料
+         * 關聯被破壞。
+         */
+
+
+        /*
+         * JPA Dirty Checking 本來就會 UPDATE。
+         *
+         * 保留 save 比較容易理解。
+         */
+        memberRepository.save(
                 member
         );
     }
 
 
+
     // =====================================================
     // LOGIN
+    //
+    // ★ 只允許 deleted_at IS NULL 會員登入
     // =====================================================
     @Transactional(readOnly = true)
     public MemberResponse login(
             LoginRequest request
     ) {
 
-        if (request.getAccount() == null
-                || request.getPassword() == null) {
+
+        if (
+                request.getAccount() == null
+
+                        ||
+
+                request.getPassword() == null
+        ) {
 
             throw new BusinessException(
                     "帳號或密碼錯誤"
@@ -372,33 +662,56 @@ public class MemberService {
         }
 
 
+        String account =
+                request.getAccount()
+                        .trim();
+
+
+        // =================================================
+        // ★ Soft Delete Login 判斷
+        // =================================================
+
         Member member =
                 memberRepository
-                        .findByAccount(
-                                request.getAccount()
-                                        .trim()
+
+                        .findByAccountAndDeletedAtIsNull(
+                                account
                         )
+
                         .orElseThrow(
+
                                 () ->
+
                                         new BusinessException(
                                                 "帳號或密碼錯誤"
                                         )
                         );
 
 
+
+        // =================================================
+        // BCrypt 驗證
+        // =================================================
+
         boolean passwordMatches =
                 passwordEncoder.matches(
+
                         request.getPassword(),
+
                         member.getPasswordHash()
                 );
 
 
-        if (!passwordMatches) {
+
+        if (
+                !passwordMatches
+        ) {
 
             throw new BusinessException(
                     "帳號或密碼錯誤"
             );
         }
+
 
 
         return MemberResponse.from(
@@ -407,19 +720,24 @@ public class MemberService {
     }
 
 
+
     // =====================================================
-    // 共用：
-    // 確認會員是否為 ADMIN
+    // 確認會員是否 ADMIN
     // =====================================================
     @Transactional(readOnly = true)
     public boolean isAdmin(
             Long memberId
     ) {
 
+
+        /*
+         * 已刪除會員視為不存在。
+         */
         Member member =
-                findMemberOrThrow(
+                findActiveMemberOrThrow(
                         memberId
                 );
+
 
         return "ROLE_ADMIN"
                 .equals(
@@ -428,18 +746,29 @@ public class MemberService {
     }
 
 
+
     // =====================================================
-    // 私有共用方法
-    // 查詢會員，不存在則丟 Exception
+    // 共用：
+    //
+    // 查詢「有效會員」
+    //
+    // deleted_at 必須為 NULL
     // =====================================================
-    private Member findMemberOrThrow(
+    private Member findActiveMemberOrThrow(
             Long id
     ) {
 
+
         return memberRepository
-                .findById(id)
+
+                .findByMemberIdAndDeletedAtIsNull(
+                        id
+                )
+
                 .orElseThrow(
+
                         () ->
+
                                 new ResourceNotFoundException(
                                         "找不到會員"
                                 )
@@ -447,20 +776,24 @@ public class MemberService {
     }
 
 
+
     // =====================================================
-    // 私有共用方法
-    // 驗證手機格式
-    //
-    // 09xxxxxxxx
+    // 手機格式驗證
     // =====================================================
     private void validatePhone(
             String phone
     ) {
 
-        if (phone == null
-                || !phone.matches(
+
+        if (
+                phone == null
+
+                        ||
+
+                !phone.matches(
                         "^09\\d{8}$"
-                )) {
+                )
+        ) {
 
             throw new BusinessException(
                     "手機格式錯誤，需為 09 開頭後接 8 個數字"
@@ -469,15 +802,18 @@ public class MemberService {
     }
 
 
+
     // =====================================================
-    // 私有共用方法
-    // 處理可以為 null 的文字
+    // Nullable String 處理
     // =====================================================
     private String normalizeNullableText(
             String value
     ) {
 
-        if (value == null) {
+
+        if (
+                value == null
+        ) {
 
             return null;
         }
@@ -488,7 +824,9 @@ public class MemberService {
 
 
         return trimmed.isEmpty()
+
                 ? null
+
                 : trimmed;
     }
 }
