@@ -52,13 +52,24 @@ const emit = defineEmits([
 ]);
 const showTargetSelector = ref(false);
 const selectedTarget = ref(null);
-
+const CATEGORY_NAMES = {
+  1: "籃球鞋",
+  2: "慢跑鞋",
+  3: "休閒鞋",
+  4: "滑板鞋",
+};
 watch(
   () => props.show,
   (isOpen) => {
     if (isOpen) {
       // 每次開啟建立／編輯抽屜，都清除前一次暫存在元件內的選取名稱。
-      selectedTarget.value = null;
+      selectedTarget.value =
+        props.form.targetType === "CATEGORY" && props.form.targetId
+          ? {
+              id: props.form.targetId,
+              name: CATEGORY_NAMES[props.form.targetId],
+            }
+          : null;
       showTargetSelector.value = false;
     }
   },
@@ -81,6 +92,15 @@ function clearTarget() {
 function handleTargetTypeChange() {
   clearTarget();
 }
+
+function getTargetLabel(targetType) {
+  const labels = {
+    PRODUCT: "商品",
+    AUCTION: "競標商品",
+    CATEGORY: "商品分類",
+  };
+  return labels[targetType] || "目標";
+}
 </script>
 
 <template>
@@ -100,7 +120,7 @@ function handleTargetTypeChange() {
             {{
               isEditing
                 ? "修改目前這則廣告的內容與設定。"
-                : "先建立草稿，稍後可補上圖片與導向設定。"
+                : "填寫廣告內容並上傳圖片，以建立廣告草稿。"
             }}
           </p>
         </div>
@@ -133,8 +153,9 @@ function handleTargetTypeChange() {
               <option value="BANNER">首頁橫幅</option>
               <option value="POPUP">首頁彈窗</option>
               <option value="SMALL_BLOCK">商品頁側欄</option>
-            </select></label
-          >
+              <option value="CATEGORY_CARD">分類卡片</option>
+            </select>
+          </label>
         </div>
         <div class="image-upload-field">
           <span class="image-upload-label">圖片上傳</span>
@@ -191,6 +212,7 @@ function handleTargetTypeChange() {
             >
               <option value="PRODUCT">一般商品</option>
               <option value="AUCTION">競標商品</option>
+              <option value="CATEGORY">商品分類</option>
               <!-- <option value="COUPON">優惠券</option> -->
               <!-- <option value="URL">外部網址</option> -->
             </select>
@@ -223,17 +245,16 @@ function handleTargetTypeChange() {
           <div class="target-picker-header">
             <div>
               <span>
-                指定{{
-                  form.targetType === "PRODUCT" ? "商品" : "競標商品"
-                }}（選填）
+                指定{{ getTargetLabel(form.targetType) }}
+                {{ form.targetType === "CATEGORY" ? "（必填）" : "（選填）" }}
               </span>
 
               <small v-if="selectedTarget">
                 已選擇：{{ selectedTarget.name }}
               </small>
 
-              <small v-else-if="form.targetId">
-                目前已設定目標編號：{{ form.targetId }}
+              <small v-else-if="form.targetType === 'CATEGORY'">
+                分類導向必須選擇一個商品分類。
               </small>
 
               <small v-else>
@@ -260,7 +281,7 @@ function handleTargetTypeChange() {
                 class="select-target-button"
                 @click="showTargetSelector = true"
               >
-                選擇{{ form.targetType === "PRODUCT" ? "商品" : "競標商品" }}
+                選擇{{ getTargetLabel(form.targetType) }}
               </button>
             </div>
           </div>
@@ -308,7 +329,7 @@ function handleTargetTypeChange() {
 
       <Transition name="toast">
         <div v-if="toast" class="form-notice" :class="toastType" role="status">
-          {{ toastType === "success" ? "✓" : "!" }} {{ toast }}
+          {{ toastType === "success" ? "✓" : "X" }} {{ toast }}
         </div>
       </Transition>
 
@@ -355,7 +376,6 @@ function handleTargetTypeChange() {
   height: 100%;
   background: #fff;
   box-shadow: -20px 0 50px #00000029;
-  animation: slide-in 0.25s ease-out;
 }
 .create-drawer header {
   display: flex;

@@ -1,5 +1,5 @@
 <script setup>
-import AdvertisementDisplay from "./AdvertisementDisplay.vue";
+import AdvertisementShowcase from "@/components/advertisement/AdvertisementShowcase.vue";
 </script>
 
 <template>
@@ -10,6 +10,6 @@ import AdvertisementDisplay from "./AdvertisementDisplay.vue";
       <RouterLink class="btn btn-primary" to="/ads"> 返回廣告管理 </RouterLink>
     </div>
 
-    <AdvertisementDisplay />
+    <AdvertisementShowcase />
   </section>
 </template>

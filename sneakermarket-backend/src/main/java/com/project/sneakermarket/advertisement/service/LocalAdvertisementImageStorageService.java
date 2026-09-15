@@ -64,8 +64,8 @@ public class LocalAdvertisementImageStorageService implements AdvertisementImage
                     AdvertisementPlacement.CATEGORY_CARD,
                     new ImageRule(
                             "分類卡片",
-                            650,
-                            700,
+                            600,
+                            750,
                             4.0/5.0,
                             "4:5"
                     )
