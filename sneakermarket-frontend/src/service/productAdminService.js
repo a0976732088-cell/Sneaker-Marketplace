@@ -1,7 +1,7 @@
 import httpClient from "./httpClient";
 
 export function getAdminProducts(params = {}) {
-  return httpClient.get("/products", { params });
+  return httpClient.get("/admin/products", { params });
 }
 
 export function getAdminProductDetail(productId) {
@@ -14,10 +14,6 @@ export function createProduct(data) {
 
 export function updateProduct(productId, data) {
   return httpClient.put("/admin/products/" + productId, data);
-}
-
-export function deleteProduct(productId) {
-  return httpClient.delete("/admin/products/" + productId);
 }
 
 export function uploadProductImage(file) {

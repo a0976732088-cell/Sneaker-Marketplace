@@ -93,6 +93,65 @@ public class ProductService {
     }
 
 
+
+
+
+    // [後台]取得商品列表
+    public List<ProductListItemResponse> getAllProductsForAdmin(
+            Long categoryId, String keyword, String size, Long brandId, String status, Integer maxStock) {
+
+        List<Product> products = productRepository.findAll();
+
+        List<ProductListItemResponse> result = products.stream()
+                // 不寫死「只顯示 ON_SALE」，狀態要不要篩由參數決定
+                .filter(p -> categoryId == null || p.getCategory().getCategoryId().equals(categoryId))
+                .filter(p -> keyword == null || p.getProductName().toLowerCase().contains(keyword.toLowerCase()))
+                .filter(p -> size == null || productVariantRepository.findByProductProductId(p.getProductId())
+                        .stream()
+                        .anyMatch(v -> v.getSize().equals(size)))
+                .filter(p -> brandId == null || p.getBrand().getBrandId().equals(brandId))
+                // 有指定狀態就照指定的篩；沒指定就預設排除已刪除（DELETED）的商品
+                .filter(p -> status != null ? p.getStatus().equals(status) : !p.getStatus().equals("DELETED"))
+                .map(p -> {
+                    List<ProductVariant> variants =
+                            productVariantRepository.findByProductProductId(p.getProductId());
+
+                    BigDecimal price = variants.isEmpty() ? null : variants.get(0).getPrice();
+
+                    List<ProductImage> images =
+                            productImageRepository.findByProductProductIdAndIsPrimaryTrue(p.getProductId());
+
+                    String imageUrl = images.isEmpty() ? null : images.get(0).getImageUrl();
+
+                    int totalStock = variants.stream()
+                            .mapToInt(ProductVariant::getStock)
+                            .sum();
+
+                    return new ProductListItemResponse(
+                            p.getProductId(),
+                            p.getProductName(),
+                            p.getBrand().getBrandName(),
+                            p.getStatus(),
+                            price,
+                            imageUrl,
+                            totalStock);
+                })
+                .collect(Collectors.toList());
+
+        // 庫存篩選（庫存小於某數字）要等上面 totalStock 算出來才能篩
+        if (maxStock != null) {
+            result = result.stream()
+                    .filter(r -> r.getTotalStock() < maxStock)
+                    .collect(Collectors.toList());
+        }
+
+        return result;
+    }
+
+
+
+
+
     // [後台]新增某筆商品
     public ProductDetailResponse createProduct(CreateProductRequest request) {
 
@@ -107,7 +166,7 @@ public class ProductService {
         product.setBrand( brand);
         product.setProductName(request.getProductName());
         product.setDescription( request.getDescription());
-        product.setStatus( "ON_SALE");
+        product.setStatus(request.getStatus() != null ? request.getStatus() : "DRAFT");
         productRepository.save(product);
 
         for (ProductVariantRequest v : request.getVariants()) {
@@ -155,6 +214,7 @@ public class ProductService {
         product.setBrand(brand);
         product.setProductName(request.getProductName());
         product.setDescription(request.getDescription());
+        product.setStatus(request.getStatus() != null ? request.getStatus() : product.getStatus());
         productRepository.save(product);
 
         // 記錄這次處理完後，應該保留的規格ID
@@ -207,20 +267,26 @@ public class ProductService {
                 productImageRepository.save(image);
             }
         }
-        
+
         return getProductDetail(product.getProductId());
     }
 
 
 
-    // [後台]刪除某筆商品
+    // [後台]刪除某筆商品（假刪除：只把狀態改成 DELETED，圖片與規格都不動）
     @Transactional
     public void deleteProduct(Long productId){
 
-        productImageRepository.deleteByProductProductId(productId);
-        productVariantRepository.deleteByProductProductId(productId);
-        productRepository.deleteById(productId);
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("找不到這個商品"));
+
+        product.setStatus("DELETED");
+        productRepository.save(product);
 
     }
+
+
+
+
 
 }

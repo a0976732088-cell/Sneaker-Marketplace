@@ -2,6 +2,7 @@ package com.project.sneakermarket.commerce.controller;
 
 import com.project.sneakermarket.commerce.dto.CreateProductRequest;
 import com.project.sneakermarket.commerce.dto.ProductDetailResponse;
+import com.project.sneakermarket.commerce.dto.ProductListItemResponse;
 import com.project.sneakermarket.commerce.dto.UpdateProductRequest;
 import com.project.sneakermarket.commerce.service.ProductImageStorageService;
 import com.project.sneakermarket.commerce.service.ProductService;
@@ -14,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -57,6 +60,22 @@ public class AdminProductController {
     }
 
 
+    // 管理員查看全部商品（不篩狀態）
+    @GetMapping("/api/admin/products")
+    public List<ProductListItemResponse> getAllProductsForAdmin(
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String size,
+            @RequestParam(required = false) Long brandId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer maxStock,
+            HttpServletRequest httpRequest) {
+
+        requireAdmin(httpRequest);
+        return productService.getAllProductsForAdmin(categoryId, keyword, size, brandId, status, maxStock);
+    }
+
+
     // 管理員新增商品
     @PostMapping("/api/admin/products")
     public ProductDetailResponse createProduct(@RequestBody CreateProductRequest request,
@@ -77,18 +96,7 @@ public class AdminProductController {
         requireAdmin(httpRequest);
         return productService.updateProduct(id,request);
     }
-
-
-
-
-    // 管理員刪除商品
-    @DeleteMapping("/api/admin/products/{id}")
-    public void deleteProduct(@PathVariable Long id, HttpServletRequest httpRequest){
-        requireAdmin(httpRequest);
-        productService.deleteProduct(id);
-    }
-
-
+    
 
 
     // 管理員上傳商品圖片

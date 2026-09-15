@@ -16,4 +16,5 @@ public class CreateProductRequest {
     private String description;
     private List<ProductVariantRequest> variants;
     private List<ProductImageRequest> images;
+    private String status;
 }

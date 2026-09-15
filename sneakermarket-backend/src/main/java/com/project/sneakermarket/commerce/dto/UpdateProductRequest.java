@@ -15,4 +15,5 @@ public class UpdateProductRequest {
     private String description;
     private List<UpdateVariantRequest> variants;
     private List<ProductImageRequest> images;
+    private String status;
 }

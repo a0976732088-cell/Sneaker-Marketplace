@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import { getAdminProducts, deleteProduct } from "@/service/productAdminService";
+import { getAdminProducts } from "@/service/productAdminService";
+import { getBrands } from "@/service/brandService";
 import { resolveProductImageUrl } from "@/utils/productImageUrl";
 
 const router = useRouter();
@@ -13,6 +14,11 @@ const errorMessage = ref("");
 const keyword = ref("");
 const categoryId = ref(null);
 const size = ref(null);
+const brands = ref([]);
+const loadingBrands = ref(true);
+const brandId = ref(null);
+const status = ref(null);
+const maxStock = ref(null);
 
 const currentPage = ref(1);
 const pageSize = 10;
@@ -24,6 +30,16 @@ const pagedProducts = computed(() => {
   return products.value.slice(start, start + pageSize);
 });
 
+async function loadBrands() {
+  loadingBrands.value = true;
+  try {
+    const response = await getBrands();
+    brands.value = response.data;
+  } finally {
+    loadingBrands.value = false;
+  }
+}
+
 async function loadProducts() {
   loading.value = true;
   errorMessage.value = "";
@@ -33,6 +49,9 @@ async function loadProducts() {
       keyword: keyword.value || undefined,
       categoryId: categoryId.value || undefined,
       size: size.value || undefined,
+      brandId: brandId.value || undefined,
+      status: status.value || undefined,
+      maxStock: maxStock.value || undefined,
     });
     products.value = response.data;
     currentPage.value = 1;
@@ -56,26 +75,22 @@ function goToPage(page) {
   currentPage.value = page;
 }
 
-async function handleDelete(product) {
-  const confirmed = window.confirm(`確定要刪除商品「${product.productName}」嗎？`);
-
-  if (!confirmed) {
-    return;
-  }
-
-  try {
-    await deleteProduct(product.productId);
-    await loadProducts();
-  } catch (error) {
-    errorMessage.value = "刪除商品失敗";
-  }
-}
-
 function formatPrice(price) {
   return price != null ? "NT$ " + price : "-";
 }
 
-onMounted(loadProducts);
+function statusBadgeClass(status) {
+  return {
+    DRAFT: "bg-secondary",
+    ON_SALE: "bg-success",
+    OFF_SHELF: "bg-warning text-dark",
+  }[status] || "bg-dark";
+}
+
+onMounted(() => {
+  loadBrands();
+  loadProducts();
+});
 </script>
 
 <template>
@@ -130,6 +145,37 @@ onMounted(loadProducts);
             </select>
           </div>
 
+          <div class="col-6 col-md-3">
+            <label class="form-label small text-secondary">品牌</label>
+            <select v-model="brandId" class="form-select" :disabled="loadingBrands">
+              <option :value="null">全部品牌</option>
+              <option v-for="brand in brands" :key="brand.brandId" :value="brand.brandId">
+                {{ brand.brandName }}
+              </option>
+            </select>
+          </div>
+
+          <div class="col-6 col-md-3">
+            <label class="form-label small text-secondary">狀態</label>
+            <select v-model="status" class="form-select">
+              <option :value="null">全部狀態</option>
+              <option value="DRAFT">草稿</option>
+              <option value="ON_SALE">販售中</option>
+              <option value="OFF_SHELF">已下架</option>
+            </select>
+          </div>
+
+          <div class="col-6 col-md-3">
+            <label class="form-label small text-secondary">庫存小於</label>
+            <input
+              v-model.number="maxStock"
+              type="number"
+              min="0"
+              class="form-control"
+              placeholder="例如 5"
+            />
+          </div>
+
           <div class="col-12 col-md-2">
             <button type="button" class="btn btn-dark w-100" @click="loadProducts">搜尋</button>
           </div>
@@ -159,7 +205,7 @@ onMounted(loadProducts);
           <div class="col-8 col-md-10">
             <div class="card-body d-flex flex-wrap justify-content-between align-items-center h-100 gap-2">
               <div>
-                <span class="badge bg-dark mb-1">{{ product.status }}</span>
+                <span class="badge mb-1" :class="statusBadgeClass(product.status)">{{ product.status }}</span>
                 <h5 class="card-title mb-1">{{ product.productName }}</h5>
                 <p class="text-secondary small mb-1">{{ product.brandName }}</p>
                 <p class="fw-semibold mb-0">{{ formatPrice(product.price) }}</p>
@@ -175,14 +221,6 @@ onMounted(loadProducts);
                 >
                   編輯
                 </RouterLink>
-
-                <button
-                  type="button"
-                  class="btn btn-sm btn-outline-danger"
-                  @click="handleDelete(product)"
-                >
-                  刪除
-                </button>
               </div>
             </div>
           </div>

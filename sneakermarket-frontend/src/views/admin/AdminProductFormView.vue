@@ -22,6 +22,7 @@ const form = ref({
   brandId: null,
   productName: "",
   description: "",
+  status: "DRAFT",
   variants: [],
   images: [],
 });
@@ -101,6 +102,7 @@ async function loadExistingProduct() {
   form.value.brandId = detail.brandId;
   form.value.productName = detail.productName;
   form.value.description = detail.description;
+  form.value.status = detail.status;
 
   form.value.variants = detail.variants.map((v) => ({
     variantId: v.variantId,
@@ -134,6 +136,7 @@ async function handleSubmit() {
     brandId: form.value.brandId,
     productName: form.value.productName,
     description: form.value.description,
+    status: form.value.status,
     variants: form.value.variants.map((v) => ({
       variantId: v.variantId,
       size: v.size,
@@ -201,6 +204,15 @@ onMounted(async () => {
               <option v-for="brand in brands" :key="brand.brandId" :value="brand.brandId">
                 {{ brand.brandName }}
               </option>
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">狀態</label>
+            <select v-model="form.status" class="form-select">
+              <option value="DRAFT">草稿</option>
+              <option value="ON_SALE">販售中</option>
+              <option value="OFF_SHELF">已下架</option>
             </select>
           </div>
 
