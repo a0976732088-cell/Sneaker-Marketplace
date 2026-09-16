@@ -84,6 +84,7 @@ class AuctionAdminConcurrencyTests {
             assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
         }
         if (auctionId != null) {
+            jdbc.update("DELETE FROM dbo.notifications WHERE target_type='AUCTION' AND target_id=?", auctionId);
             results.findByAuctionId(auctionId).ifPresent(results::delete);
             bids.deleteAllInBatch(bids.findByAuctionIdOrderByCreatedAtDesc(auctionId));
             if (auctions.existsById(auctionId)) auctions.deleteById(auctionId);

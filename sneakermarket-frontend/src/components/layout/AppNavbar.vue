@@ -151,6 +151,7 @@ import NotificationDrawer from "@/components/notification/NotificationDrawer.vue
 ================================ */
 
 import { getCurrentMember, logout } from "@/service/authService";
+import { createAuctionPrivateSocketClient } from "@/service/auctionPrivateSocketService";
 
 /* =====================================================
    Router
@@ -204,6 +205,9 @@ async function handleLogout() {
   try {
     // 呼叫 authService.js 的 logout service
     await logout();
+
+    // Session 已失效，立即停止會員私人競標通知連線
+    await disconnectAuctionPrivateSocket();
 
     // 清掉 Navbar 的會員狀態
     currentMember.value = null;
@@ -284,10 +288,45 @@ const fetchNotifications = async () => {
   }
 };
 
+let auctionPrivateSocket = null;
+
+function ensureAuctionPrivateSocketConnected() {
+  if (!auctionPrivateSocket) {
+    auctionPrivateSocket = createAuctionPrivateSocketClient({
+      // 初次連線或自動重連成功時，用 REST 補齊離線期間可能漏掉的通知
+      onConnect: fetchNotifications,
+      // WebSocket 只表示通知資料有更新；正式資料仍由既有通知 API 取得
+      onMessage: fetchNotifications,
+      onError: (error) => {
+        console.error("競標私人通知連線失敗", error);
+      },
+    });
+  }
+
+  auctionPrivateSocket.connect();
+}
+
+async function disconnectAuctionPrivateSocket() {
+  const socket = auctionPrivateSocket;
+  auctionPrivateSocket = null;
+
+  if (!socket) {
+    return;
+  }
+
+  try {
+    await socket.disconnect();
+  } catch (error) {
+    console.error("停止競標私人通知連線失敗", error);
+  }
+}
+
 watch(currentMember, (member) => {
   if (member) {
     fetchNotifications();
+    ensureAuctionPrivateSocketConnected();
   } else {
+    void disconnectAuctionPrivateSocket();
     notifications.value = [];
     isNoticeOpen.value = false;
   }
@@ -314,7 +353,7 @@ onMounted(() => {
   // Navbar 登入會員由 watch
   // immediate: true 負責讀取
 
-  // 🎯 每 5 秒自動向後端拉取最新通知
+  // 每 60 秒向後端拉取最新通知，作為私人 WebSocket 的低頻 fallback
   timer = setInterval(() => {
     fetchNotifications();
   }, 60000);
@@ -327,5 +366,6 @@ onUnmounted(() => {
   // 元件銷毀時清除定時器
   if (timer) clearInterval(timer);
   window.removeEventListener("focus", fetchNotifications);
+  void disconnectAuctionPrivateSocket();
 });
 </script>

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import org.hibernate.SessionFactory;
@@ -57,6 +58,7 @@ class AuctionAdminIntegrationTests {
     @Autowired private AuctionOrderRepository orders;
     @Autowired private AuctionEmailLogRepository emailLogs;
     @Autowired private MemberRepository members;
+    @Autowired private JdbcTemplate jdbc;
     @Autowired private EntityManager em;
     @Autowired private EntityManagerFactory emf;
     @MockitoBean private AuctionTime time;
@@ -304,6 +306,7 @@ class AuctionAdminIntegrationTests {
     @AfterEach
     void cleanupCommittedFixtures() {
         for (Long auctionId : auctionIds) {
+            jdbc.update("DELETE FROM dbo.notifications WHERE target_type='AUCTION' AND target_id=?", auctionId);
             emailLogs.deleteAllInBatch(emailLogs.findByAuctionId(auctionId));
             orders.findByAuctionId(auctionId).ifPresent(orders::delete);
             results.findByAuctionId(auctionId).ifPresent(results::delete);

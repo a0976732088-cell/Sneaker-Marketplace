@@ -9,6 +9,7 @@ import com.project.sneakermarket.auction.entity.Auction;
 import com.project.sneakermarket.auction.entity.AuctionResult;
 import com.project.sneakermarket.auction.entity.AuctionResultStatus;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
 import com.project.sneakermarket.auction.repository.AuctionResultRepository;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
@@ -26,6 +27,7 @@ public class AuctionLifecycleService {
     private final AuctionTime auctionTime;
     private final org.springframework.context.ApplicationEventPublisher events;
     private final AuctionRealtimeEventPublisher realtimeEvents;
+    private final AuctionPrivateNotificationEventPublisher privateNotificationEvents;
 
     @Transactional
     public void processAuction(Long auctionId) {
@@ -101,6 +103,14 @@ public class AuctionLifecycleService {
                 sold ? AuctionRealtimeEventType.AUCTION_SOLD : AuctionRealtimeEventType.AUCTION_UNSOLD,
                 auction
         );
+        if (sold) {
+            privateNotificationEvents.publishSold(
+                    auction.getAuctionId(),
+                    auction.getHighestBidderId(),
+                    auction.getCurrentPrice(),
+                    now
+            );
+        }
         events.publishEvent(new com.project.sneakermarket.auction.email.AuctionEmailReadyEvent(auction.getAuctionId()));
     }
 

@@ -14,6 +14,7 @@ import com.project.sneakermarket.auction.entity.AuctionProduct;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.AuctionBidRepository;
 import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
@@ -40,6 +41,7 @@ public class AuctionBidService {
     private final AuctionBidRepository auctionBidRepository;
     private final AuctionTime auctionTime;
     private final AuctionRealtimeEventPublisher realtimeEvents;
+    private final AuctionPrivateNotificationEventPublisher privateNotificationEvents;
 
     /**
      * 對指定競標出價。
@@ -67,6 +69,7 @@ public class AuctionBidService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("找不到指定的競標資料")
                 );
+        Long previousHighestBidderId = auction.getHighestBidderId();
 
         AuctionProduct product = auctionProductRepository
                 .findById(auction.getAuctionProductId())
@@ -139,6 +142,15 @@ public class AuctionBidService {
         auction.setUpdatedAt(now);
         auctionRepository.save(auction);
         realtimeEvents.publish(AuctionRealtimeEventType.BID_PLACED, auction);
+        if (previousHighestBidderId != null
+                && !previousHighestBidderId.equals(bidderId)) {
+            privateNotificationEvents.publishOutbid(
+                    auction.getAuctionId(),
+                    previousHighestBidderId,
+                    auction.getCurrentPrice(),
+                    now
+            );
+        }
 
         return new AuctionStatusResponse(
                 auction.getAuctionId(),

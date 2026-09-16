@@ -29,6 +29,7 @@ import com.project.sneakermarket.auction.entity.AuctionBid;
 import com.project.sneakermarket.auction.entity.AuctionProduct;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.AuctionBidRepository;
 import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
@@ -49,6 +50,7 @@ class AuctionBidServiceTests {
     private AuctionProductRepository products;
     private AuctionBidRepository bids;
     private AuctionRealtimeEventPublisher realtimeEvents;
+    private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
     private AuctionBidService service;
     private Auction auction;
 
@@ -58,11 +60,19 @@ class AuctionBidServiceTests {
         products = mock(AuctionProductRepository.class);
         bids = mock(AuctionBidRepository.class);
         realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
+        privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
 
         AuctionTime time = new AuctionTime(
                 Clock.fixed(Instant.parse("2026-09-08T04:00:00Z"), ZoneOffset.UTC)
         );
-        service = new AuctionBidService(auctions, products, bids, time, realtimeEvents);
+        service = new AuctionBidService(
+                auctions,
+                products,
+                bids,
+                time,
+                realtimeEvents,
+                privateNotificationEvents
+        );
 
         auction = new Auction();
         auction.setAuctionId(AUCTION_ID);
@@ -114,6 +124,7 @@ class AuctionBidServiceTests {
         order.verify(bids).save(savedBid);
         order.verify(auctions).save(auction);
         order.verify(realtimeEvents).publish(AuctionRealtimeEventType.BID_PLACED, auction);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -208,6 +219,46 @@ class AuctionBidServiceTests {
         assertAmount("4500.00", response.nextMinimumBid());
         verify(bids).save(any(AuctionBid.class));
         verify(auctions).save(auction);
+    }
+
+    @Test
+    void successfulHigherBidPublishesOutbidWorkForPreviousHighestBidderOnly() {
+        auction.setCurrentPrice(new BigDecimal("3500.00"));
+        auction.setHighestBidderId(66L);
+        auction.setBidCount(1);
+
+        service.placeBid(
+                AUCTION_ID,
+                BUYER_ID,
+                new BidCreateRequest(new BigDecimal("4000.00"))
+        );
+
+        var order = inOrder(bids, auctions, realtimeEvents, privateNotificationEvents);
+        order.verify(bids).save(any(AuctionBid.class));
+        order.verify(auctions).save(auction);
+        order.verify(realtimeEvents).publish(AuctionRealtimeEventType.BID_PLACED, auction);
+        order.verify(privateNotificationEvents).publishOutbid(
+                AUCTION_ID,
+                66L,
+                new BigDecimal("4000.00"),
+                NOW
+        );
+    }
+
+    @Test
+    void currentHighestBidderRaisingOwnBidDoesNotReceiveSelfOutbid() {
+        auction.setCurrentPrice(new BigDecimal("3500.00"));
+        auction.setHighestBidderId(BUYER_ID);
+        auction.setBidCount(1);
+
+        service.placeBid(
+                AUCTION_ID,
+                BUYER_ID,
+                new BidCreateRequest(new BigDecimal("4000.00"))
+        );
+
+        verifyNoInteractions(privateNotificationEvents);
+        verify(realtimeEvents).publish(AuctionRealtimeEventType.BID_PLACED, auction);
     }
 
     @Test
@@ -371,7 +422,7 @@ class AuctionBidServiceTests {
     private void verifyNoWrites() {
         verify(bids, never()).save(any());
         verify(auctions, never()).save(any());
-        verifyNoInteractions(realtimeEvents);
+        verifyNoInteractions(realtimeEvents, privateNotificationEvents);
     }
 
     private void assertAmount(String expected, BigDecimal actual) {

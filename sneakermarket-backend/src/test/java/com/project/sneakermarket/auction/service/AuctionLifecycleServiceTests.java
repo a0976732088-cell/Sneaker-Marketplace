@@ -19,6 +19,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 import com.project.sneakermarket.auction.entity.*;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.*;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
@@ -29,6 +30,7 @@ class AuctionLifecycleServiceTests {
     private AuctionResultRepository results;
     private org.springframework.context.ApplicationEventPublisher events;
     private AuctionRealtimeEventPublisher realtimeEvents;
+    private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
     private AuctionLifecycleService service;
     private Auction auction;
 
@@ -38,8 +40,16 @@ class AuctionLifecycleServiceTests {
         results = mock(AuctionResultRepository.class);
         events = mock(org.springframework.context.ApplicationEventPublisher.class);
         realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
+        privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
         var time = new AuctionTime(Clock.fixed(Instant.parse("2026-09-10T04:00:00Z"), ZoneOffset.UTC));
-        service = new AuctionLifecycleService(auctions, results, time, events, realtimeEvents);
+        service = new AuctionLifecycleService(
+                auctions,
+                results,
+                time,
+                events,
+                realtimeEvents,
+                privateNotificationEvents
+        );
         auction = new Auction();
         auction.setAuctionId(1L);
         auction.setStatus(AuctionStatus.SCHEDULED);
@@ -242,7 +252,8 @@ class AuctionLifecycleServiceTests {
                 results,
                 time,
                 mock(org.springframework.context.ApplicationEventPublisher.class),
-                mock(AuctionRealtimeEventPublisher.class)
+                mock(AuctionRealtimeEventPublisher.class),
+                mock(AuctionPrivateNotificationEventPublisher.class)
         ).processAuction(1L);
         var order = inOrder(auctions, time);
         order.verify(auctions).findByIdForUpdate(1L);
@@ -265,13 +276,23 @@ class AuctionLifecycleServiceTests {
             default -> throw new AssertionError("Unexpected closed status: " + auction.getStatus());
         };
         verify(realtimeEvents).publish(expectedType, auction);
+        if (auction.getStatus() == AuctionStatus.SOLD) {
+            verify(privateNotificationEvents).publishSold(
+                    1L,
+                    auction.getHighestBidderId(),
+                    auction.getCurrentPrice(),
+                    NOW
+            );
+        } else {
+            verifyNoInteractions(privateNotificationEvents);
+        }
         return captor.getValue();
     }
 
     private void noWrites() {
         verify(auctions, never()).save(any());
         verify(results, never()).save(any());
-        verifyNoInteractions(realtimeEvents);
+        verifyNoInteractions(realtimeEvents, privateNotificationEvents);
         assertEquals(NOW.minusDays(1), auction.getUpdatedAt());
     }
 }

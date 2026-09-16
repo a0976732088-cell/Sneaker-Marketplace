@@ -75,6 +75,7 @@ class AuctionOrderIntegrationTests {
             assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
         }
         for (Long id : auctionIds) {
+            jdbc.update("DELETE FROM dbo.notifications WHERE target_type='AUCTION' AND target_id=?", id);
             orders.findByAuctionId(id).ifPresent(orders::delete);
             results.findByAuctionId(id).ifPresent(results::delete);
             bids.deleteAllInBatch(bids.findByAuctionIdOrderByCreatedAtDesc(id));
