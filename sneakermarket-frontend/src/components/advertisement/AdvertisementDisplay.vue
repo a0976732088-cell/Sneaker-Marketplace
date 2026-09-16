@@ -251,20 +251,45 @@ onUnmounted(() => {
         </header>
 
         <div class="category-card-track">
-          <button
+          <article
             v-for="ad in categoryCardAds"
             :key="ad.adId"
-            type="button"
             class="category-card"
-            @click="goToAdvertisementTarget(ad)"
           >
-            <img
-              :src="resolveAdvertisementImageUrl(ad.imageUrl)"
-              :alt="ad.adName"
-            />
+            <button
+              type="button"
+              class="category-card-image-button"
+              @click="goToAdvertisementTarget(ad)"
+            >
+              <img
+                :src="resolveAdvertisementImageUrl(ad.imageUrl)"
+                :alt="ad.adName"
+              />
+            </button>
 
-            <strong>{{ ad.adName }}</strong>
-          </button>
+            <div class="category-card-footer">
+              <button
+                type="button"
+                class="category-card-title"
+                @click="goToAdvertisementTarget(ad)"
+              >
+                <strong>{{ ad.adName }}</strong>
+              </button>
+
+              <RouterLink
+                v-if="ad.targetType === 'CATEGORY' && ad.targetId"
+                class="category-view-link"
+                :to="{
+                  name: 'commerce',
+                  query: {
+                    categoryId: ad.targetId,
+                  },
+                }"
+              >
+                查看相關
+              </RouterLink>
+            </div>
+          </article>
         </div>
       </section>
 

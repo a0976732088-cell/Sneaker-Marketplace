@@ -25,7 +25,9 @@ async function handleCategorySelect({ categoryId, categoryName }) {
       },
     });
 
-    categoryProducts.value = response.data;
+    categoryProducts.value = [...response.data]
+      .sort((a, b) => Number(b.productId) - Number(a.productId))
+      .slice(0, 4);
   } catch (error) {
     console.error("分類商品載入失敗", error);
 
@@ -43,10 +45,8 @@ async function handleCategorySelect({ categoryId, categoryName }) {
   <section v-if="selectedCategoryId" class="category-products-section">
     <header class="category-products-header">
       <div>
-        <h3>{{ selectedCategoryName }}</h3>
+        <h3>最新商品</h3>
       </div>
-
-      <small> 共 {{ categoryProducts.length }} 件商品 </small>
     </header>
 
     <p v-if="categoryProductsLoading" class="category-products-message">
@@ -121,10 +121,6 @@ async function handleCategorySelect({ categoryId, categoryName }) {
   margin: 5px 0 0;
   font-size: 30px;
   font-weight: 800;
-}
-
-.category-products-header > small {
-  color: #777;
 }
 
 .category-product-grid {

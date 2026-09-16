@@ -2,6 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import httpClient from '@/service/httpClient'
 import { getBrands } from '@/service/brandService'
+import { useRoute } from 'vue-router' // zwei導向分類
+
+const route = useRoute(); //zwei導向分類
 
 const products = ref([])
 const loading = ref(true)
@@ -118,6 +121,8 @@ function formatPrice(price) {
 }
 
 onMounted(() => {
+  // zwei導向分類，取得id後再執行fetchProducts
+  categoryId.value = Number(route.query.categoryId) || null 
   loadBrands()
   fetchProducts()
 })
