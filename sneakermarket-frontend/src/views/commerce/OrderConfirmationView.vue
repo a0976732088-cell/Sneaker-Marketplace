@@ -50,6 +50,7 @@ onMounted(() => {
 
     <p>小計：NT$ {{ order.subtotal }}</p>
     <p>運費：NT$ {{ order.shippingFee }}</p>
+    <p v-if="order.discountAmount > 0" class="text-danger">優惠券折抵：−NT$ {{ order.discountAmount }}</p>
     <p class="fw-bold">總計：NT$ {{ order.totalAmount }}</p>
   </div>
 </template>

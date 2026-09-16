@@ -9,6 +9,7 @@ import com.project.sneakermarket.commerce.entity.Order;
 import com.project.sneakermarket.commerce.entity.OrderItem;
 import com.project.sneakermarket.commerce.repository.*;
 import com.project.sneakermarket.common.exception.ForbiddenException;
+import com.project.sneakermarket.coupon.service.CouponService;
 import com.project.sneakermarket.member.service.MemberService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final ProductVariantRepository productVariantRepository;
     private final MemberService memberService;
+    private final CouponService couponService;
 
     // 查看「我的訂單列表」：一次列出這個會員的所有訂單摘要
     public List<OrderListItemResponse> getMyOrders(Long memberId) {
@@ -98,7 +100,8 @@ public class OrderService {
     public OrderDetailResponse createOrder(Long memberId,
                                            String receiverName,
                                            String receiverPhone,
-                                           String shippingAddress) {
+                                           String shippingAddress,
+                                           Long couponId) {
 
         Cart cart = cartRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new RuntimeException("找不到這個購物車"));
@@ -124,16 +127,22 @@ public class OrderService {
             subtotal = subtotal.add(lineTotal);
         }
 
+        BigDecimal discount = BigDecimal.ZERO;
+        if (couponId != null) {
+            discount = couponService.useCoupon(memberId, couponId, subtotal);
+        }
+
         String orderNumber = "ORD" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
                 + String.format("%04d", new Random().nextInt(10000));
 
         Order order = new Order();
         order.setOrderNumber(orderNumber);
         order.setMemberId(memberId);
+        order.setCouponId(couponId);
         order.setSubtotal(subtotal);
-        order.setDiscountAmount(BigDecimal.ZERO);
+        order.setDiscountAmount(discount);
         order.setShippingFee(BigDecimal.valueOf(100));
-        order.setTotalAmount(subtotal.add(BigDecimal.valueOf(100)));
+        order.setTotalAmount(subtotal.add(BigDecimal.valueOf(100)).subtract(discount));
         order.setPaymentMethod("MOCK_CREDIT_CARD");
         order.setStatus("PAID");
         order.setReceiverName(receiverName);

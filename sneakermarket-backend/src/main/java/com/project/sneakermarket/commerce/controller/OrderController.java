@@ -51,7 +51,8 @@ public class OrderController {
                 memberId,
                 request.getReceiverName(),
                 request.getReceiverPhone(),
-                request.getShippingAddress()
+                request.getShippingAddress(),
+                request.getCouponId()
         );
     }
 
