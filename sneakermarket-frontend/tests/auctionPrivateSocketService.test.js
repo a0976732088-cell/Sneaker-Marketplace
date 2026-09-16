@@ -158,6 +158,99 @@ test("private STOMP parsing, transport and async callback failures reach onError
   assert.equal(errors.length, 4);
 });
 
+test("private socket forwards lifecycle, visibility, order and future event types without filtering", () => {
+  let configuration;
+  const messages = [];
+  const fakeClient = {
+    connected: true,
+    activate() {},
+    async deactivate() {},
+    subscribe(_destination, callback) {
+      this.callback = callback;
+      return { unsubscribe() {} };
+    },
+  };
+
+  const socket = createAuctionPrivateSocketClient({
+    onMessage: (message) => messages.push(message),
+    clientFactory: (options) => {
+      configuration = options;
+      return fakeClient;
+    },
+  });
+  socket.connect();
+  configuration.onConnect({});
+
+  const events = [
+    {
+      eventType: "AUCTION_STARTED",
+      auctionId: 95,
+      notificationId: 4995,
+      occurredAt: "2026-09-17T11:54:00",
+    },
+    {
+      eventType: "AUCTION_SOLD",
+      auctionId: 96,
+      notificationId: 4996,
+      occurredAt: "2026-09-17T11:55:00",
+    },
+    {
+      eventType: "AUCTION_UNSOLD",
+      auctionId: 97,
+      notificationId: 4997,
+      occurredAt: "2026-09-17T11:56:00",
+    },
+    {
+      eventType: "AUCTION_CANCELLED",
+      auctionId: 98,
+      notificationId: 4998,
+      occurredAt: "2026-09-17T11:57:00",
+    },
+    {
+      eventType: "AUCTION_REMOVED",
+      auctionId: 99,
+      notificationId: 4999,
+      occurredAt: "2026-09-17T11:58:00",
+    },
+    {
+      eventType: "AUCTION_RESTORED",
+      auctionId: 100,
+      notificationId: 5000,
+      occurredAt: "2026-09-17T11:59:00",
+    },
+    {
+      eventType: "AUCTION_ORDER_CREATED",
+      auctionId: 101,
+      notificationId: 5001,
+      occurredAt: "2026-09-16T12:00:00",
+    },
+    {
+      eventType: "AUCTION_ORDER_PAID",
+      auctionId: 102,
+      notificationId: 5002,
+      occurredAt: "2026-09-16T12:01:00",
+    },
+    {
+      eventType: "AUCTION_ORDER_ABANDONED",
+      auctionId: 103,
+      notificationId: 5003,
+      occurredAt: "2026-09-16T12:02:00",
+    },
+    {
+      eventType: "AUCTION_FUTURE_EVENT",
+      auctionId: 104,
+      notificationId: 5004,
+      occurredAt: "2026-09-16T12:03:00",
+    },
+  ];
+
+  for (const event of events) {
+    fakeClient.callback({ body: JSON.stringify(event) });
+  }
+
+  assert.deepEqual(messages, events);
+});
+
 test("private socket always deactivates when subscription cleanup throws", async () => {
   let deactivateCount = 0;
   const unsubscribeError = new Error("unsubscribe failed");

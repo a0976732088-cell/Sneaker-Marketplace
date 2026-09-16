@@ -15,6 +15,8 @@ import com.project.sneakermarket.auction.entity.Auction;
 import com.project.sneakermarket.auction.entity.AuctionProduct;
 import com.project.sneakermarket.auction.entity.AuctionProductImage;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
+import com.project.sneakermarket.auction.repository.AuctionBidRepository;
 import com.project.sneakermarket.auction.repository.AuctionProductImageRepository;
 import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
@@ -43,10 +45,12 @@ public class AuctionCommandService {
     private final AuctionProductRepository auctionProductRepository;
     private final AuctionProductImageRepository auctionProductImageRepository;
     private final AuctionRepository auctionRepository;
+    private final AuctionBidRepository auctionBidRepository;
     private final ImageStorageService imageStorageService;
     private final AuctionReferenceService referenceService;
     private final AuctionTime auctionTime;
     private final AuctionRealtimeEventPublisher realtimeEvents;
+    private final AuctionPrivateNotificationEventPublisher privateNotificationEvents;
 
     /**
      * 建立一場新的競標。
@@ -538,9 +542,13 @@ public class AuctionCommandService {
                 && auction.getStatus() != AuctionStatus.ACTIVE) {
             throw new BusinessException("目前競標狀態不允許取消");
         }
-        if (!auction.getEndAt().isAfter(auctionTime.now())) {
+        LocalDateTime now = auctionTime.now();
+        if (!auction.getEndAt().isAfter(now)) {
             throw new BusinessException("競標已到截止時間，無法取消");
         }
+
+        List<Long> participantIds =
+                auctionBidRepository.findDistinctBidderIds(auction.getAuctionId());
 
         /*
          * 不實際 DELETE。
@@ -552,9 +560,7 @@ public class AuctionCommandService {
                 AuctionStatus.CANCELLED
         );
 
-        auction.setUpdatedAt(
-                auctionTime.now()
-        );
+        auction.setUpdatedAt(now);
 
         /*
          * 因為目前方法有 @Transactional，
@@ -565,6 +571,13 @@ public class AuctionCommandService {
          */
         auctionRepository.save(auction);
         realtimeEvents.publish(AuctionRealtimeEventType.AUCTION_CANCELLED, auction);
+        privateNotificationEvents.publishCancelled(
+                auction.getAuctionId(),
+                product.getSellerId(),
+                participantIds,
+                null,
+                now
+        );
     }
 
     /**

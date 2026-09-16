@@ -25,18 +25,76 @@ public class AuctionPrivateRealtimeEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPrivateNotificationReady(AuctionPrivateNotificationReadyEvent event) {
-        if (event.kind() == AuctionPrivateNotificationKind.OUTBID) {
-            createAndSend(
-                    () -> Optional.of(notifications.createOutbidNotification(
+        switch (event.kind()) {
+            case OUTBID -> createAndSend(
+                        () -> Optional.of(notifications.createOutbidNotification(
+                                event.auctionId(),
+                                event.memberId(),
+                                event.amount(),
+                                event.occurredAt()
+                        )),
+                        event,
+                        event.memberId()
+                );
+            case STARTED -> createAndSend(
+                    () -> notifications.createStartedSellerNotification(
                             event.auctionId(),
-                            event.memberId(),
+                            event.sellerId(),
+                            event.occurredAt()
+                    ),
+                    event,
+                    event.sellerId()
+            );
+            case SOLD -> handleSold(event);
+            case UNSOLD -> createAndSend(
+                    () -> notifications.createUnsoldSellerNotification(
+                            event.auctionId(),
+                            event.sellerId(),
+                            event.occurredAt()
+                    ),
+                    event,
+                    event.sellerId()
+            );
+            case CANCELLED -> handleCancelled(event);
+            case REMOVED -> handleRemoved(event);
+            case RESTORED -> handleRestored(event);
+            case ORDER_CREATED -> createAndSend(
+                        () -> notifications.createOrderCreatedNotification(
+                                event.auctionId(),
+                                event.orderId(),
+                                event.orderNumber(),
+                                event.memberId(),
+                                event.occurredAt()
+                        ),
+                        event,
+                        event.memberId()
+                );
+            case ORDER_PAID -> createAndSend(
+                        () -> notifications.createOrderPaidNotification(
+                                event.auctionId(),
+                                event.orderId(),
+                                event.sellerId(),
+                                event.occurredAt()
+                        ),
+                        event,
+                        event.sellerId()
+                );
+            case ORDER_ABANDONED -> handleOrderAbandoned(event);
+        }
+    }
+
+    private void handleSold(AuctionPrivateNotificationReadyEvent event) {
+        if (event.sellerId() != null) {
+            createAndSend(
+                    () -> notifications.createSoldSellerNotification(
+                            event.auctionId(),
+                            event.sellerId(),
                             event.amount(),
                             event.occurredAt()
-                    )),
+                    ),
                     event,
-                    event.memberId()
+                    event.sellerId()
             );
-            return;
         }
 
         createAndSend(
@@ -50,18 +108,24 @@ public class AuctionPrivateRealtimeEventListener {
                 event.memberId()
         );
 
-        List<Long> losingBidderIds;
-        try {
-            losingBidderIds = notifications.findDistinctLosingBidderIds(
-                    event.auctionId(),
-                    event.memberId()
-            );
-        } catch (RuntimeException ex) {
-            log.error("Auction losing bidders lookup failed: auctionId={}", event.auctionId(), ex);
-            return;
+        List<Long> losingBidderIds = event.participantIds();
+        // 舊版 SOLD event 沒有 participant snapshot，保留既有查詢路徑。
+        if (event.sellerId() == null && losingBidderIds.isEmpty()) {
+            try {
+                losingBidderIds = notifications.findDistinctLosingBidderIds(
+                        event.auctionId(),
+                        event.memberId()
+                );
+            } catch (RuntimeException ex) {
+                log.error("Auction losing bidders lookup failed: auctionId={}", event.auctionId(), ex);
+                return;
+            }
         }
 
         for (Long loserId : losingBidderIds) {
+            if (loserId.equals(event.memberId()) || loserId.equals(event.sellerId())) {
+                continue;
+            }
             createAndSend(
                     () -> notifications.createLostNotification(
                             event.auctionId(),
@@ -75,18 +139,129 @@ public class AuctionPrivateRealtimeEventListener {
         }
     }
 
+    private void handleCancelled(AuctionPrivateNotificationReadyEvent event) {
+        createAndSend(
+                () -> notifications.createCancelledSellerNotification(
+                        event.auctionId(),
+                        event.sellerId(),
+                        event.occurredAt()
+                ),
+                event,
+                event.sellerId()
+        );
+        for (Long participantId : participantsExcludingSeller(event)) {
+            createAndSend(
+                    () -> notifications.createCancelledParticipantNotification(
+                            event.auctionId(),
+                            participantId,
+                            event.occurredAt()
+                    ),
+                    event,
+                    participantId
+            );
+        }
+    }
+
+    private void handleRemoved(AuctionPrivateNotificationReadyEvent event) {
+        createAndSend(
+                () -> Optional.of(notifications.createRemovedSellerNotification(
+                        event.auctionId(),
+                        event.sellerId(),
+                        event.reason(),
+                        event.occurredAt()
+                )),
+                event,
+                event.sellerId()
+        );
+        for (Long participantId : participantsExcludingSeller(event)) {
+            createAndSend(
+                    () -> Optional.of(notifications.createRemovedParticipantNotification(
+                            event.auctionId(),
+                            participantId,
+                            event.occurredAt()
+                    )),
+                    event,
+                    participantId
+            );
+        }
+    }
+
+    private void handleRestored(AuctionPrivateNotificationReadyEvent event) {
+        createAndSend(
+                () -> Optional.of(notifications.createRestoredSellerNotification(
+                        event.auctionId(),
+                        event.sellerId(),
+                        event.occurredAt()
+                )),
+                event,
+                event.sellerId()
+        );
+        for (Long participantId : participantsExcludingSeller(event)) {
+            createAndSend(
+                    () -> Optional.of(notifications.createRestoredParticipantNotification(
+                            event.auctionId(),
+                            participantId,
+                            event.occurredAt()
+                    )),
+                    event,
+                    participantId
+            );
+        }
+    }
+
+    private List<Long> participantsExcludingSeller(AuctionPrivateNotificationReadyEvent event) {
+        return event.participantIds().stream()
+                .filter(participantId -> !participantId.equals(event.sellerId()))
+                .toList();
+    }
+
+    private void handleOrderAbandoned(AuctionPrivateNotificationReadyEvent event) {
+        // 每位收件人各自建立 REQUIRES_NEW 通知；一方失敗不會阻止另一方。
+        createAndSend(
+                () -> notifications.createOrderAbandonedBuyerNotification(
+                        event.auctionId(),
+                        event.orderId(),
+                        event.orderNumber(),
+                        event.memberId(),
+                        event.occurredAt()
+                ),
+                event,
+                event.memberId()
+        );
+        createAndSend(
+                () -> notifications.createOrderAbandonedSellerNotification(
+                        event.auctionId(),
+                        event.orderId(),
+                        event.sellerId(),
+                        event.occurredAt()
+                ),
+                event,
+                event.sellerId()
+        );
+    }
+
     private void createAndSend(
             Supplier<Optional<AuctionPrivateNotificationDelivery>> notificationFactory,
             AuctionPrivateNotificationReadyEvent event,
             Long recipientMemberId) {
+        if (recipientMemberId == null) {
+            log.warn(
+                    "Auction private notification skipped without recipient: auctionId={}, kind={}",
+                    event.auctionId(),
+                    event.kind()
+            );
+            return;
+        }
+
         Optional<AuctionPrivateNotificationDelivery> delivery;
         try {
             // REQUIRES_NEW proxy 已回傳，代表 Notification transaction 已完成 commit。
             delivery = notificationFactory.get();
         } catch (RuntimeException ex) {
             log.error(
-                    "Auction private notification creation failed: auctionId={}, kind={}, memberId={}",
+                    "Auction private notification creation failed: auctionId={}, orderId={}, kind={}, memberId={}",
                     event.auctionId(),
+                    event.orderId(),
                     event.kind(),
                     recipientMemberId,
                     ex

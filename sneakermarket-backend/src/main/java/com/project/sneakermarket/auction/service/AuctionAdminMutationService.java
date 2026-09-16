@@ -1,15 +1,21 @@
 package com.project.sneakermarket.auction.service;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.sneakermarket.auction.entity.Auction;
+import com.project.sneakermarket.auction.entity.AuctionProduct;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
+import com.project.sneakermarket.auction.repository.AuctionBidRepository;
+import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
@@ -23,8 +29,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuctionAdminMutationService {
     private final AuctionRepository auctions;
+    private final AuctionProductRepository products;
+    private final AuctionBidRepository bids;
     private final AuctionTime time;
     private final AuctionRealtimeEventPublisher realtimeEvents;
+    private final AuctionPrivateNotificationEventPublisher privateNotificationEvents;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void removeAuction(Long auctionId, Long adminId, String reason) {
@@ -39,6 +48,8 @@ public class AuctionAdminMutationService {
         if (auction.getRemovedAt() != null) return;
 
         LocalDateTime now = time.now();
+        Long sellerId = findSellerId(auction);
+        List<Long> participantIds = findParticipantIds(auction.getAuctionId(), sellerId);
         auction.setRemovedAt(now);
         auction.setRemovedByMemberId(adminId);
         auction.setRemoveReason(normalizedReason);
@@ -46,6 +57,13 @@ public class AuctionAdminMutationService {
         auction.setUpdatedAt(now);
         auctions.save(auction);
         realtimeEvents.publish(AuctionRealtimeEventType.AUCTION_REMOVED, auction);
+        privateNotificationEvents.publishRemoved(
+                auction.getAuctionId(),
+                sellerId,
+                participantIds,
+                normalizedReason,
+                now
+        );
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -67,6 +85,7 @@ public class AuctionAdminMutationService {
         if (auction.getRemovedAt() == null) return;
 
         LocalDateTime now = time.now();
+        String removalReason = safeStoredReason(auction.getRemoveReason());
         switch (auction.getStatus()) {
             case DRAFT -> {
                 // 草稿僅解除管理員下架 metadata。
@@ -82,12 +101,21 @@ public class AuctionAdminMutationService {
                 throw new AuctionConflictException("已結標或終止的競標無法重新上架");
             case REMOVED -> throw new AuctionConflictException("廢標競標無法重新上架");
         }
+        Long sellerId = findSellerId(auction);
+        List<Long> participantIds = findParticipantIds(auction.getAuctionId(), sellerId);
         auction.setRemovedAt(null);
         auction.setRemovedByMemberId(null);
         auction.setRemoveReason(null);
         auction.setRemovedFromStatus(null);
         auction.setUpdatedAt(now);
         auctions.save(auction);
+        privateNotificationEvents.publishRestored(
+                auction.getAuctionId(),
+                sellerId,
+                participantIds,
+                removalReason,
+                now
+        );
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -121,6 +149,24 @@ public class AuctionAdminMutationService {
         String normalized = reason.trim();
         if (normalized.length() > 500) throw new BusinessException("管理原因不可超過 500 字");
         return normalized;
+    }
+
+    private Long findSellerId(Auction auction) {
+        AuctionProduct product = products.findById(auction.getAuctionProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("找不到指定的競標商品"));
+        return product.getSellerId();
+    }
+
+    private List<Long> findParticipantIds(Long auctionId, Long sellerId) {
+        return bids.findDistinctBidderIds(auctionId).stream()
+                .filter(Objects::nonNull)
+                .filter(memberId -> !memberId.equals(sellerId))
+                .distinct()
+                .toList();
+    }
+
+    private String safeStoredReason(String reason) {
+        return reason == null || reason.isBlank() ? null : reason.trim();
     }
 
     private AuctionConflictException expiredRestoreConflict() {

@@ -16,15 +16,15 @@ import {
 const servicePath = new URL("../src/service/auctionAdminService.js", import.meta.url);
 const viewPath = new URL("../src/views/admin/AdminAuctionListView.vue", import.meta.url);
 const routerPath = new URL("../src/router/index.js", import.meta.url);
-const homePath = new URL("../src/views/admin/AdminHomeView.vue", import.meta.url);
+const sidebarPath = new URL("../src/components/admin/AdminSidebar.vue", import.meta.url);
 const detailPath = new URL("../src/views/admin/AdminAuctionDetailView.vue", import.meta.url);
 const imageUrlPath = new URL("../src/utils/auctionImageUrl.js", import.meta.url);
 
-const [service, view, router, home, detail, imageUrl] = await Promise.all([
+const [service, view, router, sidebar, detail, imageUrl] = await Promise.all([
   readFile(servicePath, "utf8"),
   readFile(viewPath, "utf8"),
   readFile(routerPath, "utf8"),
-  readFile(homePath, "utf8"),
+  readFile(sidebarPath, "utf8"),
   readFile(detailPath, "utf8"),
   readFile(imageUrlPath, "utf8"),
 ]);
@@ -46,11 +46,16 @@ test("admin auction service reuses httpClient and implements list, detail and mu
   assert.match(service, /restoreAdminAuctionsBatch[\s\S]*?\{ auctionIds \}/);
 });
 
-test("admin auction route is guarded and AdminHome links to the management page", () => {
-  assert.match(router, /path: ["']\/admin\/auctions["'][\s\S]*?requiresAdmin: true/);
-  assert.match(home, /title: ["']競標系統["'][\s\S]*?name: ["']admin-auctions["']/);
-  assert.match(home, /管理競標、下架／恢復顯示與批量刪除/);
-  assert.doesNotMatch(home, /批次假刪除/);
+test("admin auction route is guarded and the current sidebar links to it", () => {
+  assert.match(
+    router,
+    /path: ["']\/admin["'][\s\S]*?meta: \{[\s\S]*?requiresAdmin: true[\s\S]*?children: \[/,
+  );
+  assert.match(
+    router,
+    /path: ["']auctions["'][\s\S]*?name: ["']admin-auctions["']/,
+  );
+  assert.match(sidebar, /name: ["']admin-auctions["'][\s\S]*?>\s*<span>\s*競標管理\s*<\/span>/);
 });
 
 test("admin views use shared status and time formatters and keep required SFC order", () => {
@@ -194,7 +199,10 @@ test("admin list keeps filters readable and scrolls a non-breaking table when zo
 });
 
 test("admin detail remains available after moderation and resolves images against backend", () => {
-  assert.match(router, /path: ["']\/admin\/auctions\/:id["'][\s\S]*?requiresAdmin: true/);
+  assert.match(
+    router,
+    /path: ["']auctions\/:id["'][\s\S]*?name: ["']admin-auction-detail["']/,
+  );
   assert.ok(detail.includes("getAdminAuctionDetail"));
   assert.ok(detail.includes("公開中、已下架及已刪除"));
   assert.ok(detail.includes("resolveAuctionImageUrl(imageUrl)"));

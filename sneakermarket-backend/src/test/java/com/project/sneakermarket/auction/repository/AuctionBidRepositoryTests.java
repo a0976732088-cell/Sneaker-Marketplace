@@ -112,6 +112,38 @@ class AuctionBidRepositoryTests {
         });
     }
 
+    @Test
+    void findDistinctBidderIdsReturnsEachParticipantOnce() {
+        Auction auction = auctionRepository.findAll()
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("目前沒有競標測試資料"));
+        LocalDateTime baseTime = LocalDateTime.now().withNano(0);
+        Long repeatedBidderId = 91001L;
+        Long otherBidderId = 91002L;
+
+        auctionBidRepository.saveAndFlush(bid(
+                auction.getAuctionId(), repeatedBidderId, "6000.00", baseTime.minusSeconds(3)));
+        auctionBidRepository.saveAndFlush(bid(
+                auction.getAuctionId(), repeatedBidderId, "6100.00", baseTime.minusSeconds(2)));
+        auctionBidRepository.saveAndFlush(bid(
+                auction.getAuctionId(), otherBidderId, "6200.00", baseTime.minusSeconds(1)));
+
+        List<Long> bidderIds = auctionBidRepository.findDistinctBidderIds(auction.getAuctionId());
+
+        assertEquals(1L, bidderIds.stream().filter(repeatedBidderId::equals).count());
+        assertEquals(1L, bidderIds.stream().filter(otherBidderId::equals).count());
+    }
+
+    private AuctionBid bid(Long auctionId, Long bidderId, String amount, LocalDateTime createdAt) {
+        AuctionBid bid = new AuctionBid();
+        bid.setAuctionId(auctionId);
+        bid.setBidderId(bidderId);
+        bid.setBidAmount(new BigDecimal(amount));
+        bid.setCreatedAt(createdAt);
+        return bid;
+    }
+
     /**
      * 依 bidId 找出指定出價紀錄在查詢結果中的位置。
      *

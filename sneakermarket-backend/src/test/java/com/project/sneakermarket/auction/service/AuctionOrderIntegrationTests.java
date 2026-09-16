@@ -18,19 +18,25 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.project.sneakermarket.auction.entity.*;
+import com.project.sneakermarket.auction.notification.AuctionPrivateRealtimeEventType;
+import com.project.sneakermarket.auction.notification.AuctionPrivateRealtimeMessage;
 import com.project.sneakermarket.auction.repository.*;
 import com.project.sneakermarket.auction.scheduler.AuctionOrderScheduler;
 import com.project.sneakermarket.member.entity.Member;
 import com.project.sneakermarket.member.repository.MemberRepository;
+import com.project.sneakermarket.notification.entity.Notification;
+import com.project.sneakermarket.notification.repository.NotificationRepository;
 
 /** 真實 MSSQL；fixture 先 commit，Service 經 Spring proxy 呼叫，僅控制時間與候選清單。 */
 @SpringBootTest(properties = {
@@ -49,9 +55,11 @@ class AuctionOrderIntegrationTests {
     @Autowired private AuctionProductRepository products;
     @Autowired private AuctionBidRepository bids;
     @Autowired private MemberRepository members;
+    @Autowired private NotificationRepository notifications;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
     @MockitoBean private AuctionTime time;
+    @MockitoBean private SimpMessagingTemplate messaging;
     private final List<Long> auctionIds = new ArrayList<>();
     private final List<Long> productIds = new ArrayList<>();
     private final List<Long> memberIds = new ArrayList<>();
@@ -74,8 +82,11 @@ class AuctionOrderIntegrationTests {
             executor.shutdownNow();
             assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
         }
+        // Notification 持有 member FK；必須先於 order/member fixture 清除。
+        for (Long id : memberIds) {
+            jdbc.update("DELETE FROM dbo.notifications WHERE member_id = ?", id);
+        }
         for (Long id : auctionIds) {
-            jdbc.update("DELETE FROM dbo.notifications WHERE target_type='AUCTION' AND target_id=?", id);
             orders.findByAuctionId(id).ifPresent(orders::delete);
             results.findByAuctionId(id).ifPresent(results::delete);
             bids.deleteAllInBatch(bids.findByAuctionIdOrderByCreatedAtDesc(id));
@@ -88,6 +99,7 @@ class AuctionOrderIntegrationTests {
     @Test
     void committedLifecycleResultCreatesOneCompleteOrderAndRepeatsAreIdempotent() {
         Long id = fixture(true);
+        clearInvocations(messaging);
         var auctionBefore = auctionRow(id);
         var resultBefore = resultRow(id);
         service.createOrderForAuction(id);
@@ -114,6 +126,28 @@ class AuctionOrderIntegrationTests {
         assertEquals(1, orderCount(id));
         assertEquals(auctionBefore, auctionRow(id));
         assertEquals(resultBefore, resultRow(id));
+
+        List<Notification> created = orderNotifications(
+                order.getAuctionOrderId(), "AUCTION_ORDER_CREATED");
+        assertEquals(1, created.size());
+        Notification notification = created.get(0);
+        assertEquals(buyerId, notification.getMemberId());
+        assertEquals("您的競標訂單已建立", notification.getTitle());
+        assertEquals("您得標的競標已建立訂單，請於付款期限內完成付款。",
+                notification.getContent());
+        assertOrderNotificationContract(
+                notification,
+                order.getAuctionOrderId(),
+                "/auction-orders/" + order.getOrderNumber() + "/payment",
+                NOW);
+
+        AuctionPrivateRealtimeMessage message = capturePrivateMessage(buyerId);
+        assertEquals(AuctionPrivateRealtimeEventType.AUCTION_ORDER_CREATED, message.eventType());
+        assertEquals(id, message.auctionId());
+        assertEquals(notification.getNotificationId(), message.notificationId());
+        assertEquals(NOW, message.occurredAt());
+        verify(messaging, never()).convertAndSendToUser(
+                eq(sellerId.toString()), eq("/queue/auction-events"), any());
     }
 
     @Test
@@ -218,14 +252,23 @@ class AuctionOrderIntegrationTests {
     @ValueSource(strings = {" ", "\t"})
     void missingAddressRollsBackAndCanRetryAfterMemberCorrection(String address) {
         Long id = fixture(true);
+        clearInvocations(messaging);
         changeBuyer(b -> b.setAddress(address));
         rejectWithoutChanges(id);
+        assertTrue(memberNotifications(buyerId, "AUCTION_ORDER_CREATED").isEmpty());
+        verify(messaging, never()).convertAndSendToUser(
+                anyString(), eq("/queue/auction-events"), any());
         assertEquals(AuctionStatus.SOLD, auctions.findById(id).orElseThrow().getStatus());
         assertTrue(results.findOrderCandidateIds().contains(id));
         changeBuyer(b -> b.setAddress("補齊地址"));
         service.createOrderForAuction(id);
-        assertEquals("補齊地址", orders.findByAuctionId(id).orElseThrow().getShippingAddress());
+        AuctionOrder order = orders.findByAuctionId(id).orElseThrow();
+        assertEquals("補齊地址", order.getShippingAddress());
         assertFalse(results.findOrderCandidateIds().contains(id));
+        assertEquals(1, orderNotifications(
+                order.getAuctionOrderId(), "AUCTION_ORDER_CREATED").size());
+        assertEquals(AuctionPrivateRealtimeEventType.AUCTION_ORDER_CREATED,
+                capturePrivateMessage(buyerId).eventType());
     }
 
     @Test
@@ -370,6 +413,42 @@ class AuctionOrderIntegrationTests {
 
     private int orderCount(Long id) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM dbo.auction_orders WHERE auction_id = ?", Integer.class, id);
+    }
+
+    private List<Notification> orderNotifications(Long orderId, String type) {
+        return notifications.findAll().stream()
+                .filter(row -> "AUCTION_ORDER".equals(row.getTargetType()))
+                .filter(row -> orderId.equals(row.getTargetId()))
+                .filter(row -> type.equals(row.getNotificationType()))
+                .toList();
+    }
+
+    private List<Notification> memberNotifications(Long memberId, String type) {
+        return notifications.findAll().stream()
+                .filter(row -> memberId.equals(row.getMemberId()))
+                .filter(row -> type.equals(row.getNotificationType()))
+                .toList();
+    }
+
+    private void assertOrderNotificationContract(
+            Notification notification,
+            Long orderId,
+            String targetUrl,
+            LocalDateTime sentAt) {
+        assertEquals("AUCTION_ORDER", notification.getTargetType());
+        assertEquals(orderId, notification.getTargetId());
+        assertEquals(targetUrl, notification.getTargetUrl());
+        assertFalse(notification.getIsRead());
+        assertTrue(notification.getIsSent());
+        assertEquals(sentAt, notification.getSentAt());
+    }
+
+    private AuctionPrivateRealtimeMessage capturePrivateMessage(Long memberId) {
+        ArgumentCaptor<AuctionPrivateRealtimeMessage> message =
+                ArgumentCaptor.forClass(AuctionPrivateRealtimeMessage.class);
+        verify(messaging).convertAndSendToUser(
+                eq(memberId.toString()), eq("/queue/auction-events"), message.capture());
+        return message.getValue();
     }
 
     private void changeBuyer(java.util.function.Consumer<Member> change) {

@@ -3,6 +3,7 @@ package com.project.sneakermarket.auction.service;
 import com.project.sneakermarket.auction.dto.*;
 import com.project.sneakermarket.auction.entity.*;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.*;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
@@ -20,8 +21,10 @@ class AuctionCommandValidationTests {
     private AuctionReferenceRepository references;
     private AuctionRepository auctions;
     private AuctionProductRepository products;
+    private AuctionBidRepository bids;
     private ImageStorageService images;
     private AuctionRealtimeEventPublisher realtimeEvents;
+    private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
     private AuctionCommandService service;
     private Auction auction;
     private AuctionProduct product;
@@ -31,11 +34,14 @@ class AuctionCommandValidationTests {
         references = mock(AuctionReferenceRepository.class);
         auctions = mock(AuctionRepository.class);
         products = mock(AuctionProductRepository.class);
+        bids = mock(AuctionBidRepository.class);
         images = mock(ImageStorageService.class);
         realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
+        privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
         var time = new AuctionTime(Clock.fixed(Instant.parse("2026-09-07T04:00:00Z"), ZoneOffset.UTC));
         service = new AuctionCommandService(products, mock(AuctionProductImageRepository.class),
-                auctions, images, new AuctionReferenceService(references), time, realtimeEvents);
+                auctions, bids, images, new AuctionReferenceService(references), time,
+                realtimeEvents, privateNotificationEvents);
         when(references.isActiveMember(42L)).thenReturn(true);
         when(references.brandExists(7L)).thenReturn(true);
         when(references.categoryExists(9L)).thenReturn(true);
@@ -53,6 +59,7 @@ class AuctionCommandValidationTests {
         product.setCategoryId(9L);
         when(auctions.findByIdForUpdate(12L)).thenReturn(Optional.of(auction));
         when(products.findById(3L)).thenReturn(Optional.of(product));
+        when(bids.findDistinctBidderIds(12L)).thenReturn(List.of());
     }
 
     private AuctionCreateRequest createRequest(Long brand, Long category) {
@@ -155,17 +162,43 @@ class AuctionCommandValidationTests {
         auction.setEndAt(now);
         assertThrows(BusinessException.class, () -> service.cancelAuction(12L, 42L));
         verify(auctions, never()).save(any());
-        verifyNoInteractions(realtimeEvents);
+        verifyNoInteractions(bids, realtimeEvents, privateNotificationEvents);
     }
 
     @Test
     void successfulCancellationPublishesRealtimeEventAfterSave() {
+        when(bids.findDistinctBidderIds(12L)).thenReturn(List.of(61L, 77L));
+
         service.cancelAuction(12L, 42L);
 
         assertEquals(AuctionStatus.CANCELLED, auction.getStatus());
-        var order = inOrder(auctions, realtimeEvents);
+        assertEquals(now, auction.getUpdatedAt());
+        var order = inOrder(auctions, realtimeEvents, privateNotificationEvents);
         order.verify(auctions).save(auction);
         order.verify(realtimeEvents).publish(AuctionRealtimeEventType.AUCTION_CANCELLED, auction);
+        order.verify(privateNotificationEvents).publishCancelled(
+                12L, 42L, List.of(61L, 77L), null, now);
+        verify(bids).findDistinctBidderIds(12L);
+    }
+
+    @Test
+    void alreadyCancelledAuctionDoesNotQueryParticipantsOrPublishAgain() {
+        auction.setStatus(AuctionStatus.CANCELLED);
+
+        assertThrows(BusinessException.class, () -> service.cancelAuction(12L, 42L));
+
+        verify(auctions, never()).save(any());
+        verifyNoInteractions(bids, realtimeEvents, privateNotificationEvents);
+    }
+
+    @Test
+    void auctionWithBidSummaryDoesNotQueryParticipantsOrPublishCancellation() {
+        auction.setBidCount(1);
+
+        assertThrows(BusinessException.class, () -> service.cancelAuction(12L, 42L));
+
+        verify(auctions, never()).save(any());
+        verifyNoInteractions(bids, realtimeEvents, privateNotificationEvents);
     }
 
     @Test
@@ -184,5 +217,6 @@ class AuctionCommandValidationTests {
             return Optional.of(auction);
         });
         assertThrows(BusinessException.class, () -> service.cancelAuction(12L, 42L));
+        verifyNoInteractions(bids, realtimeEvents, privateNotificationEvents);
     }
 }

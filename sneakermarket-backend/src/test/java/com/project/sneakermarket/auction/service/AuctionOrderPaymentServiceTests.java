@@ -18,6 +18,7 @@ import com.project.sneakermarket.auction.entity.AuctionPaymentStatus;
 import com.project.sneakermarket.auction.entity.AuctionShippingStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.AuctionOrderRepository;
 import com.project.sneakermarket.common.exception.ForbiddenException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
@@ -28,6 +29,7 @@ class AuctionOrderPaymentServiceTests {
 
     private AuctionOrderRepository orders;
     private AuctionTime time;
+    private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
     private AuctionOrderPaymentService service;
     private AuctionOrder order;
 
@@ -35,7 +37,8 @@ class AuctionOrderPaymentServiceTests {
     void setup() {
         orders = mock(AuctionOrderRepository.class);
         time = mock(AuctionTime.class);
-        service = new AuctionOrderPaymentService(orders, time);
+        privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
+        service = new AuctionOrderPaymentService(orders, time, privateNotificationEvents);
         order = pendingOrder();
         when(orders.findByOrderNumberForUpdate("AO-PAY-001")).thenReturn(Optional.of(order));
     }
@@ -64,6 +67,7 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(PAYMENT_AT, response.updatedAt());
         verify(orders).save(order);
         verify(time).now();
+        verifyPaidEvent(PAYMENT_AT);
     }
 
     @Test
@@ -74,6 +78,7 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(AuctionPaymentStatus.PAID,
                 service.pay("AO-PAY-001", 10L).paymentStatus());
         assertEquals(AuctionOrderStatus.PAID, order.getOrderStatus());
+        verifyPaidEvent(PAYMENT_AT);
     }
 
     @Test
@@ -89,6 +94,7 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(before, snapshot(order));
         verify(orders, never()).save(any());
         verify(time).now();
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -103,6 +109,7 @@ class AuctionOrderPaymentServiceTests {
         assertEquals("競標訂單付款期限已過", error.getMessage());
         assertEquals(before, snapshot(order));
         verify(orders, never()).save(any());
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -114,6 +121,7 @@ class AuctionOrderPaymentServiceTests {
 
         assertEquals(AuctionPaymentStatus.PAID, response.paymentStatus());
         assertEquals(PAYMENT_AT, response.paidAt());
+        verifyPaidEvent(PAYMENT_AT);
     }
 
     @Test
@@ -132,6 +140,8 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(firstUpdatedAt, repeated.updatedAt());
         verify(time, times(1)).now();
         verify(orders, times(1)).save(order);
+        verify(privateNotificationEvents, times(1)).publishOrderPaid(
+                7L, 8L, "AO-PAY-001", 10L, 11L, PAYMENT_AT);
     }
 
     @Test
@@ -139,6 +149,7 @@ class AuctionOrderPaymentServiceTests {
         assertThrows(AuctionUnauthorizedException.class, () -> service.pay("AO-PAY-001", null));
         assertThrows(AuctionUnauthorizedException.class, () -> service.pay("AO-PAY-001", 0L));
         verifyNoInteractions(orders, time);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -148,6 +159,7 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(before, snapshot(order));
         verify(orders, never()).save(any());
         verifyNoInteractions(time);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -156,6 +168,7 @@ class AuctionOrderPaymentServiceTests {
         assertThrows(ResourceNotFoundException.class, () -> service.pay("AO-MISSING", 10L));
         verify(orders, never()).save(any());
         verifyNoInteractions(time);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -166,6 +179,7 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(before, snapshot(order));
         verify(orders, never()).save(any());
         verifyNoInteractions(time);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -176,6 +190,7 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(before, snapshot(order));
         verify(orders, never()).save(any());
         verifyNoInteractions(time);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -187,6 +202,7 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(before, snapshot(order));
         verify(orders, never()).save(any());
         verifyNoInteractions(time);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -197,6 +213,7 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(before, snapshot(order));
         verify(orders, never()).save(any());
         verifyNoInteractions(time);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -208,6 +225,18 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(before, snapshot(order));
         verify(orders, never()).save(any());
         verifyNoInteractions(time);
+        verifyNoInteractions(privateNotificationEvents);
+    }
+
+    @Test
+    void orderSaveFailureDoesNotPublishPaidEvent() {
+        when(time.now()).thenReturn(PAYMENT_AT);
+        doThrow(new IllegalStateException("save failed")).when(orders).save(order);
+
+        assertThrows(IllegalStateException.class,
+                () -> service.pay("AO-PAY-001", 10L));
+
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @ParameterizedTest
@@ -231,10 +260,12 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(originalUpdatedAt, order.getUpdatedAt());
         verify(orders, never()).save(any());
         verifyNoInteractions(time);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     private AuctionOrder pendingOrder() {
         AuctionOrder value = new AuctionOrder();
+        value.setAuctionOrderId(8L);
         value.setOrderNumber("AO-PAY-001");
         value.setAuctionId(7L);
         value.setBuyerId(10L);
@@ -251,6 +282,11 @@ class AuctionOrderPaymentServiceTests {
         value.setUpdatedAt(CREATED_AT);
         value.setPaymentDueAt(PAYMENT_AT.plusMinutes(1));
         return value;
+    }
+
+    private void verifyPaidEvent(LocalDateTime occurredAt) {
+        verify(privateNotificationEvents).publishOrderPaid(
+                7L, 8L, "AO-PAY-001", 10L, 11L, occurredAt);
     }
 
     private PaymentSnapshot snapshot(AuctionOrder value) {

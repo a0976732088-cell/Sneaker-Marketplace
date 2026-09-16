@@ -1,6 +1,7 @@
 package com.project.sneakermarket.auction.service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +11,8 @@ import com.project.sneakermarket.auction.entity.AuctionResult;
 import com.project.sneakermarket.auction.entity.AuctionResultStatus;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
+import com.project.sneakermarket.auction.repository.AuctionBidRepository;
+import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
 import com.project.sneakermarket.auction.repository.AuctionResultRepository;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
@@ -24,6 +27,8 @@ public class AuctionLifecycleService {
 
     private final AuctionRepository auctionRepository;
     private final AuctionResultRepository auctionResultRepository;
+    private final AuctionProductRepository auctionProductRepository;
+    private final AuctionBidRepository auctionBidRepository;
     private final AuctionTime auctionTime;
     private final org.springframework.context.ApplicationEventPublisher events;
     private final AuctionRealtimeEventPublisher realtimeEvents;
@@ -50,10 +55,16 @@ public class AuctionLifecycleService {
 
         if (auction.getStatus() == AuctionStatus.SCHEDULED
                 && !auction.getStartAt().isAfter(now)) {
+            Long sellerId = sellerId(auction);
             auction.setStatus(AuctionStatus.ACTIVE);
             auction.setUpdatedAt(now);
             auctionRepository.save(auction);
             realtimeEvents.publish(AuctionRealtimeEventType.AUCTION_STARTED, auction);
+            privateNotificationEvents.publishStarted(
+                    auction.getAuctionId(),
+                    sellerId,
+                    now
+            );
         }
     }
 
@@ -86,6 +97,11 @@ public class AuctionLifecycleService {
                     + ", hasHighestBidder=" + (auction.getHighestBidderId() != null));
         }
 
+        Long sellerId = sellerId(auction);
+        List<Long> participantIds = sold
+                ? auctionBidRepository.findDistinctBidderIds(auction.getAuctionId())
+                : List.of();
+
         AuctionResult result = result(
                 auction,
                 sold ? AuctionResultStatus.SOLD : AuctionResultStatus.UNSOLD,
@@ -106,12 +122,28 @@ public class AuctionLifecycleService {
         if (sold) {
             privateNotificationEvents.publishSold(
                     auction.getAuctionId(),
+                    sellerId,
                     auction.getHighestBidderId(),
+                    participantIds,
                     auction.getCurrentPrice(),
+                    now
+            );
+        } else {
+            privateNotificationEvents.publishUnsold(
+                    auction.getAuctionId(),
+                    sellerId,
                     now
             );
         }
         events.publishEvent(new com.project.sneakermarket.auction.email.AuctionEmailReadyEvent(auction.getAuctionId()));
+    }
+
+    private Long sellerId(Auction auction) {
+        return auctionProductRepository.findById(auction.getAuctionProductId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Auction product not found: auctionProductId="
+                                + auction.getAuctionProductId()))
+                .getSellerId();
     }
 
     private AuctionResult result(Auction auction, AuctionResultStatus status, Long winnerId,

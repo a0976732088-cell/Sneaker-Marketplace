@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -16,8 +17,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import com.project.sneakermarket.auction.entity.Auction;
+import com.project.sneakermarket.auction.entity.AuctionProduct;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
+import com.project.sneakermarket.auction.repository.AuctionBidRepository;
+import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
 import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
@@ -25,19 +30,50 @@ import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 
 class AuctionAdminMutationServiceTests {
     private static final Long AUCTION_ID = 12L;
+    private static final Long PRODUCT_ID = 21L;
     private static final Long ADMIN_ID = 7L;
+    private static final Long SELLER_ID = 101L;
+    private static final Long BIDDER_A_ID = 201L;
+    private static final Long BIDDER_B_ID = 202L;
+    private static final Long BIDDER_C_ID = 203L;
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 12, 20, 0);
 
     private AuctionRepository auctions;
+    private AuctionProductRepository products;
+    private AuctionBidRepository bids;
     private AuctionRealtimeEventPublisher realtimeEvents;
+    private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
     private AuctionAdminMutationService service;
 
     @BeforeEach
     void setup() {
         auctions = mock(AuctionRepository.class);
+        products = mock(AuctionProductRepository.class);
+        bids = mock(AuctionBidRepository.class);
         realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
+        privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
         AuctionTime time = new AuctionTime(Clock.fixed(Instant.parse("2026-09-12T12:00:00Z"), ZoneOffset.UTC));
-        service = new AuctionAdminMutationService(auctions, time, realtimeEvents);
+        service = new AuctionAdminMutationService(
+                auctions,
+                products,
+                bids,
+                time,
+                realtimeEvents,
+                privateNotificationEvents
+        );
+
+        AuctionProduct product = new AuctionProduct();
+        product.setAuctionProductId(PRODUCT_ID);
+        product.setSellerId(SELLER_ID);
+        when(products.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        // Repository 應 distinct；service 仍防禦性去重並排除 seller。
+        when(bids.findDistinctBidderIds(AUCTION_ID)).thenReturn(List.of(
+                SELLER_ID,
+                BIDDER_A_ID,
+                BIDDER_A_ID,
+                BIDDER_B_ID,
+                BIDDER_C_ID
+        ));
     }
 
     @ParameterizedTest
@@ -57,6 +93,13 @@ class AuctionAdminMutationServiceTests {
         verify(auctions).findByIdForUpdate(AUCTION_ID);
         verify(auctions).save(auction);
         verify(realtimeEvents).publish(AuctionRealtimeEventType.AUCTION_REMOVED, auction);
+        verify(privateNotificationEvents).publishRemoved(
+                AUCTION_ID,
+                SELLER_ID,
+                List.of(BIDDER_A_ID, BIDDER_B_ID, BIDDER_C_ID),
+                "違反平台規範",
+                NOW
+        );
         verify(auctions, never()).delete(any(Auction.class));
         verify(auctions, never()).deleteById(anyLong());
     }
@@ -90,6 +133,8 @@ class AuctionAdminMutationServiceTests {
         assertEquals("原始原因", auction.getRemoveReason());
         verify(auctions, never()).save(any());
         verifyNoInteractions(realtimeEvents);
+        verifyNoInteractions(privateNotificationEvents);
+        verifyNoInteractions(products, bids);
     }
 
     @Test
@@ -104,6 +149,13 @@ class AuctionAdminMutationServiceTests {
         assertRemovalMetadataCleared(auction);
         assertEquals(NOW, auction.getUpdatedAt());
         verify(auctions).save(auction);
+        verify(privateNotificationEvents).publishRestored(
+                AUCTION_ID,
+                SELLER_ID,
+                List.of(BIDDER_A_ID, BIDDER_B_ID, BIDDER_C_ID),
+                "原始原因",
+                NOW
+        );
     }
 
     @Test
@@ -130,6 +182,23 @@ class AuctionAdminMutationServiceTests {
 
         assertEquals(AuctionStatus.ACTIVE, auction.getStatus());
         assertRemovalMetadataCleared(auction);
+    }
+
+    @Test
+    void restoreLegacyBlankReasonPublishesSafeNullReason() {
+        Auction auction = removedAuction(AuctionStatus.ACTIVE);
+        auction.setRemoveReason("   ");
+        when(auctions.findByIdForUpdate(AUCTION_ID)).thenReturn(Optional.of(auction));
+
+        service.restoreAuction(AUCTION_ID, ADMIN_ID);
+
+        verify(privateNotificationEvents).publishRestored(
+                AUCTION_ID,
+                SELLER_ID,
+                List.of(BIDDER_A_ID, BIDDER_B_ID, BIDDER_C_ID),
+                null,
+                NOW
+        );
     }
 
     @ParameterizedTest
@@ -197,6 +266,44 @@ class AuctionAdminMutationServiceTests {
         assertDoesNotThrow(() -> service.restoreAuction(AUCTION_ID, ADMIN_ID));
 
         verify(auctions, never()).save(any());
+        verifyNoInteractions(privateNotificationEvents);
+        verifyNoInteractions(products, bids);
+    }
+
+    @Test
+    void removeRestoreRemovePublishesEachRealTransitionButNotRepeatedCalls() {
+        Auction auction = auction(AuctionStatus.ACTIVE);
+        when(auctions.findByIdForUpdate(AUCTION_ID)).thenReturn(Optional.of(auction));
+
+        service.removeAuction(AUCTION_ID, ADMIN_ID, "第一次下架");
+        service.removeAuction(AUCTION_ID, ADMIN_ID, "重複下架");
+        service.restoreAuction(AUCTION_ID, ADMIN_ID);
+        service.restoreAuction(AUCTION_ID, ADMIN_ID);
+        service.removeAuction(AUCTION_ID, ADMIN_ID, "第二次下架");
+
+        List<Long> participants = List.of(BIDDER_A_ID, BIDDER_B_ID, BIDDER_C_ID);
+        verify(privateNotificationEvents).publishRemoved(
+                AUCTION_ID, SELLER_ID, participants, "第一次下架", NOW);
+        verify(privateNotificationEvents).publishRestored(
+                AUCTION_ID, SELLER_ID, participants, "第一次下架", NOW);
+        verify(privateNotificationEvents).publishRemoved(
+                AUCTION_ID, SELLER_ID, participants, "第二次下架", NOW);
+        verifyNoMoreInteractions(privateNotificationEvents);
+        verify(products, times(3)).findById(PRODUCT_ID);
+        verify(bids, times(3)).findDistinctBidderIds(AUCTION_ID);
+        verify(realtimeEvents, times(2)).publish(AuctionRealtimeEventType.AUCTION_REMOVED, auction);
+    }
+
+    @Test
+    void failedMutationDoesNotPublishPrivateEvent() {
+        Auction auction = auction(AuctionStatus.ACTIVE);
+        when(auctions.findByIdForUpdate(AUCTION_ID)).thenReturn(Optional.of(auction));
+        when(auctions.save(auction)).thenThrow(new IllegalStateException("persistence failed"));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.removeAuction(AUCTION_ID, ADMIN_ID, "下架原因"));
+
+        verifyNoInteractions(realtimeEvents, privateNotificationEvents);
     }
 
     @Test
@@ -293,6 +400,7 @@ class AuctionAdminMutationServiceTests {
     private Auction auction(AuctionStatus status) {
         Auction auction = new Auction();
         auction.setAuctionId(AUCTION_ID);
+        auction.setAuctionProductId(PRODUCT_ID);
         auction.setStatus(status);
         auction.setCurrentPrice(new BigDecimal("5000.00"));
         auction.setHighestBidderId(null);

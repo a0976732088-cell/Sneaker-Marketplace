@@ -43,6 +43,7 @@ import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
 import com.project.sneakermarket.auction.repository.AuctionResultRepository;
 import com.project.sneakermarket.auction.service.AuctionBidService;
+import com.project.sneakermarket.auction.service.AuctionCommandService;
 import com.project.sneakermarket.auction.service.AuctionLifecycleService;
 import com.project.sneakermarket.auction.service.AuctionTime;
 import com.project.sneakermarket.member.entity.Member;
@@ -65,6 +66,7 @@ class AuctionPrivateNotificationIntegrationTests {
     private static final LocalDateTime BID_AT = CLOSE_AT.minusMinutes(10);
 
     @Autowired private AuctionBidService bidding;
+    @Autowired private AuctionCommandService commands;
     @Autowired private AuctionLifecycleService lifecycle;
     @Autowired private AuctionRepository auctions;
     @Autowired private AuctionProductRepository products;
@@ -183,6 +185,181 @@ class AuctionPrivateNotificationIntegrationTests {
     }
 
     @Test
+    void startedWaitsForCommitThenNotifiesOnlySeller() {
+        Long auctionId = fixture(
+                AuctionStatus.SCHEDULED,
+                BID_AT,
+                CLOSE_AT
+        );
+        clearInvocations(messaging);
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            lifecycle.processAuction(auctionId);
+
+            assertTrue(notificationRows(auctionId).isEmpty());
+            verify(messaging, never()).convertAndSendToUser(
+                    anyString(), eq(PRIVATE_DESTINATION), any());
+        });
+
+        assertEquals(AuctionStatus.ACTIVE, auctions.findById(auctionId).orElseThrow().getStatus());
+        List<Notification> rows = notificationRows(auctionId, "AUCTION_STARTED");
+        assertEquals(1, rows.size());
+        Notification seller = rows.get(0);
+        assertEquals(sellerId, seller.getMemberId());
+        assertNotificationContract(seller, auctionId, "/auctions/me/listings", BID_AT);
+        assertPrivateEvent(
+                sellerId,
+                AuctionPrivateRealtimeEventType.AUCTION_STARTED,
+                auctionId,
+                seller.getNotificationId(),
+                BID_AT
+        );
+        verify(messaging, never()).convertAndSendToUser(
+                eq(bidderAId.toString()), eq(PRIVATE_DESTINATION), any());
+    }
+
+    @Test
+    void unsoldNotifiesOnlySeller() {
+        Long auctionId = fixture();
+        when(time.now()).thenReturn(CLOSE_AT);
+
+        lifecycle.processAuction(auctionId);
+
+        assertEquals(AuctionStatus.UNSOLD, auctions.findById(auctionId).orElseThrow().getStatus());
+        List<Notification> rows = notificationRows(auctionId, "AUCTION_UNSOLD");
+        assertEquals(1, rows.size());
+        Notification seller = rows.get(0);
+        assertEquals(sellerId, seller.getMemberId());
+        assertNotificationContract(seller, auctionId, "/auctions/me/listings", CLOSE_AT);
+        assertPrivateEvent(
+                sellerId,
+                AuctionPrivateRealtimeEventType.AUCTION_UNSOLD,
+                auctionId,
+                seller.getNotificationId()
+        );
+        verify(messaging, never()).convertAndSendToUser(
+                eq(bidderAId.toString()), eq(PRIVATE_DESTINATION), any());
+    }
+
+    @Test
+    void cancelledUsesDistinctSnapshotForSellerAndParticipants() {
+        Long auctionId = fixture();
+        directBid(auctionId, bidderAId, "5100", BID_AT.minusMinutes(4));
+        directBid(auctionId, bidderAId, "5200", BID_AT.minusMinutes(3));
+        directBid(auctionId, bidderBId, "5300", BID_AT.minusMinutes(2));
+        directBid(auctionId, sellerId, "5400", BID_AT.minusMinutes(1));
+        clearInvocations(messaging);
+
+        commands.cancelAuction(auctionId, sellerId);
+
+        assertEquals(AuctionStatus.CANCELLED, auctions.findById(auctionId).orElseThrow().getStatus());
+        List<Notification> rows = notificationRows(auctionId, "AUCTION_CANCELLED");
+        assertEquals(3, rows.size());
+        Notification seller = notificationRows(
+                auctionId, sellerId, "AUCTION_CANCELLED").get(0);
+        Notification participantA = notificationRows(
+                auctionId, bidderAId, "AUCTION_CANCELLED").get(0);
+        Notification participantB = notificationRows(
+                auctionId, bidderBId, "AUCTION_CANCELLED").get(0);
+        assertNotificationContract(seller, auctionId, "/auctions/me/listings", BID_AT);
+        assertNotificationContract(participantA, auctionId, "/auctions/me/bids", BID_AT);
+        assertNotificationContract(participantB, auctionId, "/auctions/me/bids", BID_AT);
+        assertTrue(notificationRows(auctionId, bidderCId, "AUCTION_CANCELLED").isEmpty());
+        assertPrivateEvent(
+                sellerId,
+                AuctionPrivateRealtimeEventType.AUCTION_CANCELLED,
+                auctionId,
+                seller.getNotificationId(),
+                BID_AT
+        );
+        assertPrivateEvent(
+                bidderAId,
+                AuctionPrivateRealtimeEventType.AUCTION_CANCELLED,
+                auctionId,
+                participantA.getNotificationId(),
+                BID_AT
+        );
+        assertPrivateEvent(
+                bidderBId,
+                AuctionPrivateRealtimeEventType.AUCTION_CANCELLED,
+                auctionId,
+                participantB.getNotificationId(),
+                BID_AT
+        );
+        verify(messaging, never()).convertAndSendToUser(
+                eq(bidderCId.toString()), eq(PRIVATE_DESTINATION), any());
+    }
+
+    @Test
+    void soldRollbackCreatesNeitherResultNotificationNorPrivateMessage() {
+        Long auctionId = fixture();
+        directBid(auctionId, bidderAId, "5100", CLOSE_AT.minusMinutes(1));
+        Auction auction = auctions.findById(auctionId).orElseThrow();
+        auction.setCurrentPrice(new BigDecimal("5100"));
+        auction.setHighestBidderId(bidderAId);
+        auction.setBidCount(1);
+        auctions.saveAndFlush(auction);
+        when(time.now()).thenReturn(CLOSE_AT);
+        clearInvocations(messaging);
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            lifecycle.processAuction(auctionId);
+
+            assertTrue(notificationRows(auctionId).isEmpty());
+            verify(messaging, never()).convertAndSendToUser(
+                    anyString(), eq(PRIVATE_DESTINATION), any());
+            status.setRollbackOnly();
+        });
+
+        assertEquals(AuctionStatus.ACTIVE, auctions.findById(auctionId).orElseThrow().getStatus());
+        assertTrue(results.findByAuctionId(auctionId).isEmpty());
+        assertTrue(notificationRows(auctionId).isEmpty());
+        verify(messaging, never()).convertAndSendToUser(
+                anyString(), eq(PRIVATE_DESTINATION), any());
+    }
+
+    @Test
+    void cancelledRollbackCreatesNeitherNotificationNorPrivateMessage() {
+        Long auctionId = fixture();
+        clearInvocations(messaging);
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            commands.cancelAuction(auctionId, sellerId);
+
+            assertTrue(notificationRows(auctionId).isEmpty());
+            verify(messaging, never()).convertAndSendToUser(
+                    anyString(), eq(PRIVATE_DESTINATION), any());
+            status.setRollbackOnly();
+        });
+
+        assertEquals(AuctionStatus.ACTIVE, auctions.findById(auctionId).orElseThrow().getStatus());
+        assertTrue(notificationRows(auctionId).isEmpty());
+        verify(messaging, never()).convertAndSendToUser(
+                anyString(), eq(PRIVATE_DESTINATION), any());
+    }
+
+    @Test
+    void removedAtDeadlineDoesNotPublishPrivateRemovedEvent() {
+        Long auctionId = fixture();
+        Auction auction = auctions.findById(auctionId).orElseThrow();
+        auction.setRemovedAt(BID_AT);
+        auction.setRemovedByMemberId(sellerId);
+        auction.setRemoveReason("integration removed fixture");
+        auction.setRemovedFromStatus(AuctionStatus.ACTIVE);
+        auctions.saveAndFlush(auction);
+        when(time.now()).thenReturn(CLOSE_AT);
+        clearInvocations(messaging);
+
+        lifecycle.processAuction(auctionId);
+
+        assertEquals(AuctionStatus.REMOVED, auctions.findById(auctionId).orElseThrow().getStatus());
+        assertTrue(results.findByAuctionId(auctionId).isPresent());
+        assertTrue(notificationRows(auctionId).isEmpty());
+        verify(messaging, never()).convertAndSendToUser(
+                anyString(), eq(PRIVATE_DESTINATION), any());
+    }
+
+    @Test
     void soldCreatesWinnerAndDistinctLoserNotificationsAndReplayIsIdempotent() {
         Long auctionId = fixture();
         directBid(auctionId, bidderAId, "5100", CLOSE_AT.minusMinutes(4));
@@ -200,12 +377,19 @@ class AuctionPrivateNotificationIntegrationTests {
         lifecycle.processAuction(auctionId);
 
         assertEquals(AuctionStatus.SOLD, auctions.findById(auctionId).orElseThrow().getStatus());
+        assertEquals(1, notificationRows(auctionId, sellerId, "AUCTION_SOLD").size());
+        assertTrue(notificationRows(auctionId, sellerId, "AUCTION_WON").isEmpty());
+        assertTrue(notificationRows(auctionId, sellerId, "AUCTION_LOST").isEmpty());
         assertEquals(1, notificationRows(auctionId, bidderCId, "AUCTION_WON").size());
         assertTrue(notificationRows(auctionId, bidderCId, "AUCTION_LOST").isEmpty());
         assertEquals(1, notificationRows(auctionId, bidderAId, "AUCTION_LOST").size());
         assertEquals(1, notificationRows(auctionId, bidderBId, "AUCTION_LOST").size());
-        assertEquals(3, notificationRows(auctionId).size());
+        assertEquals(4, notificationRows(auctionId).size());
 
+        Notification seller = notificationRows(auctionId, sellerId, "AUCTION_SOLD").get(0);
+        assertEquals("您的競標已結標", seller.getTitle());
+        assertTrue(seller.getContent().contains("NT$ 6,000"));
+        assertNotificationContract(seller, auctionId, "/auctions/me/listings", CLOSE_AT);
         Notification winner = notificationRows(auctionId, bidderCId, "AUCTION_WON").get(0);
         assertEquals("恭喜您競標得標", winner.getTitle());
         assertTrue(winner.getContent().contains("NT$ 6,000"));
@@ -215,6 +399,8 @@ class AuctionPrivateNotificationIntegrationTests {
         assertTrue(loserA.getContent().contains("本次由其他會員得標"));
         assertNotificationContract(loserA, auctionId, CLOSE_AT);
 
+        assertPrivateEvent(sellerId, AuctionPrivateRealtimeEventType.AUCTION_SOLD, auctionId,
+                seller.getNotificationId());
         assertPrivateEvent(bidderCId, AuctionPrivateRealtimeEventType.AUCTION_WON, auctionId,
                 winner.getNotificationId());
         assertPrivateEvent(bidderAId, AuctionPrivateRealtimeEventType.AUCTION_LOST, auctionId,
@@ -233,10 +419,11 @@ class AuctionPrivateNotificationIntegrationTests {
                         CLOSE_AT
                 )));
 
+        assertEquals(1, notificationRows(auctionId, sellerId, "AUCTION_SOLD").size());
         assertEquals(1, notificationRows(auctionId, bidderCId, "AUCTION_WON").size());
         assertEquals(1, notificationRows(auctionId, bidderAId, "AUCTION_LOST").size());
         assertEquals(1, notificationRows(auctionId, bidderBId, "AUCTION_LOST").size());
-        assertEquals(3, notificationRows(auctionId).size());
+        assertEquals(4, notificationRows(auctionId).size());
         verify(messaging, never()).convertAndSendToUser(
                 anyString(), eq(PRIVATE_DESTINATION), any());
     }
@@ -281,6 +468,17 @@ class AuctionPrivateNotificationIntegrationTests {
     }
 
     private Long fixture() {
+        return fixture(
+                AuctionStatus.ACTIVE,
+                CLOSE_AT.minusHours(1),
+                CLOSE_AT
+        );
+    }
+
+    private Long fixture(
+            AuctionStatus status,
+            LocalDateTime startAt,
+            LocalDateTime endAt) {
         AuctionProduct product = new AuctionProduct();
         product.setSellerId(sellerId);
         product.setBrandId(1L);
@@ -304,9 +502,9 @@ class AuctionPrivateNotificationIntegrationTests {
         auction.setStartPrice(new BigDecimal("5000"));
         auction.setCurrentPrice(new BigDecimal("5000"));
         auction.setMinIncrement(new BigDecimal("100"));
-        auction.setStartAt(CLOSE_AT.minusHours(1));
-        auction.setEndAt(CLOSE_AT);
-        auction.setStatus(AuctionStatus.ACTIVE);
+        auction.setStartAt(startAt);
+        auction.setEndAt(endAt);
+        auction.setStatus(status);
         auction.setBidCount(0);
         auction.setCreatedAt(CLOSE_AT.minusHours(2));
         auction.setUpdatedAt(CLOSE_AT.minusHours(2));
@@ -347,9 +545,22 @@ class AuctionPrivateNotificationIntegrationTests {
             Notification notification,
             Long auctionId,
             LocalDateTime sentAt) {
+        assertNotificationContract(
+                notification,
+                auctionId,
+                "/auctions/" + auctionId,
+                sentAt
+        );
+    }
+
+    private void assertNotificationContract(
+            Notification notification,
+            Long auctionId,
+            String targetUrl,
+            LocalDateTime sentAt) {
         assertEquals("AUCTION", notification.getTargetType());
         assertEquals(auctionId, notification.getTargetId());
-        assertEquals("/auctions/" + auctionId, notification.getTargetUrl());
+        assertEquals(targetUrl, notification.getTargetUrl());
         assertFalse(notification.getIsRead());
         assertTrue(notification.getIsSent());
         assertEquals(sentAt, notification.getSentAt());
@@ -368,11 +579,20 @@ class AuctionPrivateNotificationIntegrationTests {
             AuctionPrivateRealtimeEventType eventType,
             Long auctionId,
             Long notificationId) {
+        assertPrivateEvent(memberId, eventType, auctionId, notificationId, CLOSE_AT);
+    }
+
+    private void assertPrivateEvent(
+            Long memberId,
+            AuctionPrivateRealtimeEventType eventType,
+            Long auctionId,
+            Long notificationId,
+            LocalDateTime occurredAt) {
         AuctionPrivateRealtimeMessage message = capturePrivateMessage(memberId);
         assertEquals(eventType, message.eventType());
         assertEquals(auctionId, message.auctionId());
         assertEquals(notificationId, message.notificationId());
-        assertEquals(CLOSE_AT, message.occurredAt());
+        assertEquals(occurredAt, message.occurredAt());
     }
 
     private void deleteFixtureNotifications(Long auctionId) {

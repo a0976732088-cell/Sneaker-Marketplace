@@ -12,6 +12,7 @@ import com.project.sneakermarket.auction.entity.AuctionOrderStatus;
 import com.project.sneakermarket.auction.entity.AuctionPaymentStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.AuctionOrderRepository;
 import com.project.sneakermarket.common.exception.ForbiddenException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
@@ -28,6 +29,7 @@ public class AuctionOrderPaymentService {
 
     private final AuctionOrderRepository orders;
     private final AuctionTime time;
+    private final AuctionPrivateNotificationEventPublisher privateNotificationEvents;
 
     @Transactional
     public AuctionOrderPaymentResponse pay(String orderNumber, Long memberId) {
@@ -61,6 +63,14 @@ public class AuctionOrderPaymentService {
         order.setPaidAt(paidAt);
         order.setUpdatedAt(paidAt);
         orders.save(order);
+        privateNotificationEvents.publishOrderPaid(
+                order.getAuctionId(),
+                order.getAuctionOrderId(),
+                order.getOrderNumber(),
+                order.getBuyerId(),
+                order.getSellerId(),
+                paidAt
+        );
 
         return toResponse(order);
     }

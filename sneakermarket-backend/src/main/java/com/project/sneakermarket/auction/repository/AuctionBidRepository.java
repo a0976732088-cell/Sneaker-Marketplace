@@ -20,6 +20,10 @@ public interface AuctionBidRepository
     @Query("select distinct b.bidderId from AuctionBid b where b.auctionId = :auctionId and b.bidderId <> :winnerId")
     List<Long> findDistinctLosingBidderIds(@Param("auctionId") Long auctionId, @Param("winnerId") Long winnerId);
 
+    /** 生命週期與管理事件的參與者快照；同一會員只回傳一次。 */
+    @Query("select distinct b.bidderId from AuctionBid b where b.auctionId = :auctionId")
+    List<Long> findDistinctBidderIds(@Param("auctionId") Long auctionId);
+
     /** 先按競標聚合再由 DB 分頁；count 計算競標數而非出價筆數。 */
     @Query(value = """
             select b.auctionId as auctionId, max(b.bidAmount) as myHighestBid,

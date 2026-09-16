@@ -20,6 +20,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 import com.project.sneakermarket.auction.entity.*;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.*;
 import com.project.sneakermarket.member.entity.Member;
 import com.project.sneakermarket.member.repository.MemberRepository;
@@ -30,6 +31,7 @@ class AuctionOrderServiceTests {
     private AuctionRepository auctions;
     private AuctionProductRepository products;
     private MemberRepository members;
+    private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
     private AuctionOrderService service;
     private AuctionResult result;
     private Auction auction;
@@ -44,9 +46,11 @@ class AuctionOrderServiceTests {
         auctions = mock(AuctionRepository.class);
         products = mock(AuctionProductRepository.class);
         members = mock(MemberRepository.class);
+        privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
         service = new AuctionOrderService(results, orders, auctions, products, members,
                 new AuctionTime(Clock.fixed(Instant.parse("2026-09-10T04:00:00Z"), ZoneOffset.UTC)),
                 new AuctionOrderSettings(24),
+                privateNotificationEvents,
                 mock(org.springframework.context.ApplicationEventPublisher.class));
         result = new AuctionResult();
         result.setAuctionId(1L);
@@ -71,6 +75,11 @@ class AuctionOrderServiceTests {
         when(products.findById(4L)).thenReturn(Optional.of(product));
         when(members.existsById(3L)).thenReturn(true);
         when(members.findById(2L)).thenReturn(Optional.of(buyer));
+        when(orders.saveAndFlush(any())).thenAnswer(call -> {
+            AuctionOrder saved = call.getArgument(0);
+            saved.setAuctionOrderId(11L);
+            return saved;
+        });
     }
 
     @Test
@@ -101,6 +110,8 @@ class AuctionOrderServiceTests {
         sequence.verify(results).findByAuctionIdForUpdate(1L);
         sequence.verify(orders).existsByAuctionId(1L);
         sequence.verify(orders).saveAndFlush(any());
+        verify(privateNotificationEvents).publishOrderCreated(
+                1L, 11L, order.getOrderNumber(), 2L, 3L, NOW);
         verify(auctions, never()).save(any());
         verify(results, never()).save(any());
     }
@@ -112,6 +123,7 @@ class AuctionOrderServiceTests {
         service.createOrderForAuction(1L);
         verify(orders, never()).saveAndFlush(any());
         verifyNoInteractions(auctions, products, members);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -119,6 +131,7 @@ class AuctionOrderServiceTests {
         when(results.findByAuctionIdForUpdate(1L)).thenReturn(Optional.empty());
         service.createOrderForAuction(1L);
         verifyNoInteractions(orders, auctions, products, members);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -127,6 +140,7 @@ class AuctionOrderServiceTests {
         service.createOrderForAuction(1L);
         verify(orders, never()).saveAndFlush(any());
         verifyNoInteractions(auctions, products, members);
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test
@@ -195,6 +209,16 @@ class AuctionOrderServiceTests {
     }
 
     @Test
+    void orderInsertFailureDoesNotPublishCreatedEvent() {
+        doThrow(new IllegalStateException("insert failed"))
+                .when(orders).saveAndFlush(any());
+
+        assertThrows(IllegalStateException.class, () -> service.createOrderForAuction(1L));
+
+        verifyNoInteractions(privateNotificationEvents);
+    }
+
+    @Test
     void orderNumbersAreNonemptyWithinLimitAndUnique() {
         var numbers = new HashSet<String>();
         doAnswer(call -> {
@@ -202,6 +226,7 @@ class AuctionOrderServiceTests {
             assertFalse(order.getOrderNumber().isBlank());
             assertTrue(order.getOrderNumber().length() <= 40);
             assertTrue(numbers.add(order.getOrderNumber()));
+            order.setAuctionOrderId(11L);
             return order;
         }).when(orders).saveAndFlush(any());
         for (int i = 0; i < 1000; i++) service.createOrderForAuction(1L);
@@ -220,5 +245,6 @@ class AuctionOrderServiceTests {
         verify(orders, never()).saveAndFlush(any());
         verify(results, never()).save(any());
         verify(auctions, never()).save(any());
+        verifyNoInteractions(privateNotificationEvents);
     }
 }

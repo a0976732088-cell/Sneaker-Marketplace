@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.sneakermarket.auction.entity.*;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.*;
 import com.project.sneakermarket.member.entity.Member;
 import com.project.sneakermarket.member.repository.MemberRepository;
@@ -25,6 +26,7 @@ public class AuctionOrderService {
     private final MemberRepository members;
     private final AuctionTime time;
     private final AuctionOrderSettings settings;
+    private final AuctionPrivateNotificationEventPublisher privateNotificationEvents;
     private final org.springframework.context.ApplicationEventPublisher events;
 
     // 訂單不加入呼叫端交易；呼叫端只應傳入已 commit 的 Result 所屬 auctionId。
@@ -77,6 +79,14 @@ public class AuctionOrderService {
         order.setUpdatedAt(now);
         order.setPaymentDueAt(now.plusHours(settings.paymentTimeoutHours()));
         orders.saveAndFlush(order);
+        privateNotificationEvents.publishOrderCreated(
+                order.getAuctionId(),
+                order.getAuctionOrderId(),
+                order.getOrderNumber(),
+                order.getBuyerId(),
+                order.getSellerId(),
+                now
+        );
         events.publishEvent(new com.project.sneakermarket.auction.email.AuctionEmailReadyEvent(auctionId));
     }
 

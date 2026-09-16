@@ -1,21 +1,37 @@
 package com.project.sneakermarket.auction.service;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import org.hibernate.SessionFactory;
 
@@ -29,10 +45,15 @@ import com.project.sneakermarket.auction.dto.AuctionSearchCriteria;
 import com.project.sneakermarket.auction.dto.BidCreateRequest;
 import com.project.sneakermarket.auction.entity.*;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
+import com.project.sneakermarket.auction.notification.AuctionNotificationIntegrationService;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
+import com.project.sneakermarket.auction.notification.AuctionPrivateRealtimeMessage;
 import com.project.sneakermarket.auction.repository.*;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 import com.project.sneakermarket.member.entity.Member;
 import com.project.sneakermarket.member.repository.MemberRepository;
+import com.project.sneakermarket.notification.entity.Notification;
+import com.project.sneakermarket.notification.repository.NotificationRepository;
 
 /** 真實 MSSQL：驗證管理下架、恢復、Soft Delete、公開可見性與帳本資料保留。 */
 @SpringBootTest(properties = {
@@ -41,6 +62,7 @@ import com.project.sneakermarket.member.repository.MemberRepository;
         "spring.jpa.properties.hibernate.generate_statistics=true"
 })
 class AuctionAdminIntegrationTests {
+    private static final String PRIVATE_DESTINATION = "/queue/auction-events";
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 12, 10, 0);
 
     @Autowired private AuctionAdminMutationService mutations;
@@ -58,10 +80,14 @@ class AuctionAdminIntegrationTests {
     @Autowired private AuctionOrderRepository orders;
     @Autowired private AuctionEmailLogRepository emailLogs;
     @Autowired private MemberRepository members;
+    @Autowired private NotificationRepository notifications;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private EntityManager em;
     @Autowired private EntityManagerFactory emf;
     @MockitoBean private AuctionTime time;
+    @MockitoBean private SimpMessagingTemplate messaging;
+    @MockitoSpyBean private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
+    @MockitoSpyBean private AuctionNotificationIntegrationService notificationIntegration;
 
     private final List<Long> auctionIds = new ArrayList<>();
     private final List<Long> productIds = new ArrayList<>();
@@ -455,6 +481,126 @@ class AuctionAdminIntegrationTests {
     }
 
     @Test
+    void removeRestoreCycleNotifiesSellerAndDistinctParticipantsOnlyAfterCommit() {
+        Long bidderBId = member("買家 B", "ROLE_MEMBER");
+        Long bidderCId = member("買家 C", "ROLE_MEMBER");
+        Long outsiderId = member("未參與會員", "ROLE_MEMBER");
+        Long auctionId = fixture(AuctionStatus.ACTIVE, true, "管理通知收件人測試");
+        directBid(auctionId, buyerId, "5600.00", NOW.minusMinutes(25));
+        directBid(auctionId, bidderBId, "5700.00", NOW.minusMinutes(20));
+        directBid(auctionId, bidderBId, "5800.00", NOW.minusMinutes(15));
+        directBid(auctionId, bidderCId, "5900.00", NOW.minusMinutes(10));
+        // 防禦性驗證：即使 ledger 有 seller 紀錄，私人參與者清單仍不得重複通知 seller。
+        directBid(auctionId, sellerId, "6000.00", NOW.minusMinutes(5));
+
+        AtomicBoolean observedBeforeCommit = new AtomicBoolean(false);
+        doAnswer(invocation -> {
+            invocation.callRealMethod();
+            assertTrue(notificationRows(auctionId, "AUCTION_REMOVED").isEmpty());
+            verify(messaging, never()).convertAndSendToUser(
+                    anyString(), eq(PRIVATE_DESTINATION), any());
+            observedBeforeCommit.set(true);
+            return null;
+        }).when(privateNotificationEvents).publishRemoved(
+                eq(auctionId), eq(sellerId), anyList(), eq("第一次下架"), eq(NOW));
+
+        mutations.removeAuction(auctionId, adminId, "第一次下架");
+
+        assertTrue(observedBeforeCommit.get());
+        Set<Long> recipients = Set.of(sellerId, buyerId, bidderBId, bidderCId);
+        assertNotificationRecipients(auctionId, "AUCTION_REMOVED", recipients, 1);
+        assertTrue(notificationRows(auctionId, outsiderId, "AUCTION_REMOVED").isEmpty());
+        assertTrue(notificationRows(auctionId, sellerId, "AUCTION_REMOVED").get(0)
+                .getContent().contains("第一次下架"));
+        verifyPrivateRecipients(recipients, outsiderId);
+
+        clearInvocations(messaging);
+        mutations.removeAuction(auctionId, adminId, "重複下架");
+        assertNotificationRecipients(auctionId, "AUCTION_REMOVED", recipients, 1);
+        verify(messaging, never()).convertAndSendToUser(
+                anyString(), eq(PRIVATE_DESTINATION), any());
+
+        clearInvocations(messaging);
+        mutations.restoreAuction(auctionId, adminId);
+        assertNotificationRecipients(auctionId, "AUCTION_RESTORED", recipients, 1);
+        assertTrue(notificationRows(auctionId, outsiderId, "AUCTION_RESTORED").isEmpty());
+        verifyPrivateRecipients(recipients, outsiderId);
+
+        clearInvocations(messaging);
+        mutations.restoreAuction(auctionId, adminId);
+        assertNotificationRecipients(auctionId, "AUCTION_RESTORED", recipients, 1);
+        verify(messaging, never()).convertAndSendToUser(
+                anyString(), eq(PRIVATE_DESTINATION), any());
+
+        clearInvocations(messaging);
+        mutations.removeAuction(auctionId, adminId, "第二次下架");
+        assertNotificationRecipients(auctionId, "AUCTION_REMOVED", recipients, 2);
+        assertTrue(notificationRows(auctionId, sellerId, "AUCTION_REMOVED").stream()
+                .anyMatch(row -> row.getContent().contains("第二次下架")));
+        verifyPrivateRecipients(recipients, outsiderId);
+    }
+
+    @Test
+    void rolledBackRemoveCreatesNeitherNotificationNorPrivateMessage() {
+        Long auctionId = fixture(AuctionStatus.ACTIVE, true, "管理通知 rollback 測試");
+        doAnswer(invocation -> {
+            invocation.callRealMethod();
+            throw new IllegalStateException("force transaction rollback after event publication");
+        }).when(privateNotificationEvents).publishRemoved(
+                eq(auctionId), eq(sellerId), anyList(), eq("強制 rollback"), eq(NOW));
+
+        assertThrows(IllegalStateException.class,
+                () -> mutations.removeAuction(auctionId, adminId, "強制 rollback"));
+
+        Auction persisted = persisted(auctionId);
+        assertNull(persisted.getRemovedAt());
+        assertNull(persisted.getRemoveReason());
+        assertTrue(notificationRows(auctionId).isEmpty());
+        verify(messaging, never()).convertAndSendToUser(
+                anyString(), eq(PRIVATE_DESTINATION), any());
+    }
+
+    @Test
+    void privateWebSocketFailureKeepsCommittedRemoveAndNotifications() {
+        Long auctionId = fixture(AuctionStatus.ACTIVE, true, "管理通知 broker failure 測試");
+        doThrow(new IllegalStateException("broker unavailable"))
+                .when(messaging).convertAndSendToUser(
+                        anyString(), eq(PRIVATE_DESTINATION), any());
+
+        assertDoesNotThrow(() -> mutations.removeAuction(auctionId, adminId, "違規下架"));
+
+        Auction removed = persisted(auctionId);
+        assertEquals(NOW, removed.getRemovedAt());
+        assertEquals("違規下架", removed.getRemoveReason());
+        assertNotificationRecipients(
+                auctionId, "AUCTION_REMOVED", Set.of(sellerId, buyerId), 1);
+        verify(messaging, times(2)).convertAndSendToUser(
+                anyString(), eq(PRIVATE_DESTINATION), any(AuctionPrivateRealtimeMessage.class));
+    }
+
+    @Test
+    void notificationPersistenceFailureDoesNotRollBackCommittedRemove() {
+        Long auctionId = fixture(AuctionStatus.ACTIVE, true, "管理通知 persistence failure 測試");
+        doThrow(new DataIntegrityViolationException("notification persistence failed"))
+                .when(notificationIntegration).createRemovedSellerNotification(
+                        auctionId, sellerId, "違規下架", NOW);
+
+        assertDoesNotThrow(() -> mutations.removeAuction(auctionId, adminId, "違規下架"));
+
+        Auction removed = persisted(auctionId);
+        assertEquals(NOW, removed.getRemovedAt());
+        assertEquals("違規下架", removed.getRemoveReason());
+        assertTrue(notificationRows(auctionId, sellerId, "AUCTION_REMOVED").isEmpty());
+        assertEquals(1, notificationRows(auctionId, buyerId, "AUCTION_REMOVED").size());
+        verify(messaging, never()).convertAndSendToUser(
+                eq(sellerId.toString()), eq(PRIVATE_DESTINATION), any());
+        verify(messaging).convertAndSendToUser(
+                eq(buyerId.toString()),
+                eq(PRIVATE_DESTINATION),
+                any(AuctionPrivateRealtimeMessage.class));
+    }
+
+    @Test
     void batchRemoveRestoreAndDeleteUseDistinctIdsAndKeepPartialSuccess() {
         Long first = fixture(AuctionStatus.DRAFT, false, "批次一");
         Long second = fixture(AuctionStatus.DRAFT, false, "批次二");
@@ -563,6 +709,65 @@ class AuctionAdminIntegrationTests {
         assertEquals(bidId, persistedBids.get(0).getBidId());
         assertAmount("5500.00", persistedBids.get(0).getBidAmount());
     }
+
+    private void directBid(
+            Long auctionId,
+            Long bidderId,
+            String amount,
+            LocalDateTime createdAt) {
+        AuctionBid bid = new AuctionBid();
+        bid.setAuctionId(auctionId);
+        bid.setBidderId(bidderId);
+        bid.setBidAmount(new BigDecimal(amount));
+        bid.setCreatedAt(createdAt);
+        bids.saveAndFlush(bid);
+    }
+
+    private List<Notification> notificationRows(Long auctionId) {
+        return notifications.findAll().stream()
+                .filter(row -> "AUCTION".equals(row.getTargetType()))
+                .filter(row -> auctionId.equals(row.getTargetId()))
+                .toList();
+    }
+
+    private List<Notification> notificationRows(Long auctionId, String type) {
+        return notificationRows(auctionId).stream()
+                .filter(row -> type.equals(row.getNotificationType()))
+                .toList();
+    }
+
+    private List<Notification> notificationRows(Long auctionId, Long memberId, String type) {
+        return notificationRows(auctionId, type).stream()
+                .filter(row -> memberId.equals(row.getMemberId()))
+                .toList();
+    }
+
+    private void assertNotificationRecipients(
+            Long auctionId,
+            String type,
+            Set<Long> recipients,
+            int countPerRecipient) {
+        List<Notification> rows = notificationRows(auctionId, type);
+        assertEquals(recipients.size() * countPerRecipient, rows.size());
+        assertEquals(recipients, new HashSet<>(rows.stream()
+                .map(Notification::getMemberId)
+                .toList()));
+        recipients.forEach(memberId -> assertEquals(
+                countPerRecipient,
+                notificationRows(auctionId, memberId, type).size()));
+    }
+
+    private void verifyPrivateRecipients(Set<Long> recipients, Long outsiderId) {
+        recipients.forEach(memberId -> verify(messaging).convertAndSendToUser(
+                eq(memberId.toString()),
+                eq(PRIVATE_DESTINATION),
+                any(AuctionPrivateRealtimeMessage.class)));
+        verify(messaging, times(recipients.size())).convertAndSendToUser(
+                anyString(), eq(PRIVATE_DESTINATION), any(AuctionPrivateRealtimeMessage.class));
+        verify(messaging, never()).convertAndSendToUser(
+                eq(outsiderId.toString()), eq(PRIVATE_DESTINATION), any());
+    }
+
     private Long fixture(AuctionStatus status, boolean withBid, String productName) {
         AuctionProduct product = new AuctionProduct();
         product.setSellerId(sellerId);

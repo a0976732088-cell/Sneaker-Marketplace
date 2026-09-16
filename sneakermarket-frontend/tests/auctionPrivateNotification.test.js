@@ -82,22 +82,19 @@ function createHarness({ anonymous = false } = {}) {
     logout: async () => {
       logoutRequests++;
     },
-    httpClient: {
-      async get(path) {
-        assert.equal(path, "/notification/noticeList");
-        notificationRequests++;
-        return {
-          data: [
-            {
-              notificationId: notificationRequests,
-              title: "競標通知",
-              isRead: false,
-            },
-          ],
-        };
-      },
-      async put() {},
+    getMemberNotifications: async () => {
+      notificationRequests++;
+      return {
+        data: [
+          {
+            notificationId: notificationRequests,
+            title: "競標通知",
+            isRead: false,
+          },
+        ],
+      };
     },
+    markNotificationAsRead: async () => {},
     createAuctionPrivateSocketClient: (options) => {
       socketFactoryCount++;
       socketOptions = options;
@@ -207,6 +204,29 @@ test("private message and every socket connect or reconnect refresh notification
   await h.socketOptions().onConnect({ reconnect: true });
   assert.equal(h.notificationRequests(), initialRequests + 3);
   assert.equal(h.subject.unreadCount.value, 1);
+});
+
+test("lifecycle, visibility, order and unknown future private messages all refresh Navbar notifications", async () => {
+  const h = createHarness();
+  await h.flush();
+  let expectedRequests = h.notificationRequests();
+
+  for (const eventType of [
+    "AUCTION_STARTED",
+    "AUCTION_SOLD",
+    "AUCTION_UNSOLD",
+    "AUCTION_CANCELLED",
+    "AUCTION_REMOVED",
+    "AUCTION_RESTORED",
+    "AUCTION_ORDER_CREATED",
+    "AUCTION_ORDER_PAID",
+    "AUCTION_ORDER_ABANDONED",
+    "AUCTION_FUTURE_EVENT",
+  ]) {
+    await h.socketOptions().onMessage({ eventType });
+    expectedRequests++;
+    assert.equal(h.notificationRequests(), expectedRequests);
+  }
 });
 
 test("logout disconnects the private socket and clears Navbar notification state", async () => {

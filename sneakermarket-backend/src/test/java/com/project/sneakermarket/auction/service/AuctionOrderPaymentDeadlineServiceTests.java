@@ -2,7 +2,9 @@ package com.project.sneakermarket.auction.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -26,6 +28,7 @@ import com.project.sneakermarket.auction.entity.AuctionOrder;
 import com.project.sneakermarket.auction.entity.AuctionOrderStatus;
 import com.project.sneakermarket.auction.entity.AuctionPaymentStatus;
 import com.project.sneakermarket.auction.entity.AuctionShippingStatus;
+import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.AuctionOrderRepository;
 
 class AuctionOrderPaymentDeadlineServiceTests {
@@ -34,6 +37,7 @@ class AuctionOrderPaymentDeadlineServiceTests {
     private AuctionOrderRepository orders;
     private AuctionTime time;
     private AuctionEmailService emails;
+    private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
     private ApplicationEventPublisher events;
     private AuctionOrderPaymentDeadlineService service;
     private AuctionOrder order;
@@ -43,8 +47,10 @@ class AuctionOrderPaymentDeadlineServiceTests {
         orders = mock(AuctionOrderRepository.class);
         time = mock(AuctionTime.class);
         emails = mock(AuctionEmailService.class);
+        privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
         events = mock(ApplicationEventPublisher.class);
-        service = new AuctionOrderPaymentDeadlineService(orders, time, emails, events);
+        service = new AuctionOrderPaymentDeadlineService(
+                orders, time, emails, privateNotificationEvents, events);
         order = pendingOrder();
         when(orders.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
     }
@@ -63,9 +69,11 @@ class AuctionOrderPaymentDeadlineServiceTests {
         assertNull(order.getPaidAt());
         assertNull(order.getShippedAt());
         assertNull(order.getCompletedAt());
-        var sequence = inOrder(orders, emails, events);
+        var sequence = inOrder(orders, emails, privateNotificationEvents, events);
         sequence.verify(orders).save(order);
         sequence.verify(emails).ensureAbandonedEmailLogs(order);
+        sequence.verify(privateNotificationEvents).publishOrderAbandoned(
+                7L, 1L, "AO-DEADLINE-001", 10L, 11L, DUE_AT);
         sequence.verify(events).publishEvent(new AuctionEmailReadyEvent(7L));
     }
 
@@ -79,6 +87,8 @@ class AuctionOrderPaymentDeadlineServiceTests {
         assertEquals(AuctionOrderStatus.ABANDONED, order.getOrderStatus());
         assertEquals(expiredAt, order.getAbandonedAt());
         assertEquals(expiredAt, order.getUpdatedAt());
+        verify(privateNotificationEvents).publishOrderAbandoned(
+                7L, 1L, "AO-DEADLINE-001", 10L, 11L, expiredAt);
     }
 
     @Test
@@ -90,7 +100,7 @@ class AuctionOrderPaymentDeadlineServiceTests {
         assertEquals(AuctionOrderStatus.PENDING_PAYMENT, order.getOrderStatus());
         assertNull(order.getAbandonedAt());
         verify(orders, never()).save(any());
-        verifyNoInteractions(emails, events);
+        verifyNoInteractions(emails, privateNotificationEvents, events);
     }
 
     @ParameterizedTest
@@ -108,7 +118,7 @@ class AuctionOrderPaymentDeadlineServiceTests {
 
         assertEquals(status, order.getOrderStatus());
         verify(orders, never()).save(any());
-        verifyNoInteractions(time, emails, events);
+        verifyNoInteractions(time, emails, privateNotificationEvents, events);
     }
 
     @ParameterizedTest
@@ -120,7 +130,7 @@ class AuctionOrderPaymentDeadlineServiceTests {
 
         assertEquals(AuctionOrderStatus.PENDING_PAYMENT, order.getOrderStatus());
         verify(orders, never()).save(any());
-        verifyNoInteractions(time, emails, events);
+        verifyNoInteractions(time, emails, privateNotificationEvents, events);
     }
 
     @Test
@@ -131,7 +141,7 @@ class AuctionOrderPaymentDeadlineServiceTests {
 
         assertEquals(AuctionOrderStatus.PENDING_PAYMENT, order.getOrderStatus());
         verify(orders, never()).save(any());
-        verifyNoInteractions(time, emails, events);
+        verifyNoInteractions(time, emails, privateNotificationEvents, events);
     }
 
     @Test
@@ -141,7 +151,29 @@ class AuctionOrderPaymentDeadlineServiceTests {
         service.expireOverdueOrder(99L);
 
         verify(orders, never()).save(any());
-        verifyNoInteractions(time, emails, events);
+        verifyNoInteractions(time, emails, privateNotificationEvents, events);
+    }
+
+    @Test
+    void orderSaveFailureDoesNotPublishAbandonedEvent() {
+        when(time.now()).thenReturn(DUE_AT);
+        doThrow(new IllegalStateException("save failed")).when(orders).save(order);
+
+        assertThrows(IllegalStateException.class, () -> service.expireOverdueOrder(1L));
+
+        verifyNoInteractions(emails, privateNotificationEvents, events);
+    }
+
+    @Test
+    void abandonedEmailLogFailureDoesNotPublishAbandonedEvent() {
+        when(time.now()).thenReturn(DUE_AT);
+        doThrow(new IllegalStateException("email log failed"))
+                .when(emails).ensureAbandonedEmailLogs(order);
+
+        assertThrows(IllegalStateException.class, () -> service.expireOverdueOrder(1L));
+
+        verify(orders).save(order);
+        verifyNoInteractions(privateNotificationEvents, events);
     }
 
     @Test
@@ -156,13 +188,18 @@ class AuctionOrderPaymentDeadlineServiceTests {
         verify(orders).save(order);
         verify(time).now();
         verify(emails).ensureAbandonedEmailLogs(order);
+        verify(privateNotificationEvents).publishOrderAbandoned(
+                7L, 1L, "AO-DEADLINE-001", 10L, 11L, DUE_AT);
         verify(events).publishEvent(new AuctionEmailReadyEvent(7L));
     }
 
     private AuctionOrder pendingOrder() {
         AuctionOrder value = new AuctionOrder();
         value.setAuctionOrderId(1L);
+        value.setOrderNumber("AO-DEADLINE-001");
         value.setAuctionId(7L);
+        value.setBuyerId(10L);
+        value.setSellerId(11L);
         value.setPaymentStatus(AuctionPaymentStatus.PENDING);
         value.setShippingStatus(AuctionShippingStatus.NOT_SHIPPED);
         value.setOrderStatus(AuctionOrderStatus.PENDING_PAYMENT);

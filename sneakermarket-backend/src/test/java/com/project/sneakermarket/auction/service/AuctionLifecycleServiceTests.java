@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,8 @@ class AuctionLifecycleServiceTests {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 10, 12, 0);
     private AuctionRepository auctions;
     private AuctionResultRepository results;
+    private AuctionProductRepository products;
+    private AuctionBidRepository bids;
     private org.springframework.context.ApplicationEventPublisher events;
     private AuctionRealtimeEventPublisher realtimeEvents;
     private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
@@ -38,6 +41,8 @@ class AuctionLifecycleServiceTests {
     void setup() {
         auctions = mock(AuctionRepository.class);
         results = mock(AuctionResultRepository.class);
+        products = mock(AuctionProductRepository.class);
+        bids = mock(AuctionBidRepository.class);
         events = mock(org.springframework.context.ApplicationEventPublisher.class);
         realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
         privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
@@ -45,6 +50,8 @@ class AuctionLifecycleServiceTests {
         service = new AuctionLifecycleService(
                 auctions,
                 results,
+                products,
+                bids,
                 time,
                 events,
                 realtimeEvents,
@@ -52,13 +59,19 @@ class AuctionLifecycleServiceTests {
         );
         auction = new Auction();
         auction.setAuctionId(1L);
+        auction.setAuctionProductId(2L);
         auction.setStatus(AuctionStatus.SCHEDULED);
         auction.setStartAt(NOW);
         auction.setEndAt(NOW.plusHours(1));
         auction.setBidCount(0);
         auction.setCurrentPrice(new BigDecimal("5000.00"));
         auction.setUpdatedAt(NOW.minusDays(1));
+        AuctionProduct product = new AuctionProduct();
+        product.setAuctionProductId(2L);
+        product.setSellerId(31L);
         when(auctions.findByIdForUpdate(1L)).thenReturn(Optional.of(auction));
+        when(products.findById(2L)).thenReturn(Optional.of(product));
+        when(bids.findDistinctBidderIds(1L)).thenReturn(List.of(61L, 77L));
     }
 
     @Test
@@ -74,11 +87,14 @@ class AuctionLifecycleServiceTests {
         service.processAuction(1L);
         assertEquals(AuctionStatus.ACTIVE, auction.getStatus());
         assertEquals(NOW, auction.getUpdatedAt());
-        var order = inOrder(auctions);
+        var order = inOrder(auctions, realtimeEvents, privateNotificationEvents);
         order.verify(auctions).findByIdForUpdate(1L);
         order.verify(auctions).save(auction);
+        order.verify(realtimeEvents).publish(AuctionRealtimeEventType.AUCTION_STARTED, auction);
+        order.verify(privateNotificationEvents).publishStarted(1L, 31L, NOW);
         verifyNoInteractions(results);
-        verify(realtimeEvents).publish(AuctionRealtimeEventType.AUCTION_STARTED, auction);
+        verify(products).findById(2L);
+        verifyNoInteractions(bids);
     }
 
     @Test
@@ -222,6 +238,7 @@ class AuctionLifecycleServiceTests {
         assertEquals(AuctionStatus.ACTIVE, auction.getStatus());
         verify(results, never()).save(any());
         verify(auctions, never()).save(any());
+        verifyNoInteractions(products, bids, realtimeEvents, privateNotificationEvents, events);
     }
 
     @Test
@@ -250,6 +267,8 @@ class AuctionLifecycleServiceTests {
         new AuctionLifecycleService(
                 auctions,
                 results,
+                products,
+                bids,
                 time,
                 mock(org.springframework.context.ApplicationEventPublisher.class),
                 mock(AuctionRealtimeEventPublisher.class),
@@ -279,12 +298,20 @@ class AuctionLifecycleServiceTests {
         if (auction.getStatus() == AuctionStatus.SOLD) {
             verify(privateNotificationEvents).publishSold(
                     1L,
+                    31L,
                     auction.getHighestBidderId(),
+                    List.of(61L, 77L),
                     auction.getCurrentPrice(),
                     NOW
             );
+            verify(products).findById(2L);
+            verify(bids).findDistinctBidderIds(1L);
+        } else if (auction.getStatus() == AuctionStatus.UNSOLD) {
+            verify(privateNotificationEvents).publishUnsold(1L, 31L, NOW);
+            verify(products).findById(2L);
+            verifyNoInteractions(bids);
         } else {
-            verifyNoInteractions(privateNotificationEvents);
+            verifyNoInteractions(products, bids, privateNotificationEvents);
         }
         return captor.getValue();
     }
@@ -292,7 +319,7 @@ class AuctionLifecycleServiceTests {
     private void noWrites() {
         verify(auctions, never()).save(any());
         verify(results, never()).save(any());
-        verifyNoInteractions(realtimeEvents, privateNotificationEvents);
+        verifyNoInteractions(products, bids, realtimeEvents, privateNotificationEvents);
         assertEquals(NOW.minusDays(1), auction.getUpdatedAt());
     }
 }
