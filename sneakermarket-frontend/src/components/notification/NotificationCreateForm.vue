@@ -108,7 +108,7 @@
 
 <script setup>
 import { ref, reactive } from "vue";
-import httpClient from "@/service/httpClient";
+import { createNotification } from "@/service/notificationService";
 
 const emit = defineEmits(["created"]);
 const loading = ref(false);
@@ -127,7 +127,7 @@ const form = reactive({ ...initialForm });
 const submitForm = async () => {
   loading.value = true;
   try {
-    await httpClient.post("/notification/createNotice", form);
+    await createNotification(form);
     alert("新增通知成功！");
     resetForm();
     emit("created");

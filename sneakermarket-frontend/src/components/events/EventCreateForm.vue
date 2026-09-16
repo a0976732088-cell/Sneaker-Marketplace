@@ -216,7 +216,7 @@
 
 <script setup>
 import { ref, reactive } from "vue";
-import { createEvent } from "@/api/events";
+import { createEvent } from "@/service/eventService";
 
 const loading = ref(false);
 const errorMessage = ref("");

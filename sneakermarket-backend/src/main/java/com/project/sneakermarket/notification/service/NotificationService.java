@@ -1,6 +1,7 @@
 package com.project.sneakermarket.notification.service;
 
 
+import com.project.sneakermarket.member.entity.Member;
 import com.project.sneakermarket.notification.entity.NotificationJobStatus;
 import com.project.sneakermarket.calendar.repository.EventFollowRepository;
 import com.project.sneakermarket.member.repository.MemberRepository;
@@ -30,7 +31,10 @@ import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -44,6 +48,7 @@ public class NotificationService {
     private final NotificationLogRepository notificationLogRepo;
     private final MemberRepository memberRepo;
     private final EventFollowRepository eventFollowRepo;
+    private final NotificationEmailJobService emailJobService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -371,6 +376,9 @@ public class NotificationService {
         String oldTime = previousStartAt.format(formatter);
         String newTime = event.getStartAt().format(formatter);
 
+        String notificationTitle =
+                "活動時間異動：" + event.getTitle();
+
         List<Notification> notifications =
                 followerMemberIds.stream()
                         .distinct()
@@ -383,9 +391,7 @@ public class NotificationService {
                                     "EVENT_TIME_CHANGED"
                             );
 
-                            notification.setTitle(
-                                    "活動時間異動：" + event.getTitle()
-                            );
+                            notification.setTitle(notificationTitle);
 
                             notification.setContent(
                                     "您關注的活動時間已從 "
@@ -411,7 +417,17 @@ public class NotificationService {
                         })
                         .toList();
 
-        notificationRepo.saveAll(notifications);
+        List<Notification> savedNotifications =
+                notificationRepo.saveAll(notifications);
+
+        createEmailJobs(savedNotifications);
+
+        createCompletedAutomaticEventLog(
+                event,
+                notificationTitle,
+                savedNotifications.size(),
+                now
+        );
     }
 
     @Transactional
@@ -432,6 +448,9 @@ public class NotificationService {
         String originalStartTime =
                 event.getStartAt().format(formatter);
 
+        String notificationTitle =
+                "活動已取消：" + event.getTitle();
+
         List<Notification> notifications =
                 followerMemberIds.stream()
                         .distinct()
@@ -444,9 +463,7 @@ public class NotificationService {
                                     "EVENT_CANCELLED"
                             );
 
-                            notification.setTitle(
-                                    "活動已取消：" + event.getTitle()
-                            );
+                            notification.setTitle(notificationTitle);
 
                             notification.setContent(
                                     "您關注的活動原訂於 "
@@ -474,8 +491,91 @@ public class NotificationService {
                         })
                         .toList();
 
-        notificationRepo.saveAll(notifications);
+        List<Notification> savedNotifications =
+                notificationRepo.saveAll(notifications);
+
+        createEmailJobs(savedNotifications);
+
+        createCompletedAutomaticEventLog(
+                event,
+                notificationTitle,
+                savedNotifications.size(),
+                now
+        );
     }
+
+    private void createEmailJobs(
+            List<Notification> savedNotifications
+    ) {
+        if (savedNotifications == null
+                || savedNotifications.isEmpty()) {
+            return;
+        }
+
+        List<Long> memberIds =
+                savedNotifications.stream()
+                        .map(Notification::getMemberId)
+                        .filter(memberId -> memberId != null)
+                        .distinct()
+                        .toList();
+
+        Map<Long, Member> memberMap =
+                memberRepo.findAllById(memberIds)
+                        .stream()
+                        .collect(
+                                Collectors.toMap(
+                                        Member::getMemberId,
+                                        Function.identity()
+                                )
+                        );
+
+        for (Notification notification : savedNotifications) {
+            Member member =
+                    memberMap.get(notification.getMemberId());
+
+            if (member == null) {
+                continue;
+            }
+
+            emailJobService.createPending(
+                    notification.getNotificationId(),
+                    member.getMemberId(),
+                    member.getEmail()
+            );
+        }
+    }
+
+    private void createCompletedAutomaticEventLog(
+            CalendarEvent event,
+            String title,
+            int totalSent,
+            LocalDateTime startedAt
+    ) {
+        NotificationLog log = new NotificationLog();
+
+        /*
+         * 自動通知沒有管理員建立的通知範本，
+         * 因此 notificationId 保持 null。
+         */
+        log.setNotificationId(null);
+
+        log.setSendType("EVENT_FOLLOWERS");
+        log.setTitle(title);
+        log.setTargetType("EVENT");
+        log.setEventId(event.getEventId());
+
+        log.setStatus(NotificationJobStatus.COMPLETED);
+        log.setTotalRecipients(totalSent);
+        log.setTotalSent(totalSent);
+        log.setFailedCount(0);
+
+        log.setStartedAt(startedAt);
+        log.setCompletedAt(LocalDateTime.now());
+        log.setErrorMessage(null);
+
+        notificationLogRepo.save(log);
+    }
+
 
 
 private Notification createMemberNotification(

@@ -9,15 +9,6 @@
         <h1 class="h3 fw-bold text-slate-800 mb-1">Morning, User! 👋</h1>
         <p class="text-muted small m-0">這是你本月的排程與活動總覽。</p>
       </div>
-      <div class="d-flex align-items-center gap-3">
-        <button
-          type="button"
-          class="btn btn-primary rounded-pill px-4 fw-semibold shadow-sm"
-          @click="goToManage"
-        >
-          後臺管理
-        </button>
-      </div>
     </header>
 
     <!-- 左右雙欄卡片容器 (模仿參考圖的 Layout) -->
@@ -93,21 +84,30 @@
                   v-if="evt.targetUrl"
                   :href="evt.targetUrl"
                   target="_blank"
+                  rel="noopener noreferrer"
                   class="link-btn"
                   @click.stop
                 >
                   🔗 相關連結
                 </a>
 
-                <button
-                  type="button"
-                  class="follow-btn"
-                  :class="{ followed: isFollowed(evt.id) }"
-                  :disabled="followLoadingIds.has(evt.id)"
-                  @click.stop="toggleFollow(evt)"
-                >
-                  {{ isFollowed(evt.id) ? "✓ 已關注" : "☆ 關注" }}
-                </button>
+                <div class="follow-pill-toggle">
+                  <button
+                    type="button"
+                    class="follow-btn"
+                    :class="{ followed: isFollowed(evt.id) }"
+                    :disabled="followLoadingIds.has(evt.id)"
+                    @click.stop="toggleFollow(evt)"
+                  >
+                    {{
+                      followLoadingIds.has(evt.id)
+                        ? "處理中..."
+                        : isFollowed(evt.id)
+                          ? "✓ 關注中"
+                          : "☆ 關注"
+                    }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -128,20 +128,19 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import axios from "axios";
 
 import CalendarHeader from "@/components/calendar/CalendarHeader.vue";
 import CalendarMonthView from "@/components/calendar/CalendarMonthView.vue";
 import CalendarListView from "@/components/calendar/CalendarListView.vue";
 import EventDetailModal from "@/components/events/EventDetailModal.vue";
 import {
+  eventPage,
   getMyEventFollows,
   followEvent,
   unfollowEvent,
-} from "@/api/calendar";
+} from "@/service/calendarService";
 
 const router = useRouter();
-const goToManage = () => router.push("/calendar/eventManage");
 
 const currentView = ref("month");
 const currentDate = ref(new Date());
@@ -207,17 +206,22 @@ const fetchMonthEvents = async () => {
   const endAt = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}T23:59:59`;
 
   try {
-    const response = await axios.get(
-      "http://localhost:8080/api/calendar/eventPage",
-      {
-        params: { startAt, endAt, pageNumber: 1, pageSize: 100 },
-      },
-    );
+    const response = await eventPage({
+      startAt,
+      endAt,
+      pageNumber: 1,
+      pageSize: 100,
+    });
     const rawData =
       response.data.content || response.data.data || response.data || [];
 
     events.value = rawData
-      .filter((item) => item.status !== "INACTIVE" && item.status !== "DRAFT" && item.status !== "CANCELLED")
+      .filter(
+        (item) =>
+          item.status !== "INACTIVE" &&
+          item.status !== "DRAFT" &&
+          item.status !== "CANCELLED",
+      )
       .map((item) => {
         const rawStartAt = item.startAt || "";
         const datePart = rawStartAt
@@ -274,7 +278,7 @@ const loadMyFollows = async () => {
     const response = await getMyEventFollows();
 
     followedEventIds.value = new Set(
-      response.data.map((follow) => follow.eventId)
+      response.data.map((follow) => follow.eventId),
     );
   } catch (error) {
     if (error.response?.status === 401) {
@@ -313,17 +317,17 @@ const toggleFollow = async (event) => {
       return;
     }
 
-    console.error("更新關注狀態失敗", error);
+    console.error("更新關注狀態失敗", error.response?.data || error);
   } finally {
     const loadingIds = new Set(followLoadingIds.value);
     loadingIds.delete(event.id);
     followLoadingIds.value = loadingIds;
   }
+};
 
-  onMounted(() => {
+onMounted(() => {
   loadMyFollows();
 });
-};
 </script>
 
 <style scoped>
@@ -456,5 +460,43 @@ const toggleFollow = async (event) => {
 }
 .link-btn:hover {
   text-decoration: underline;
+}
+
+.follow-pill-toggle {
+  display: inline-flex;
+  padding: 3px;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.follow-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.follow-btn:hover:not(:disabled) {
+  color: #0f172a;
+}
+
+.follow-btn.followed {
+  background: #ffffff;
+  color: #4f46e5;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.follow-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 </style>

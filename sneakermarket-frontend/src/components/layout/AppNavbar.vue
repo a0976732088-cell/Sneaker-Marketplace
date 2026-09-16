@@ -140,7 +140,10 @@
 <script setup>
 import { ref, computed, onMounted, watch, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import httpClient from "@/service/httpClient"; // 🎯 Import 彈窗元件
+import {
+  getMemberNotifications,
+  markNotificationAsRead,
+} from "@/service/notificationService";
 import NotificationDrawer from "@/components/notification/NotificationDrawer.vue";
 
 /* ================================
@@ -255,8 +258,13 @@ const toggleNotice = () => {
 };
 
 const fetchNotifications = async () => {
+  if (!currentMember.value) {
+    notifications.value = [];
+    return;
+  }
+
   try {
-    const res = await httpClient.get("/notification/noticeList");
+    const res = await getMemberNotifications();
     // 加上 Array.isArray 檢查，防止被回傳的 404 HTML 弄壞陣列
     if (Array.isArray(res.data)) {
       notifications.value = res.data;
@@ -264,8 +272,15 @@ const fetchNotifications = async () => {
       notifications.value = [];
     }
   } catch (err) {
-    console.error("取得通知失敗", err);
     notifications.value = [];
+
+    // Session 過期後停止輪詢，避免每分鐘重複發出 401。
+    if (err.response?.status === 401) {
+      currentMember.value = null;
+      return;
+    }
+
+    console.error("取得通知失敗", err);
   }
 };
 
@@ -281,7 +296,7 @@ watch(currentMember, (member) => {
 const handleMarkAsRead = async (id) => {
   try {
     // 呼叫後端更新資料庫 is_read = 1 與 read_at
-    await httpClient.put(`/notification/read/${id}`);
+    await markNotificationAsRead(id);
 
     // 更新前端狀態（紅點數量會自動減少）
     const target = notifications.value.find((n) => n.notificationId === id);

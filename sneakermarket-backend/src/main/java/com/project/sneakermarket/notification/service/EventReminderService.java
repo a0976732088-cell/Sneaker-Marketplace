@@ -6,6 +6,8 @@ import com.project.sneakermarket.calendar.repository.CalendarEventRepository;
 import com.project.sneakermarket.calendar.repository.EventFollowRepository;
 import com.project.sneakermarket.notification.entity.Notification;
 import com.project.sneakermarket.notification.repository.NotificationRepository;
+import com.project.sneakermarket.member.entity.Member;
+import com.project.sneakermarket.member.repository.MemberRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +27,8 @@ public class EventReminderService {
     private final EventFollowRepository eventFollowRepository;
     private final CalendarEventRepository calendarEventRepository;
     private final NotificationRepository notificationRepository;
+    private final MemberRepository memberRepository;
+    private final NotificationEmailJobService emailJobService;
 
     /**
      * 每一筆關注各自使用一個 Transaction。
@@ -106,7 +110,20 @@ public class EventReminderService {
             notification.setIsSent(true);
             notification.setSentAt(now);
 
-            notificationRepository.save(notification);
+            Notification saved =
+                    notificationRepository.save(notification);
+
+            Member member = memberRepository
+                    .findById(follow.getMemberId())
+                    .orElse(null);
+
+            if (member != null) {
+                emailJobService.createPending(
+                        saved.getNotificationId(),
+                        member.getMemberId(),
+                        member.getEmail()
+                );
+            }
         }
 
         /*

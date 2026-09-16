@@ -1,18 +1,21 @@
 package com.project.sneakermarket.notification.entity;
 
 
-import com.project.sneakermarket.notification.entity.NotificationJobStatus;
 import jakarta.persistence.*;
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "notification_logs")
+@Table(
+        name = "notification_logs",
+        indexes = @Index(
+                name = "IX_notification_logs_status_created_at",
+                columnList = "status, created_at"
+        )
+)
 public class NotificationLog {
 
     @Id
@@ -43,13 +46,16 @@ public class NotificationLog {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
+    @ColumnDefault("'PENDING'")
     private NotificationJobStatus status =
             NotificationJobStatus.PENDING;
 
     @Column(name = "total_recipients", nullable = false)
+    @ColumnDefault("0")
     private Integer totalRecipients = 0;
 
     @Column(name = "failed_count", nullable = false)
+    @ColumnDefault("0")
     private Integer failedCount = 0;
 
     @Column(name = "started_at")

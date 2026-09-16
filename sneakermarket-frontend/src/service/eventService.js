@@ -1,4 +1,4 @@
-import httpClient from '../service/httpClient.js'
+import httpClient from './httpClient.js'
 
 // 1. 取得活動分頁列表
 export const getEventPage = (params) => {

@@ -1,4 +1,4 @@
-import httpClient from '../service/httpClient.js'
+import httpClient from './httpClient.js'
 import { formatTimeStr } from '@/utils/dateUtils'
 
 export const EVENT_TYPE_COLOR_MAP = {

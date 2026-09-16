@@ -1,16 +1,16 @@
 <!-- 活動列表與分頁 -->
 <template>
   <div class="table-responsive">
-    <table class="table table-hover align-middle">
+    <table class="table table-hover align-middle event-table">
       <thead class="table-light">
         <tr>
           <th>ID</th>
           <th>活動標題</th>
           <th>類型</th>
           <th>狀態</th>
-          <th>開始時間</th>
-          <th>結束時間</th>
-          <th>操作</th>
+          <th class="event-date-heading">開始時間</th>
+          <th class="event-date-heading">結束時間</th>
+          <th class="event-action-heading">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -30,38 +30,49 @@
               {{ event.status }}
             </span>
           </td>
-          <td>{{ formatDate(event.startAt) }}</td>
-          <td>{{ formatDate(event.endAt) }}</td>
-          <td>
-            <button
-              class="btn btn-sm btn-outline-info event-small-action me-1"
-              @click="$emit('open-detail', event)"
-            >
-              查看
-            </button>
-            <button
-              v-if="event.status !== 'CANCELLED'"
-              class="btn btn-sm btn-outline-primary event-small-action me-1"
-              @click="$emit('open-edit', event)"
-            >
-              編輯
-            </button>
-            <button
-              v-if="event.status !== 'CANCELLED'"
-              class="btn btn-sm btn-outline-danger"
-              @click="$emit('delete', event.eventId)"
-            >
-              取消活動
-            </button>
+          <td class="event-date-cell">
+            {{ formatDate(event.startAt) }}
+          </td>
+          <td class="event-date-cell">
+            {{ formatDate(event.endAt) }}
+          </td>
+          <td class="event-action-cell">
+            <div class="event-actions">
+              <button
+                type="button"
+                class="event-action action-view"
+                @click="$emit('open-detail', event)"
+              >
+                查看
+              </button>
 
-            <button
-              v-else
-              type="button"
-              class="btn btn-sm event-small-action event-cancelled"
-              disabled
-            >
-              已取消
-            </button>
+              <button
+                v-if="event.status !== 'CANCELLED'"
+                type="button"
+                class="event-action action-edit"
+                @click="$emit('open-edit', event)"
+              >
+                編輯
+              </button>
+
+              <button
+                v-if="event.status !== 'CANCELLED'"
+                type="button"
+                class="event-action action-cancel"
+                @click="$emit('delete', event.eventId)"
+              >
+                取消活動
+              </button>
+
+              <button
+                v-else
+                type="button"
+                class="event-action action-cancelled"
+                disabled
+              >
+                已取消
+              </button>
+            </div>
           </td>
         </tr>
 
@@ -121,22 +132,88 @@ const formatDate = (dateStr) => {
 </script>
 
 <style scoped>
-.event-small-action {
-  display: inline-flex;
-  width: 64px;
-  min-height: 36px;
-  align-items: center;
-  justify-content: center;
-  padding: 0.4rem 0.6rem;
-  white-space: nowrap;
+.table-responsive {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
-.event-cancelled,
-.event-cancelled:disabled {
-  border: 1px solid var(--admin-rose);
-  color: #704f4b;
-  background: #eadfdd;
+.event-action-heading,
+.event-action-cell {
+  position: sticky;
+  right: 0;
+  width: 260px;
+  min-width: 260px;
+}
+
+.event-action-heading {
+  z-index: 3;
+  background: #eeece8;
+}
+
+.event-action-cell {
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: -8px 0 12px rgba(15, 23, 42, 0.05);
+}
+
+.event-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.event-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    filter 140ms ease;
+}
+
+.event-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(0.95);
+}
+
+.event-action:disabled {
   cursor: default;
-  opacity: 1;
+  opacity: 0.55;
+}
+
+/* 查看：霧藍灰 */
+.action-view {
+  color: #526168;
+  background: #dce3e6;
+}
+
+/* 編輯：中性灰 */
+.action-edit {
+  color: #3f403d;
+  background: #dfded9;
+}
+
+/* 取消：灰玫瑰 */
+.action-cancel {
+  min-width: 84px;
+  color: #744f4b;
+  background: #eadbd9;
+}
+
+/* 已取消 */
+.action-cancelled {
+  min-width: 84px;
+  color: #64748b;
+  background: #e5e7eb;
 }
 </style>

@@ -255,7 +255,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import httpClient from "@/service/httpClient";
+import { getNotificationCalendarDashboard } from "@/service/notificationService";
 
 const emit = defineEmits(["navigate"]);
 
@@ -299,7 +299,7 @@ async function loadDashboard() {
   errorMessage.value = "";
 
   try {
-    const response = await httpClient.get("/dashboard/notification-calendar");
+    const response = await getNotificationCalendarDashboard();
 
     dashboard.value = {
       ...dashboard.value,

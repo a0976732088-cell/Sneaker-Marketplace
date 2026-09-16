@@ -34,8 +34,12 @@
                   required
                 >
                   <option value="" disabled>請選擇通知類型</option>
-                  <option value="EVENT_REMINDER">活動提醒 (EVENT_REMINDER)</option>
-                  <option value="SYSTEM_NOTICE">系統公告 (SYSTEM_NOTICE)</option>
+                  <option value="EVENT_REMINDER">
+                    活動提醒 (EVENT_REMINDER)
+                  </option>
+                  <option value="SYSTEM_NOTICE">
+                    系統公告 (SYSTEM_NOTICE)
+                  </option>
                   <option value="ORDER_UPDATE">訂單更新 (ORDER_UPDATE)</option>
                   <option value="PROMOTION">促銷優惠 (PROMOTION)</option>
                 </select>
@@ -43,7 +47,9 @@
 
               <!-- 🎯 對象類型 (補上 v-model) -->
               <div class="col-md-6">
-                <label for="targetType" class="form-label">對象類型 (Target Type)</label>
+                <label for="targetType" class="form-label"
+                  >對象類型 (Target Type)</label
+                >
                 <select
                   v-model="formData.targetType"
                   class="form-select"
@@ -114,7 +120,7 @@
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from "vue";
-import axios from "axios";
+import { updateNotification } from "@/service/notificationService";
 import { Modal } from "bootstrap";
 
 const props = defineProps({
@@ -169,7 +175,7 @@ watch(
       formData.value = { ...newVal };
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 const closeModal = () => {
@@ -181,10 +187,7 @@ const closeModal = () => {
 const submitForm = async () => {
   loading.value = true;
   try {
-    await axios.put(
-      `/api/notification/NoticeUpdate/${formData.value.notificationId}`,
-      formData.value
-    );
+    await updateNotification(formData.value.notificationId, formData.value);
     alert("更新成功！");
     closeModal();
     emit("success");

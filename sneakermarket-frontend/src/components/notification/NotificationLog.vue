@@ -20,7 +20,9 @@
             />
           </div>
           <div class="col-md-4">
-            <label class="form-label text-muted small fw-bold">發送對象類型</label>
+            <label class="form-label text-muted small fw-bold"
+              >發送對象類型</label
+            >
             <input
               v-model="searchParams.sendType"
               type="text"
@@ -59,13 +61,19 @@
             <td>#{{ item.id }}</td>
             <td class="fw-bold text-dark">{{ item.title }}</td>
             <td>
-              <span class="badge bg-primary text-white">{{ item.sendType }}</span>
+              <span class="badge bg-primary text-white">{{
+                item.sendType
+              }}</span>
             </td>
             <td>
-              <span class="badge bg-secondary">{{ item.targetType || "通用" }}</span>
+              <span class="badge bg-secondary">{{
+                item.targetType || "通用"
+              }}</span>
             </td>
             <td>
-              <span class="fw-semibold text-success">{{ item.totalSent }} 人</span>
+              <span class="fw-semibold text-success"
+                >{{ item.totalSent }} 人</span
+              >
             </td>
             <td>{{ formatDate(item.createdAt) }}</td>
           </tr>
@@ -95,7 +103,9 @@
             {{ page }}
           </button>
         </li>
-        <li :class="['page-item', currentPage === totalPages ? 'disabled' : '']">
+        <li
+          :class="['page-item', currentPage === totalPages ? 'disabled' : '']"
+        >
           <button class="page-link" @click="fetchLogs(currentPage + 1)">
             下一頁
           </button>
@@ -106,9 +116,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import httpClient from '@/service/httpClient';
-
+import { ref, onMounted } from "vue";
+import { getNotificationLogs } from "@/service/notificationService";
 
 const currentPage = ref(1);
 const totalPages = ref(1);
@@ -116,8 +125,8 @@ const notificationLogList = ref([]);
 
 // 🎯 1. 補上搜尋條件變數定義
 const searchParams = ref({
-  title: '',
-  sendType: ''
+  title: "",
+  sendType: "",
 });
 
 onMounted(() => {
@@ -129,7 +138,7 @@ const fetchLogs = async (page = 1) => {
   try {
     const params = {
       pageNumber: page,
-      pageSize: 10
+      pageSize: 10,
     };
 
     if (searchParams.value.title?.trim()) {
@@ -139,28 +148,27 @@ const fetchLogs = async (page = 1) => {
       params.sendType = searchParams.value.sendType.trim();
     }
 
-
-    const res = await httpClient.get('/notificationLog/searchlogs', { params });
+    const res = await getNotificationLogs(params);
     notificationLogList.value = res.data.content || [];
     totalPages.value = res.data.totalPages || 1;
     currentPage.value = page;
   } catch (err) {
-    console.error('查詢紀錄失敗', err);
+    console.error("查詢紀錄失敗", err);
   }
 };
 
 const resetSearch = () => {
   searchParams.value = {
-    title: '',
-    sendType: ''
+    title: "",
+    sendType: "",
   };
   fetchLogs(1);
 };
 
 // 時間格式化
 const formatDate = (dateStr) => {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleString('zh-TW', { hour12: false });
+  if (!dateStr) return "-";
+  return new Date(dateStr).toLocaleString("zh-TW", { hour12: false });
 };
 </script>
 

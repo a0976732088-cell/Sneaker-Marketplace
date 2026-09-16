@@ -138,7 +138,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from "vue";
 import { Modal } from "bootstrap";
-import { updateEvent } from "@/api/events";
+import { updateEvent } from "@/service/eventService";
 
 const props = defineProps({
   event: { type: Object, required: true },

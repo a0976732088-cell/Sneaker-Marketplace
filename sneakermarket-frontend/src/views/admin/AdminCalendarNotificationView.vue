@@ -149,7 +149,7 @@
 
 <script setup>
 import { ref, reactive } from "vue";
-import { getEventPage, deleteEvent } from "@/api/events";
+import { getEventPage, deleteEvent } from "@/service/eventService";
 
 import EventCreateForm from "@/components/events/EventCreateForm.vue";
 import EventSearchFilter from "@/components/events/EventSearchFilter.vue";

@@ -59,7 +59,7 @@
 
     <!-- 資料表格 -->
     <div class="table-responsive">
-      <table class="table table-hover align-middle">
+      <table class="table table-hover align-middle notification-table">
         <thead class="table-light">
           <tr>
             <th width="60">ID</th>
@@ -67,7 +67,7 @@
             <th width="150">類型</th>
             <th width="120">對象類型</th>
             <th width="180">建立時間</th>
-            <th width="380" class="text-center">操作</th>
+            <th class="notification-action-heading">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -202,7 +202,11 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import httpClient from "@/service/httpClient";
+import {
+  deleteNotification,
+  getNotificationPage,
+  sendNotification,
+} from "@/service/notificationService";
 import NotificationDetailModal from "./NotificationDetailModal.vue";
 import NotificationEditModal from "./NotificationEditModal.vue";
 
@@ -255,9 +259,8 @@ const fetchNotifications = async (page = 1) => {
       params.endCreatedAt = formatToIsoDateTime(searchParams.value.endDate);
     }
 
-    const res = await httpClient.get("/notification/notificationPage", {
-      params,
-    });
+    const res = await getNotificationPage(params);
+
     notificationLogList.value = res.data.content || [];
     totalPages.value = res.data.totalPages || 1;
     currentPage.value = page;
@@ -317,12 +320,7 @@ const handleSendNotice = async (item, audienceType) => {
   item.isQueued = true;
 
   try {
-    const response = await httpClient.post(
-      `/notification/send/${item.notificationId}`,
-      {
-        audienceType: audienceType,
-      },
-    );
+    const response = await sendNotification(item.notificationId, audienceType);
 
     if (response.data.mode === "ASYNC") {
       alert(`${response.data.message}\n任務編號：${response.data.jobId}`);
@@ -361,9 +359,7 @@ const handleDelete = async (id) => {
   if (!confirm("確定要刪除這筆通知紀錄嗎？")) return;
 
   try {
-    await httpClient.delete("/notification/notificationDelete", {
-      params: { notificationId: id },
-    });
+    await deleteNotification(id);
     alert("刪除成功");
     fetchNotifications(currentPage.value);
   } catch (err) {
@@ -380,30 +376,67 @@ const formatDate = (dateStr) => {
 </script>
 
 <style scoped>
+.table-responsive {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.notification-action-heading,
 .notification-action-cell {
-  min-width: 340px;
-  text-align: center;
+  position: sticky;
+  right: 0;
+  width: 310px;
+  min-width: 310px;
+}
+
+.notification-action-heading {
+  z-index: 3;
+  background: #eeece8;
+}
+
+.notification-action-cell {
+  z-index: 2;
+  background: #ffffff;
+  box-shadow: -8px 0 12px rgba(15, 23, 42, 0.05);
 }
 
 .notification-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  justify-content: start;
+  gap: 8px;
 }
-
 .notification-action {
-  min-height: 34px;
-  padding: 0.42rem 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  height: 36px;
+  padding: 0 14px;
   border: 0;
   border-radius: 999px;
-  font-size: 0.76rem;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1;
   white-space: nowrap;
+  cursor: pointer;
   transition:
     transform 140ms ease,
     filter 140ms ease;
+}
+
+.action-view,
+.action-edit,
+.action-delete {
+  min-width: 60px;
+}
+
+.action-all {
+  min-width: 88px;
+}
+
+.action-followers {
+  min-width: 104px;
 }
 
 .notification-action:hover:not(:disabled) {
@@ -447,12 +480,10 @@ const formatDate = (dateStr) => {
 }
 
 @media (max-width: 768px) {
+  .notification-action-heading,
   .notification-action-cell {
-    min-width: 260px;
-  }
-
-  .notification-actions {
-    justify-content: flex-start;
+    width: 440px;
+    min-width: 440px;
   }
 }
 </style>

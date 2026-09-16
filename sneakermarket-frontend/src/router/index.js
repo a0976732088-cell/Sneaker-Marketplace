@@ -59,11 +59,6 @@ const routes = [
     component: () => import("@/views/calendar/CalendarHomeView.vue"),
   },
   {
-    path: "/calendar/eventManage",
-    name: "eventManage",
-    component: () => import("@/views/calendar/EventManageView.vue"),
-  },
-  {
     path: "/auctions",
     name: "auction",
     component: () => import("@/views/auction/AuctionListView.vue"),
@@ -104,32 +99,49 @@ const routes = [
   // =========================
   {
     path: "/admin",
-    name: "admin",
-    component: () => import("@/views/admin/AdminHomeView.vue"),
-
-    // 只有 ROLE_ADMIN 才能進入
+    component: () => import("@/components/layout/AdminLayout.vue"),
     meta: {
       requiresAdmin: true,
     },
+    children: [
+      {
+        path: "",
+        name: "admin",
+        component: () => import("@/views/admin/AdminHomeView.vue"),
+      },
+      {
+        path: "members",
+        name: "admin-members",
+        component: () => import("@/views/admin/AdminMemberView.vue"),
+      },
+      {
+        path: "commerce",
+        name: "admin-commerce",
+        component: () => import("@/views/commerce/CommerceHomeView.vue"),
+      },
+      {
+        path: "advertisements",
+        name: "admin-advertisements",
+        component: () =>
+          import("@/views/advertisement/AdvertisementHomeView.vue"),
+      },
+      {
+        path: "calendar",
+        name: "admin-calendar",
+        component: () => import("@/views/admin/AdminCalendarNotificationView.vue"),
+      },
+      {
+        path: "auctions",
+        name: "admin-auctions",
+        component: () => import("@/views/admin/AdminAuctionListView.vue"),
+      },
+      {
+        path: "auctions/:id",
+        name: "admin-auction-detail",
+        component: () => import("@/views/admin/AdminAuctionDetailView.vue"),
+      },
+    ],
   },
-  {
-    path: "/admin/auctions",
-    name: "admin-auctions",
-    component: () => import("@/views/admin/AdminAuctionListView.vue"),
-    meta: {
-      requiresAdmin: true,
-    },
-  },
-
-  {
-    path: "/admin/auctions/:id",
-    name: "admin-auction-detail",
-    component: () => import("@/views/admin/AdminAuctionDetailView.vue"),
-    meta: {
-      requiresAdmin: true,
-    },
-  },
-
   {
     path: "/ads/storefront",
     name: "advertisement-storefront",
