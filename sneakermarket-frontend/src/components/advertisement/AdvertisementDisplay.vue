@@ -247,7 +247,7 @@ onUnmounted(() => {
         class="category-card-section"
       >
         <header class="category-card-header">
-          <h2>為您推薦</h2>
+          <h2>(っ•‿•)っ 🎀 【我真的特別愛你】 🎀</h2>
         </header>
 
         <div class="category-card-track">
@@ -309,4 +309,4 @@ onUnmounted(() => {
   </section>
 </template>
 
-<style scoped src="./AdvertisementPreviewView.css"></style>
+<style scoped src="./AdvertisementDisplay.css"></style>

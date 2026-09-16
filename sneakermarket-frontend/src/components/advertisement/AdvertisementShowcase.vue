@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from "vue";
-import AdvertisementDisplay from "@/views/advertisement/AdvertisementDisplay.vue";
+import AdvertisementDisplay from "@/components/advertisement/AdvertisementDisplay.vue";
 import httpClient from "@/service/httpClient";
 import { resolveProductImageUrl } from "@/utils/productImageUrl";
 
@@ -43,8 +43,7 @@ async function handleCategorySelect({ categoryId, categoryName }) {
   <section v-if="selectedCategoryId" class="category-products-section">
     <header class="category-products-header">
       <div>
-        <span>SHOP BY CATEGORY</span>
-        <h2>{{ selectedCategoryName }}</h2>
+        <h3>{{ selectedCategoryName }}</h3>
       </div>
 
       <small> 共 {{ categoryProducts.length }} 件商品 </small>
@@ -118,7 +117,7 @@ async function handleCategorySelect({ categoryId, categoryName }) {
   letter-spacing: 0.16em;
 }
 
-.category-products-header h2 {
+.category-products-header h3 {
   margin: 5px 0 0;
   font-size: 30px;
   font-weight: 800;
