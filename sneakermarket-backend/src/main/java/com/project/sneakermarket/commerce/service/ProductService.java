@@ -24,7 +24,7 @@ public class ProductService {
 
     // 取得商品列表，每筆商品只顯示代表價格與一張主圖（給列表頁用）
     // categoryId、keyword、size 都可以不帶（null），代表使用者沒有指定該項篩選條件
-    public List<ProductListItemResponse> getAllProducts(Long categoryId, String keyword, String size) {
+    public List<ProductListItemResponse> getAllProducts(Long categoryId, String keyword, String size, Long brandId) {
         List<Product> products = productRepository.findAll();
 
         return products.stream()
@@ -36,6 +36,7 @@ public class ProductService {
                 .filter(p -> size == null || productVariantRepository.findByProductProductId(p.getProductId())
                         .stream()
                         .anyMatch(v -> v.getSize().equals(size)))
+                .filter(p -> brandId == null || p.getBrand().getBrandId().equals(brandId))
                 .map(p -> {
                     List<ProductVariant> variants =
                             productVariantRepository.findByProductProductId(p.getProductId());
