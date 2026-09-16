@@ -17,6 +17,8 @@ import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
 import com.project.sneakermarket.auction.repository.AuctionBidRepository;
 import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 import com.project.sneakermarket.common.exception.BusinessException;
 import com.project.sneakermarket.common.exception.ForbiddenException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
@@ -37,6 +39,7 @@ public class AuctionBidService {
     private final AuctionProductRepository auctionProductRepository;
     private final AuctionBidRepository auctionBidRepository;
     private final AuctionTime auctionTime;
+    private final AuctionRealtimeEventPublisher realtimeEvents;
 
     /**
      * 對指定競標出價。
@@ -135,6 +138,7 @@ public class AuctionBidService {
         auction.setBidCount(updatedBidCount);
         auction.setUpdatedAt(now);
         auctionRepository.save(auction);
+        realtimeEvents.publish(AuctionRealtimeEventType.BID_PLACED, auction);
 
         return new AuctionStatusResponse(
                 auction.getAuctionId(),

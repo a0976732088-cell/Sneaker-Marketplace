@@ -4,7 +4,8 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { computed, ref } from "vue";
 
-// 執行現有 SFC script setup，僅替換路由、HTTP、生命週期掛鉤與計時器。
+// WebSocket 尚未連上或已中斷時，12 秒 REST polling 仍是完整 fallback。
+// 執行 SFC script setup，僅替換路由、HTTP、生命週期掛鉤與計時器。
 const source = await readFile(
   new URL("../src/views/auction/AuctionDetailView.vue", import.meta.url),
   "utf8",
@@ -78,7 +79,7 @@ for (const [status, label, bidCount] of [
   ["UNSOLD", "流標", 0],
   ["REMOVED", "廢標", 1],
 ]) {
-  test(`existing polling displays ${status}, disables bidding and stops timer`, async () => {
+  test(`polling fallback displays ${status}, disables bidding and stops timer`, async () => {
     const h = harness({
       auctionId: 1,
       status,
@@ -107,7 +108,7 @@ for (const [status, label, bidCount] of [
   });
 }
 
-test("existing polling enables bidding when scheduled auction becomes active", async () => {
+test("polling fallback enables bidding when scheduled auction becomes active", async () => {
   const h = harness({
     auctionId: 1,
     status: "ACTIVE",

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -31,6 +32,8 @@ import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.repository.AuctionBidRepository;
 import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 import com.project.sneakermarket.common.exception.BusinessException;
 import com.project.sneakermarket.common.exception.ForbiddenException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
@@ -45,6 +48,7 @@ class AuctionBidServiceTests {
     private AuctionRepository auctions;
     private AuctionProductRepository products;
     private AuctionBidRepository bids;
+    private AuctionRealtimeEventPublisher realtimeEvents;
     private AuctionBidService service;
     private Auction auction;
 
@@ -53,11 +57,12 @@ class AuctionBidServiceTests {
         auctions = mock(AuctionRepository.class);
         products = mock(AuctionProductRepository.class);
         bids = mock(AuctionBidRepository.class);
+        realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
 
         AuctionTime time = new AuctionTime(
                 Clock.fixed(Instant.parse("2026-09-08T04:00:00Z"), ZoneOffset.UTC)
         );
-        service = new AuctionBidService(auctions, products, bids, time);
+        service = new AuctionBidService(auctions, products, bids, time, realtimeEvents);
 
         auction = new Auction();
         auction.setAuctionId(AUCTION_ID);
@@ -105,9 +110,10 @@ class AuctionBidServiceTests {
         readOrder.verify(auctions).findByIdForUpdate(AUCTION_ID);
         readOrder.verify(products).findById(3L);
 
-        var order = inOrder(bids, auctions);
+        var order = inOrder(bids, auctions, realtimeEvents);
         order.verify(bids).save(savedBid);
         order.verify(auctions).save(auction);
+        order.verify(realtimeEvents).publish(AuctionRealtimeEventType.BID_PLACED, auction);
     }
 
     @Test
@@ -365,6 +371,7 @@ class AuctionBidServiceTests {
     private void verifyNoWrites() {
         verify(bids, never()).save(any());
         verify(auctions, never()).save(any());
+        verifyNoInteractions(realtimeEvents);
     }
 
     private void assertAmount(String expected, BigDecimal actual) {

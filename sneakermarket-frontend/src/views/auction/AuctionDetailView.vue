@@ -324,9 +324,18 @@ import {
   getBidHistory,
   placeBid,
 } from "@/service/auctionService";
+import { createAuctionSocketClient } from "@/service/auctionSocketService";
 
 const STATUS_POLL_INTERVAL_MS = 12000;
 const TERMINAL_STATUSES = new Set(["SOLD", "UNSOLD", "CANCELLED", "REMOVED"]);
+const REALTIME_EVENT_TYPES = new Set([
+  "BID_PLACED",
+  "AUCTION_STARTED",
+  "AUCTION_SOLD",
+  "AUCTION_UNSOLD",
+  "AUCTION_CANCELLED",
+  "AUCTION_REMOVED",
+]);
 
 // 取得目前路由資訊
 const route = useRoute();
@@ -357,8 +366,15 @@ const bidErrorMessage = ref("");
 const statusSyncMessage = ref("");
 
 let statusPollingTimerId = null;
-let refreshingStatus = false;
+let statusRefreshPromise = null;
+let statusRefreshConnectionVersion = null;
 let bidHistorySyncPending = false;
+let bidHistorySyncPromise = null;
+let auctionSocketClient = null;
+let unsubscribeAuctionSocket = null;
+let socketConnected = false;
+let socketConnectionVersion = 0;
+let removalNavigationPending = false;
 let viewUnmounted = false;
 
 /**
@@ -384,6 +400,10 @@ async function loadAuctionDetail() {
     candidateBid.value = Number(auction.value.nextMinimumBid);
     statusSyncMessage.value = "";
     bidHistorySyncPending = false;
+
+    if (TERMINAL_STATUSES.has(auction.value.status)) {
+      stopStatusPolling();
+    }
   } catch (error) {
     console.error("取得競標詳細資料失敗：", error);
 
@@ -399,9 +419,13 @@ async function loadAuctionDetail() {
 }
 
 /**
- * 避免較早發出的 polling Response 覆蓋剛完成出價後的新狀態。
+ * 避免較早的 REST Response 或 WebSocket Event 覆蓋畫面上的新狀態。
  */
 function isOlderStatus(latestStatus) {
+  if (!auction.value || !latestStatus) {
+    return true;
+  }
+
   if (
     TERMINAL_STATUSES.has(auction.value?.status) &&
     !TERMINAL_STATUSES.has(latestStatus.status)
@@ -431,71 +455,161 @@ function isOlderStatus(latestStatus) {
 }
 
 /**
- * 重新取得競標最新狀態；只有出價次數改變時才同步出價紀錄。
+ * 依序同步出價紀錄。同步期間若又收到新 bidCount，完成後會再抓一次。
  */
-async function refreshAuctionStatus() {
-  if (!auction.value || refreshingStatus || viewUnmounted) {
-    return;
+function syncBidHistory() {
+  if (!bidHistorySyncPending || viewUnmounted) {
+    return Promise.resolve(true);
   }
 
-  refreshingStatus = true;
+  if (bidHistorySyncPromise) {
+    return bidHistorySyncPromise;
+  }
 
-  try {
-    const oldBidCount = auction.value.bidCount;
-    const response = await getAuctionStatus(auction.value.auctionId);
+  bidHistorySyncPromise = (async () => {
+    while (bidHistorySyncPending && !viewUnmounted && auction.value) {
+      bidHistorySyncPending = false;
 
-    if (viewUnmounted) {
-      return;
-    }
-
-    const latestStatus = response.data.data;
-
-    if (isOlderStatus(latestStatus)) {
-      return;
-    }
-
-    const latestMinimumBid = Number(latestStatus.nextMinimumBid);
-    Object.assign(auction.value, latestStatus);
-
-    if (
-      Number.isFinite(latestMinimumBid) &&
-      (!Number.isFinite(candidateBid.value) ||
-        candidateBid.value < latestMinimumBid)
-    ) {
-      candidateBid.value = latestMinimumBid;
-    }
-
-    statusSyncMessage.value = "";
-
-    if (latestStatus.bidCount !== oldBidCount) {
-      bidHistorySyncPending = true;
-    }
-
-    if (bidHistorySyncPending) {
       try {
         const bidsResponse = await getBidHistory(auction.value.auctionId);
 
-        if (!viewUnmounted) {
-          bids.value = bidsResponse.data.data;
-          bidHistorySyncPending = false;
-          bidErrorMessage.value = "";
+        if (viewUnmounted) {
+          return false;
         }
+
+        bids.value = bidsResponse.data.data;
+        bidErrorMessage.value = "";
       } catch (historyError) {
         console.error("同步出價紀錄失敗：", historyError);
-        statusSyncMessage.value =
-          "最新競標狀態已更新，但出價紀錄暫時同步失敗，將自動重試。";
+        bidHistorySyncPending = true;
+        const canRetryWithPolling = !TERMINAL_STATUSES.has(
+          auction.value.status,
+        );
+        statusSyncMessage.value = canRetryWithPolling
+          ? "最新競標狀態已更新，但出價紀錄暫時同步失敗，將自動重試。"
+          : "最新競標狀態已更新，但出價紀錄暫時同步失敗。";
+
+        if (canRetryWithPolling) {
+          startStatusPolling();
+        }
+        return false;
       }
     }
 
-    if (TERMINAL_STATUSES.has(latestStatus.status) && !bidHistorySyncPending) {
-      stopStatusPolling();
-    }
-  } catch (error) {
-    console.error("同步競標最新狀態失敗：", error);
-    statusSyncMessage.value = "最新競標狀態暫時同步失敗，將自動重試。";
-  } finally {
-    refreshingStatus = false;
+    return true;
+  })().finally(() => {
+    bidHistorySyncPromise = null;
+  });
+
+  return bidHistorySyncPromise;
+}
+
+/**
+ * REST polling 與 WebSocket 共用同一套狀態套用規則。
+ */
+async function applyLatestAuctionStatus(latestStatus) {
+  if (viewUnmounted || isOlderStatus(latestStatus)) {
+    return false;
   }
+
+  const oldBidCount = Number(auction.value.bidCount);
+  const latestBidCount = Number(latestStatus.bidCount);
+  const latestMinimumBid = Number(latestStatus.nextMinimumBid);
+
+  Object.assign(auction.value, latestStatus);
+
+  if (
+    Number.isFinite(latestMinimumBid) &&
+    (!Number.isFinite(candidateBid.value) ||
+      candidateBid.value < latestMinimumBid)
+  ) {
+    candidateBid.value = latestMinimumBid;
+  }
+
+  statusSyncMessage.value = "";
+
+  if (
+    Number.isFinite(latestBidCount) &&
+    Number.isFinite(oldBidCount) &&
+    latestBidCount !== oldBidCount
+  ) {
+    bidHistorySyncPending = true;
+  }
+
+  if (bidHistorySyncPending) {
+    await syncBidHistory();
+  }
+
+  if (TERMINAL_STATUSES.has(latestStatus.status) && !bidHistorySyncPending) {
+    stopStatusPolling();
+  }
+
+  return true;
+}
+
+/**
+ * 重新取得競標最新狀態。共享進行中的 Promise，讓 reconnect 一定能等待
+ * REST reconciliation 完成後才決定是否停止 fallback polling。
+ */
+function refreshAuctionStatus() {
+  if (!auction.value || viewUnmounted) {
+    return Promise.resolve(false);
+  }
+
+  if (statusRefreshPromise) {
+    return statusRefreshPromise;
+  }
+
+  const refreshConnectionVersion = socketConnected
+    ? socketConnectionVersion
+    : null;
+  let trackedRefreshPromise;
+
+  trackedRefreshPromise = (async () => {
+    try {
+      const response = await getAuctionStatus(auction.value.auctionId);
+
+      if (viewUnmounted) {
+        return false;
+      }
+
+      const latestStatus = response.data.data;
+
+      if (!isOlderStatus(latestStatus)) {
+        await applyLatestAuctionStatus(latestStatus);
+      }
+
+      if (
+        socketConnected &&
+        refreshConnectionVersion !== null &&
+        refreshConnectionVersion === socketConnectionVersion &&
+        !bidHistorySyncPending
+      ) {
+        stopStatusPolling();
+      }
+
+      return true;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        await handleAuctionRemoved();
+        return false;
+      }
+
+      console.error("同步競標最新狀態失敗：", error);
+      statusSyncMessage.value = "最新競標狀態暫時同步失敗，將自動重試。";
+      return false;
+    }
+  })().finally(() => {
+    if (statusRefreshPromise === trackedRefreshPromise) {
+      statusRefreshPromise = null;
+      statusRefreshConnectionVersion = null;
+    }
+  });
+
+  statusRefreshConnectionVersion = refreshConnectionVersion;
+  statusRefreshPromise = trackedRefreshPromise;
+
+  return trackedRefreshPromise;
 }
 
 function stopStatusPolling() {
@@ -506,12 +620,179 @@ function stopStatusPolling() {
 }
 
 function startStatusPolling() {
-  stopStatusPolling();
+  if (
+    viewUnmounted ||
+    removalNavigationPending ||
+    !auction.value ||
+    TERMINAL_STATUSES.has(auction.value.status) ||
+    statusPollingTimerId !== null
+  ) {
+    return;
+  }
 
   statusPollingTimerId = setInterval(
     refreshAuctionStatus,
     STATUS_POLL_INTERVAL_MS,
   );
+}
+
+function cleanupAuctionRealtime() {
+  const unsubscribe = unsubscribeAuctionSocket;
+  const client = auctionSocketClient;
+
+  unsubscribeAuctionSocket = null;
+  auctionSocketClient = null;
+  socketConnected = false;
+  socketConnectionVersion++;
+
+  try {
+    unsubscribe?.();
+  } catch (error) {
+    console.error("取消競標即時訂閱失敗：", error);
+  }
+
+  if (client) {
+    try {
+      Promise.resolve(client.deactivate()).catch((error) => {
+        console.error("關閉競標即時連線失敗：", error);
+      });
+    } catch (error) {
+      console.error("關閉競標即時連線失敗：", error);
+    }
+  }
+}
+
+async function handleAuctionRemoved() {
+  if (viewUnmounted || removalNavigationPending) {
+    return;
+  }
+
+  removalNavigationPending = true;
+  stopStatusPolling();
+  cleanupAuctionRealtime();
+
+  try {
+    await router.replace({ name: "auction" });
+  } catch (error) {
+    removalNavigationPending = false;
+    console.error("返回競標列表失敗：", error);
+    startStatusPolling();
+  }
+}
+
+async function handleAuctionSocketConnected() {
+  if (viewUnmounted || removalNavigationPending) {
+    return;
+  }
+
+  if (!socketConnected) {
+    socketConnected = true;
+    socketConnectionVersion++;
+  }
+
+  const connectionVersion = socketConnectionVersion;
+
+  // connect 前由 fallback polling 發出的 Request 不能充當訂閱後 reconciliation。
+  // 先讓它結束，再強制發出一次 subscribe 完成後的新 REST Request。
+  const refreshStartedBeforeConnection = statusRefreshPromise;
+
+  if (
+    refreshStartedBeforeConnection &&
+    statusRefreshConnectionVersion !== connectionVersion
+  ) {
+    await refreshStartedBeforeConnection;
+
+    if (
+      viewUnmounted ||
+      !socketConnected ||
+      connectionVersion !== socketConnectionVersion
+    ) {
+      return;
+    }
+  }
+
+  const reconciled = await refreshAuctionStatus();
+
+  if (
+    !viewUnmounted &&
+    socketConnected &&
+    connectionVersion === socketConnectionVersion &&
+    reconciled &&
+    !bidHistorySyncPending
+  ) {
+    stopStatusPolling();
+  }
+}
+
+function handleAuctionSocketDisconnected() {
+  socketConnected = false;
+  socketConnectionVersion++;
+
+  if (
+    !viewUnmounted &&
+    !removalNavigationPending &&
+    auction.value &&
+    !TERMINAL_STATUSES.has(auction.value.status)
+  ) {
+    startStatusPolling();
+  }
+}
+
+function handleAuctionSocketError(error) {
+  console.error("競標即時連線失敗，改用定時同步：", error);
+  handleAuctionSocketDisconnected();
+}
+
+async function handleAuctionRealtimeMessage(message) {
+  if (
+    viewUnmounted ||
+    !auction.value ||
+    !REALTIME_EVENT_TYPES.has(message?.eventType) ||
+    !message.data ||
+    String(message.data.auctionId) !== String(auction.value.auctionId)
+  ) {
+    return;
+  }
+
+  if (isOlderStatus(message.data)) {
+    return;
+  }
+
+  if (message.eventType === "AUCTION_REMOVED") {
+    await handleAuctionRemoved();
+    return;
+  }
+
+  await applyLatestAuctionStatus(message.data);
+}
+
+function startAuctionRealtime() {
+  if (
+    viewUnmounted ||
+    !auction.value ||
+    auctionSocketClient
+  ) {
+    return;
+  }
+
+  try {
+    const client = createAuctionSocketClient({
+      onConnected: handleAuctionSocketConnected,
+      onDisconnected: handleAuctionSocketDisconnected,
+      onError: handleAuctionSocketError,
+    });
+
+    auctionSocketClient = client;
+    unsubscribeAuctionSocket = client.subscribeAuction(
+      auction.value.auctionId,
+      {
+        onMessage: handleAuctionRealtimeMessage,
+      },
+    );
+    client.activate();
+  } catch (error) {
+    handleAuctionSocketError(error);
+  }
 }
 
 /**
@@ -696,17 +977,10 @@ async function handlePlaceBid() {
     });
 
     const latestStatus = response.data.data;
-    Object.assign(auction.value, latestStatus);
-    candidateBid.value = Number(latestStatus.nextMinimumBid);
+    await applyLatestAuctionStatus(latestStatus);
     bidSuccessMessage.value = `已成功出價 ${formatTwd(submittedBid)}`;
 
-    try {
-      const bidsResponse = await getBidHistory(auction.value.auctionId);
-      bids.value = bidsResponse.data.data;
-      bidHistorySyncPending = false;
-    } catch (historyError) {
-      console.error("重新取得出價紀錄失敗：", historyError);
-      bidHistorySyncPending = true;
+    if (bidHistorySyncPending) {
       bidErrorMessage.value = "出價已成功，但暫時無法更新出價紀錄。";
     }
   } catch (error) {
@@ -764,18 +1038,19 @@ function formatBoolean(value) {
 onMounted(async () => {
   await loadAuctionDetail();
 
-  if (
-    !viewUnmounted &&
-    auction.value &&
-    !TERMINAL_STATUSES.has(auction.value.status)
-  ) {
-    startStatusPolling();
+  if (!viewUnmounted && auction.value) {
+    if (!TERMINAL_STATUSES.has(auction.value.status)) {
+      startStatusPolling();
+    }
+
+    startAuctionRealtime();
   }
 });
 
 onUnmounted(() => {
   viewUnmounted = true;
   stopStatusPolling();
+  cleanupAuctionRealtime();
 });
 
 /**

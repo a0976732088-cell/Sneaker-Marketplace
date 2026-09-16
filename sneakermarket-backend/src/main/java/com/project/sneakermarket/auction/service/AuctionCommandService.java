@@ -18,6 +18,8 @@ import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.repository.AuctionProductImageRepository;
 import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 import com.project.sneakermarket.common.exception.BusinessException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 import com.project.sneakermarket.auction.dto.AuctionUpdateRequest;
@@ -44,6 +46,7 @@ public class AuctionCommandService {
     private final ImageStorageService imageStorageService;
     private final AuctionReferenceService referenceService;
     private final AuctionTime auctionTime;
+    private final AuctionRealtimeEventPublisher realtimeEvents;
 
     /**
      * 建立一場新的競標。
@@ -561,6 +564,7 @@ public class AuctionCommandService {
          * 此處仍明確 save，讓目前初期專案的寫入流程比較容易理解。
          */
         auctionRepository.save(auction);
+        realtimeEvents.publish(AuctionRealtimeEventType.AUCTION_CANCELLED, auction);
     }
 
     /**

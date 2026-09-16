@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.project.sneakermarket.auction.dto.AuctionCreateRequest;
@@ -26,10 +27,14 @@ import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.repository.AuctionProductImageRepository;
 import com.project.sneakermarket.auction.repository.AuctionProductRepository;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * AuctionCommandService 整合測試。
@@ -66,6 +71,9 @@ class AuctionCommandServiceTests {
 
     @Autowired
     private AuctionProductImageRepository auctionProductImageRepository;
+
+    @MockitoBean
+    private AuctionRealtimeEventPublisher realtimeEvents;
 
     /**
      * 驗證完整建立競標流程。
@@ -492,6 +500,7 @@ class AuctionCommandServiceTests {
                         .existsById(auctionProductId),
                 "取消競標後 AuctionProduct 仍應存在"
         );
+        verify(realtimeEvents).publish(AuctionRealtimeEventType.AUCTION_CANCELLED, cancelledAuction);
     }
 
     /**
@@ -1050,6 +1059,7 @@ class AuctionCommandServiceTests {
                 originalHighestBidderId,
                 auctionAfter.getHighestBidderId()
         );
+        verifyNoInteractions(realtimeEvents);
     }
 
     /**

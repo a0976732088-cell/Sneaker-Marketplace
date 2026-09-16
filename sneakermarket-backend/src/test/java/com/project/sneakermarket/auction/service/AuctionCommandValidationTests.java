@@ -4,6 +4,8 @@ import com.project.sneakermarket.auction.dto.*;
 import com.project.sneakermarket.auction.entity.*;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
 import com.project.sneakermarket.auction.repository.*;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 import com.project.sneakermarket.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ class AuctionCommandValidationTests {
     private AuctionRepository auctions;
     private AuctionProductRepository products;
     private ImageStorageService images;
+    private AuctionRealtimeEventPublisher realtimeEvents;
     private AuctionCommandService service;
     private Auction auction;
     private AuctionProduct product;
@@ -29,9 +32,10 @@ class AuctionCommandValidationTests {
         auctions = mock(AuctionRepository.class);
         products = mock(AuctionProductRepository.class);
         images = mock(ImageStorageService.class);
+        realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
         var time = new AuctionTime(Clock.fixed(Instant.parse("2026-09-07T04:00:00Z"), ZoneOffset.UTC));
         service = new AuctionCommandService(products, mock(AuctionProductImageRepository.class),
-                auctions, images, new AuctionReferenceService(references), time);
+                auctions, images, new AuctionReferenceService(references), time, realtimeEvents);
         when(references.isActiveMember(42L)).thenReturn(true);
         when(references.brandExists(7L)).thenReturn(true);
         when(references.categoryExists(9L)).thenReturn(true);
@@ -100,6 +104,7 @@ class AuctionCommandValidationTests {
         assertEquals(AuctionStatus.SCHEDULED, auction.getStatus());
         verify(products).save(product);
         verify(auctions).save(auction);
+        verifyNoInteractions(realtimeEvents);
     }
 
     @Test
@@ -150,6 +155,17 @@ class AuctionCommandValidationTests {
         auction.setEndAt(now);
         assertThrows(BusinessException.class, () -> service.cancelAuction(12L, 42L));
         verify(auctions, never()).save(any());
+        verifyNoInteractions(realtimeEvents);
+    }
+
+    @Test
+    void successfulCancellationPublishesRealtimeEventAfterSave() {
+        service.cancelAuction(12L, 42L);
+
+        assertEquals(AuctionStatus.CANCELLED, auction.getStatus());
+        var order = inOrder(auctions, realtimeEvents);
+        order.verify(auctions).save(auction);
+        order.verify(realtimeEvents).publish(AuctionRealtimeEventType.AUCTION_CANCELLED, auction);
     }
 
     @Test

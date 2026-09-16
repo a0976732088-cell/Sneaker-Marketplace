@@ -143,21 +143,26 @@ test("admin list shows clear selectors, thumbnails, detail links and 15-row numb
   assert.match(view, /batchMode\.value \? 10 : 9/);
 });
 
-test("admin list order-status filter uses every real AuctionOrderStatus", () => {
+test("admin list order-status filter exposes supported auction order states", () => {
   assert.match(
     view,
     /id="admin-order-status"[\s\S]*?v-model="filters\.orderStatus"[\s\S]*?v-for="status in orderStatuses"[\s\S]*?formatAuctionOrderStatus\(status\)/,
   );
-  const configured = view.match(/const orderStatuses = \[([\s\S]*?)\];/)?.[1] ?? "";
+  const configured =
+    view.match(/^[ \t]*const orderStatuses = \[([\s\S]*?)\];/m)?.[1] ?? "";
   for (const status of [
     "PENDING_PAYMENT",
     "PAID",
-    "SHIPPED",
-    "COMPLETED",
-    "CANCELLED",
     "ABANDONED",
   ]) {
     assert.match(configured, new RegExp(`"${status}"`), status);
+  }
+  for (const unsupportedStatus of ["SHIPPED", "COMPLETED", "CANCELLED"]) {
+    assert.doesNotMatch(
+      configured,
+      new RegExp(`"${unsupportedStatus}"`),
+      unsupportedStatus,
+    );
   }
   assert.doesNotMatch(configured, /FAILED|NOT_SHIPPED|DELIVERED/);
 });
@@ -242,7 +247,7 @@ test("ACTIVE lifecycle shows persisted schedule only and keeps result and order 
     ["AUCTION_CREATED", "AUCTION_STARTED", "AUCTION_ENDED"],
   );
   assert.equal(timeline[1].label, "排定開始");
-  assert.equal(timeline[2].label, "競標截止");
+  assert.equal(timeline[2].label, "競標排定截止");
   assert.ok(detail.includes("尚未產生競標結果"));
   assert.ok(detail.includes("尚未建立競標訂單"));
 });
@@ -528,9 +533,6 @@ test("selected order status is sent through the existing admin list GET", async 
   assert.deepEqual([...h.orderStatuses], [
     "PENDING_PAYMENT",
     "PAID",
-    "SHIPPED",
-    "COMPLETED",
-    "CANCELLED",
     "ABANDONED",
   ]);
   h.filters.orderStatus = "ABANDONED";

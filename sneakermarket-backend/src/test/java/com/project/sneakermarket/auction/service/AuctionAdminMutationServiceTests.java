@@ -19,6 +19,8 @@ import com.project.sneakermarket.auction.entity.Auction;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 
 class AuctionAdminMutationServiceTests {
@@ -27,13 +29,15 @@ class AuctionAdminMutationServiceTests {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 12, 20, 0);
 
     private AuctionRepository auctions;
+    private AuctionRealtimeEventPublisher realtimeEvents;
     private AuctionAdminMutationService service;
 
     @BeforeEach
     void setup() {
         auctions = mock(AuctionRepository.class);
+        realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
         AuctionTime time = new AuctionTime(Clock.fixed(Instant.parse("2026-09-12T12:00:00Z"), ZoneOffset.UTC));
-        service = new AuctionAdminMutationService(auctions, time);
+        service = new AuctionAdminMutationService(auctions, time, realtimeEvents);
     }
 
     @ParameterizedTest
@@ -52,6 +56,7 @@ class AuctionAdminMutationServiceTests {
         assertEquals(NOW, auction.getUpdatedAt());
         verify(auctions).findByIdForUpdate(AUCTION_ID);
         verify(auctions).save(auction);
+        verify(realtimeEvents).publish(AuctionRealtimeEventType.AUCTION_REMOVED, auction);
         verify(auctions, never()).delete(any(Auction.class));
         verify(auctions, never()).deleteById(anyLong());
     }
@@ -84,6 +89,7 @@ class AuctionAdminMutationServiceTests {
         assertEquals(6L, auction.getRemovedByMemberId());
         assertEquals("原始原因", auction.getRemoveReason());
         verify(auctions, never()).save(any());
+        verifyNoInteractions(realtimeEvents);
     }
 
     @Test
@@ -261,6 +267,7 @@ class AuctionAdminMutationServiceTests {
         assertThrows(ResourceNotFoundException.class,
                 () -> service.deleteAuction(AUCTION_ID, ADMIN_ID, "原因"));
         verify(auctions, times(3)).findByIdForUpdate(AUCTION_ID);
+        verifyNoInteractions(realtimeEvents);
     }
 
     private Auction removedAuction(AuctionStatus status) {
