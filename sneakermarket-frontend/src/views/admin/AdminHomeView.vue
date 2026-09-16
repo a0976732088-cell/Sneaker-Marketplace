@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { ref, onMounted, watch } from "vue";
+
+import { useRouter, useRoute } from "vue-router";
 
 import { getCurrentMember } from "@/service/authService";
 
@@ -13,9 +14,12 @@ import {
 
 const router = useRouter();
 
+const route = useRoute();
+
 // =====================================================
 // 管理員權限
 // =====================================================
+
 const checkingPermission = ref(true);
 
 const currentAdmin = ref(null);
@@ -23,6 +27,7 @@ const currentAdmin = ref(null);
 // =====================================================
 // 會員資料
 // =====================================================
+
 const members = ref([]);
 
 const loading = ref(true);
@@ -34,6 +39,7 @@ const successMessage = ref("");
 // =====================================================
 // 新增會員
 // =====================================================
+
 const showCreateForm = ref(false);
 
 const creating = ref(false);
@@ -50,6 +56,7 @@ const newMember = ref({
 // =====================================================
 // 修改會員
 // =====================================================
+
 const editingMemberId = ref(null);
 
 const updating = ref(false);
@@ -62,51 +69,9 @@ const editMember = ref({
 });
 
 // =====================================================
-// Admin 功能模組
+// API Error
 // =====================================================
-const adminModules = [
-  {
-    title: "會員系統",
-    description: "會員資料新增、查詢、修改與刪除。",
-    type: "member",
-  },
 
-  {
-    title: "一般商城",
-    description: "商品、購物車、結帳與一般訂單。",
-    to: {
-      name: "admin-products",
-    },
-  },
-
-  {
-    title: "廣告系統",
-    description: "首頁廣告展示與後台管理。",
-    to: {
-      name: "advertisement",
-    },
-  },
-
-  {
-    title: "行事曆 / 通知",
-    description: "事件追蹤、提醒與站內通知。",
-    to: {
-      name: "eventManage",
-    },
-  },
-
-  {
-    title: "競標系統",
-    description: "管理競標、下架／恢復顯示與批量刪除。",
-    to: {
-      name: "admin-auctions",
-    },
-  },
-];
-
-// =====================================================
-// API 錯誤訊息
-// =====================================================
 function getApiErrorMessage(error, fallbackMessage) {
   const data = error.response?.data;
 
@@ -128,6 +93,7 @@ function getApiErrorMessage(error, fallbackMessage) {
 // =====================================================
 // Email 驗證
 // =====================================================
+
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -135,13 +101,15 @@ function isValidEmail(email) {
 // =====================================================
 // 手機驗證
 // =====================================================
+
 function isValidPhone(phone) {
   return /^09\d{8}$/.test(phone);
 }
 
 // =====================================================
-// 管理員權限確認
+// 管理員權限
 // =====================================================
+
 async function checkAdminPermission() {
   try {
     const member = await getCurrentMember();
@@ -175,22 +143,9 @@ async function checkAdminPermission() {
 }
 
 // =====================================================
-// 滾動到會員管理
-// =====================================================
-function scrollToMemberManagement() {
-  document.getElementById("member-management")?.scrollIntoView({
-    behavior: "smooth",
-
-    block: "start",
-  });
-}
-
-// =====================================================
 // 取得會員
-//
-// Soft Delete 後：
-// 後端只會回傳 deleted_at IS NULL。
 // =====================================================
+
 async function loadMembers() {
   loading.value = true;
 
@@ -210,27 +165,76 @@ async function loadMembers() {
 }
 
 // =====================================================
-// 重設新增表單
+// 重設新增會員
 // =====================================================
+
 function resetCreateForm() {
   newMember.value = {
     account: "",
-
     password: "",
-
     name: "",
-
     email: "",
-
     phone: "",
-
     address: "",
   };
 }
 
 // =====================================================
+// 開啟新增會員
+//
+// 除了打開表單，也同步把網址改成：
+// /admin?action=create-member
+// =====================================================
+
+async function openCreateMember() {
+  showCreateForm.value = true;
+
+  successMessage.value = "";
+
+  errorMessage.value = "";
+
+  await router.replace({
+    name: "admin",
+
+    query: {
+      action: "create-member",
+    },
+  });
+}
+
+// =====================================================
+// 關閉新增會員
+//
+// 重要：
+// 除了關閉表單，也把網址從
+//
+// /admin?action=create-member
+//
+// 改回
+//
+// /admin
+//
+// 這樣 Sidebar 的「新增會員」就不會繼續反白
+// =====================================================
+
+async function closeCreateMember() {
+  showCreateForm.value = false;
+
+  resetCreateForm();
+
+  successMessage.value = "";
+
+  errorMessage.value = "";
+
+  await router.replace({
+    name: "admin",
+  });
+}
+
+// =====================================================
 // 新增會員
 // =====================================================
+
 async function handleCreateMember() {
   errorMessage.value = "";
 
@@ -292,6 +296,14 @@ async function handleCreateMember() {
     showCreateForm.value = false;
 
     await loadMembers();
+
+    // =============================================
+    // 新增成功後網址回到 /admin
+    // 避免「新增會員」繼續反白
+    // =============================================
+    await router.replace({
+      name: "admin",
+    });
   } catch (error) {
     console.error("新增會員失敗：", error);
 
@@ -302,8 +314,9 @@ async function handleCreateMember() {
 }
 
 // =====================================================
-// 開始修改會員
+// 開始修改
 // =====================================================
+
 function startEditMember(member) {
   errorMessage.value = "";
 
@@ -325,16 +338,14 @@ function startEditMember(member) {
 // =====================================================
 // 取消修改
 // =====================================================
+
 function cancelEditMember() {
   editingMemberId.value = null;
 
   editMember.value = {
     name: "",
-
     email: "",
-
     phone: "",
-
     address: "",
   };
 }
@@ -342,6 +353,7 @@ function cancelEditMember() {
 // =====================================================
 // 修改會員
 // =====================================================
+
 async function handleUpdateMember(memberId) {
   errorMessage.value = "";
 
@@ -388,15 +400,16 @@ async function handleUpdateMember(memberId) {
   } catch (error) {
     console.error("修改會員失敗：", error);
 
-    errorMessage.value = getApiErrorMessage(error, "修改會員失敗");
+    errorMessage.value = getApiErrorMessage(error, "會員資料修改失敗");
   } finally {
     updating.value = false;
   }
 }
 
 // =====================================================
-// Soft Delete 會員
+// 刪除會員
 // =====================================================
+
 async function handleDeleteMember(member) {
   errorMessage.value = "";
 
@@ -430,14 +443,9 @@ async function handleDeleteMember(member) {
 }
 
 // =====================================================
-// 完整日期時間
-//
-// DB / API：
-// 2026-09-15T11:50:48
-//
-// 顯示完整格式：
-// 2026-09-15 11:50:48
+// 完整時間
 // =====================================================
+
 function formatDateTimeFull(dateTime) {
   if (!dateTime) {
     return "-";
@@ -447,16 +455,9 @@ function formatDateTimeFull(dateTime) {
 }
 
 // =====================================================
-// ★ 日期時間縮短顯示
-//
-// 完整：
-// 2026-09-15 11:50:48
-//
-// 表格：
-// 2026...
-//
-// 只顯示前 4 個字元。
+// 時間預覽
 // =====================================================
+
 function formatDateTimePreview(dateTime) {
   const fullDateTime = formatDateTimeFull(dateTime);
 
@@ -466,30 +467,17 @@ function formatDateTimePreview(dateTime) {
 
   const chars = Array.from(fullDateTime);
 
-  /*
-   * 4 個字以內就完整顯示
-   */
   if (chars.length <= 4) {
     return fullDateTime;
   }
 
-  /*
-   * 超過 4 個字：
-   *
-   * 2026...
-   */
   return chars.slice(0, 4).join("") + "...";
 }
 
 // =====================================================
-// 地址縮短
-//
-// 高雄市左營區博愛三路100號
-//
-// ↓
-//
-// 高雄市...
+// 地址預覽
 // =====================================================
+
 function formatAddressPreview(address) {
   if (!address) {
     return "尚未填寫";
@@ -505,234 +493,232 @@ function formatAddressPreview(address) {
 }
 
 // =====================================================
+// 根據 URL 決定新增表單是否開啟
+// =====================================================
+
+function handleQueryAction() {
+  // /admin?action=create-member
+  if (route.query.action === "create-member") {
+    showCreateForm.value = true;
+
+    return;
+  }
+
+  // /admin
+  showCreateForm.value = false;
+}
+
+// =====================================================
 // 初始化
 // =====================================================
+
 onMounted(async () => {
   const allowed = await checkAdminPermission();
 
   if (allowed) {
     await loadMembers();
+
+    handleQueryAction();
   }
 });
+
+// =====================================================
+// URL Query 改變時同步畫面
+//
+// 例如：
+// /admin
+// ↓
+// /admin?action=create-member
+// ↓
+// /admin
+// =====================================================
+
+watch(
+  () => route.query.action,
+
+  () => {
+    handleQueryAction();
+  },
+);
 </script>
 
 <template>
-  <div class="container py-5">
-    <!-- ==================================================
-         驗證管理員權限
-    =================================================== -->
-    <div v-if="checkingPermission" class="alert alert-secondary">
+  <div class="admin-member-page">
+    <!-- =========================================
+         權限驗證
+    ========================================== -->
+
+    <div v-if="checkingPermission" class="status-box">
       正在驗證管理員權限...
     </div>
 
     <template v-else-if="currentAdmin">
-      <!-- ==================================================
-           管理後台標題
-      =================================================== -->
-      <div class="mb-4">
-        <h1 class="h2 mb-2">管理後台</h1>
+      <!-- =====================================
+           Page Header
+      ====================================== -->
 
-        <p class="text-secondary mb-1">SneakerMarket 系統管理中心</p>
+      <div class="page-header">
+        <div>
+          <p class="eyebrow">MEMBER MANAGEMENT</p>
 
-        <p class="text-secondary mb-0">
-          目前登入管理員：
+          <h1>會員管理</h1>
 
-          <strong>
-            {{ currentAdmin.account }}
-          </strong>
-        </p>
+          <p class="page-description">
+            管理 SneakerMarket 會員資料、建立會員、 修改會員與刪除會員。
+          </p>
+
+          <p class="admin-info">
+            目前登入管理員：
+
+            <strong>
+              {{ currentAdmin.account }}
+            </strong>
+          </p>
+        </div>
+
+        <!-- =================================
+             右上角 新增 / 關閉
+        ================================== -->
+
+        <button
+          type="button"
+          class="create-button"
+          @click="showCreateForm ? closeCreateMember() : openCreateMember()"
+        >
+          {{ showCreateForm ? "關閉新增" : "+ 新增會員" }}
+        </button>
       </div>
 
-      <!-- ==================================================
-           後台模組
-      =================================================== -->
-      <section class="mb-5">
-        <div class="row g-4">
-          <div
-            v-for="module in adminModules"
-            :key="module.title"
-            class="col-12 col-md-6"
-          >
-            <div class="card h-100 shadow-sm">
-              <div class="card-body p-4">
-                <h2 class="h4 mb-3">
-                  {{ module.title }}
-                </h2>
+      <!-- =====================================
+           新增會員
+      ====================================== -->
 
-                <p class="text-secondary mb-4">
-                  {{ module.description }}
-                </p>
+      <section v-if="showCreateForm" class="panel create-panel">
+        <div class="panel-header">
+          <div>
+            <h2>新增會員</h2>
 
-                <button
-                  v-if="module.type === 'member'"
-                  type="button"
-                  class="btn btn-outline-dark"
-                  @click="scrollToMemberManagement"
-                >
-                  開啟模組
-                </button>
-
-                <RouterLink v-else :to="module.to" class="btn btn-outline-dark">
-                  開啟模組
-                </RouterLink>
-              </div>
-            </div>
+            <p>建立新的商城會員帳號</p>
           </div>
         </div>
-      </section>
 
-      <hr class="my-5" />
+        <div class="form-grid">
+          <div class="form-group">
+            <label> 帳號 * </label>
 
-      <!-- ==================================================
-           會員管理
-      =================================================== -->
-      <section id="member-management">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            <h2 class="h3 mb-1">會員管理</h2>
-
-            <p class="text-secondary mb-0">SneakerMarket 後台會員資料</p>
+            <input
+              v-model="newMember.account"
+              type="text"
+              placeholder="請輸入帳號"
+            />
           </div>
+
+          <div class="form-group">
+            <label> 密碼 * </label>
+
+            <input
+              v-model="newMember.password"
+              type="password"
+              placeholder="至少 8 碼"
+            />
+          </div>
+
+          <div class="form-group">
+            <label> 姓名 * </label>
+
+            <input v-model="newMember.name" type="text" />
+          </div>
+
+          <div class="form-group">
+            <label> Email * </label>
+
+            <input v-model="newMember.email" type="email" />
+          </div>
+
+          <div class="form-group">
+            <label> 手機 * </label>
+
+            <input
+              v-model="newMember.phone"
+              type="tel"
+              maxlength="10"
+              placeholder="0912345678"
+            />
+          </div>
+
+          <div class="form-group">
+            <label> 地址 </label>
+
+            <input v-model="newMember.address" type="text" />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <!-- =================================
+               取消時也清除 URL Query
+          ================================== -->
 
           <button
             type="button"
-            class="btn btn-primary"
-            @click="showCreateForm = !showCreateForm"
+            class="secondary-button"
+            @click="closeCreateMember"
           >
-            + 新增會員
+            取消
+          </button>
+
+          <button
+            type="button"
+            class="primary-button"
+            :disabled="creating"
+            @click="handleCreateMember"
+          >
+            {{ creating ? "新增中..." : "確認新增" }}
           </button>
         </div>
+      </section>
 
-        <!-- ==================================================
-             新增會員
-        =================================================== -->
-        <div v-if="showCreateForm" class="card shadow-sm mb-4">
-          <div class="card-body">
-            <h5 class="card-title mb-4">新增會員</h5>
+      <!-- =====================================
+           Message
+      ====================================== -->
 
-            <div class="row g-3">
-              <!-- 帳號 -->
-              <div class="col-md-6">
-                <label class="form-label"> 帳號 * </label>
+      <div v-if="successMessage" class="message-box success-box">
+        {{ successMessage }}
+      </div>
 
-                <input
-                  v-model="newMember.account"
-                  class="form-control"
-                  type="text"
-                  placeholder="請輸入帳號"
-                />
-              </div>
+      <div v-if="errorMessage" class="message-box error-box">
+        {{ errorMessage }}
+      </div>
 
-              <!-- 密碼 -->
-              <div class="col-md-6">
-                <label class="form-label"> 密碼 * </label>
+      <!-- =====================================
+           Member List
+      ====================================== -->
 
-                <input
-                  v-model="newMember.password"
-                  class="form-control"
-                  type="password"
-                  placeholder="至少 8 碼"
-                />
-              </div>
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>會員列表</h2>
 
-              <!-- 姓名 -->
-              <div class="col-md-6">
-                <label class="form-label"> 姓名 * </label>
+            <p>
+              共
 
-                <input
-                  v-model="newMember.name"
-                  class="form-control"
-                  type="text"
-                />
-              </div>
+              <strong>
+                {{ members.length }}
+              </strong>
 
-              <!-- Email -->
-              <div class="col-md-6">
-                <label class="form-label"> Email * </label>
-
-                <input
-                  v-model="newMember.email"
-                  class="form-control"
-                  type="email"
-                />
-              </div>
-
-              <!-- 手機 -->
-              <div class="col-md-6">
-                <label class="form-label"> 手機 * </label>
-
-                <input
-                  v-model="newMember.phone"
-                  class="form-control"
-                  type="tel"
-                  maxlength="10"
-                  placeholder="0912345678"
-                />
-              </div>
-
-              <!-- 地址 -->
-              <div class="col-md-6">
-                <label class="form-label"> 地址 </label>
-
-                <input
-                  v-model="newMember.address"
-                  class="form-control"
-                  type="text"
-                />
-              </div>
-            </div>
-
-            <!-- 按鈕 -->
-            <div class="d-flex justify-content-end gap-2 mt-4">
-              <button
-                type="button"
-                class="btn btn-outline-secondary"
-                @click="
-                  showCreateForm = false;
-                  resetCreateForm();
-                "
-              >
-                取消
-              </button>
-
-              <button
-                type="button"
-                class="btn btn-primary"
-                :disabled="creating"
-                @click="handleCreateMember"
-              >
-                {{ creating ? "新增中..." : "確認新增" }}
-              </button>
-            </div>
+              位有效會員
+            </p>
           </div>
         </div>
 
-        <!-- 成功訊息 -->
-        <div v-if="successMessage" class="alert alert-success">
-          {{ successMessage }}
-        </div>
+        <div v-if="loading" class="status-box">會員資料載入中...</div>
 
-        <!-- Error -->
-        <div v-if="errorMessage" class="alert alert-danger">
-          {{ errorMessage }}
-        </div>
-
-        <!-- Loading -->
-        <div v-if="loading" class="alert alert-secondary">
-          會員資料載入中...
-        </div>
-
-        <!-- 無會員 -->
-        <div v-else-if="members.length === 0" class="alert alert-warning">
+        <div v-else-if="members.length === 0" class="status-box">
           目前沒有會員資料
         </div>
 
-        <!-- ==================================================
-             會員 Table
-        =================================================== -->
-        <div v-else class="table-responsive">
-          <table class="table table-hover align-middle">
-            <thead class="table-dark">
+        <div v-else class="member-table-wrapper">
+          <table class="member-table">
+            <thead>
               <tr>
                 <th>ID</th>
 
@@ -744,204 +730,155 @@ onMounted(async () => {
 
                 <th>手機</th>
 
-                <!-- 地址 -->
-                <th class="address-header">地址</th>
+                <th>地址</th>
 
                 <th>角色</th>
 
-                <!-- ★ 註冊時間 -->
-                <th class="datetime-header">註冊時間</th>
+                <th>註冊時間</th>
 
-                <th style="min-width: 150px">操作</th>
+                <th>操作</th>
               </tr>
             </thead>
 
             <tbody>
               <template v-for="member in members" :key="member.memberId">
                 <tr>
-                  <!-- ID -->
                   <td>
                     {{ member.memberId }}
                   </td>
 
-                  <!-- 帳號 -->
                   <td>
                     {{ member.account }}
                   </td>
 
-                  <!-- 姓名 -->
                   <td>
                     {{ member.name }}
                   </td>
 
-                  <!-- Email -->
                   <td>
                     {{ member.email }}
                   </td>
 
-                  <!-- 手機 -->
                   <td>
                     {{ member.phone || "尚未填寫" }}
                   </td>
 
-                  <!-- =================================================
-                       地址
-
-                       高雄市左營區博愛三路100號
-                       ↓
-                       高雄市...
-                  ================================================== -->
-                  <td class="address-cell">
+                  <td>
                     <span
-                      class="address-preview"
+                      class="truncate-cell"
                       :title="member.address || '尚未填寫'"
                     >
                       {{ formatAddressPreview(member.address) }}
                     </span>
                   </td>
 
-                  <!-- 角色 -->
                   <td>
-                    <span
-                      class="badge"
-                      :class="
-                        member.role === 'ROLE_ADMIN'
-                          ? 'bg-dark'
-                          : 'bg-secondary'
-                      "
-                    >
+                    <span class="role-badge">
                       {{ member.role }}
                     </span>
                   </td>
 
-                  <!-- =================================================
-                       ★ 註冊時間
-
-                       完整：
-                       2026-09-15 11:50:48
-
-                       顯示：
-                       2026...
-
-                       title：
-                       完整時間
-                  ================================================== -->
-                  <td class="datetime-cell">
+                  <td>
                     <span
-                      class="datetime-preview"
+                      class="truncate-cell"
                       :title="formatDateTimeFull(member.createdAt)"
                     >
                       {{ formatDateTimePreview(member.createdAt) }}
                     </span>
                   </td>
 
-                  <!-- 操作 -->
                   <td>
-                    <div class="d-flex gap-2 align-items-center">
-                      <!-- 修改 -->
+                    <div class="table-actions">
+                      <!-- 修改：藍色 -->
+
                       <button
                         type="button"
-                        class="btn btn-sm btn-outline-primary"
+                        class="text-button edit-text"
                         @click="startEditMember(member)"
                       >
                         修改
                       </button>
 
-                      <!-- 刪除 -->
+                      <!-- 刪除：紅色 -->
+
                       <button
                         v-if="member.memberId !== currentAdmin.memberId"
                         type="button"
-                        class="btn btn-sm btn-outline-danger"
+                        class="text-button delete-text"
                         @click="handleDeleteMember(member)"
                       >
                         刪除
                       </button>
 
-                      <!-- Admin 自己 -->
-                      <span v-else class="small text-secondary">
+                      <span v-else class="current-admin-text">
                         目前管理員
                       </span>
                     </div>
                   </td>
                 </tr>
 
-                <!-- ==================================================
-                     修改會員
-                =================================================== -->
-                <tr v-if="editingMemberId === member.memberId">
+                <!-- =============================
+                     Edit Member
+                ============================== -->
+
+                <tr v-if="editingMemberId === member.memberId" class="edit-row">
                   <td colspan="9">
-                    <div class="card bg-light border-0">
-                      <div class="card-body">
-                        <h5 class="mb-3">
-                          修改會員：
+                    <div class="edit-panel">
+                      <div class="edit-title">
+                        修改會員：
+
+                        <strong>
                           {{ member.account }}
-                        </h5>
+                        </strong>
+                      </div>
 
-                        <div class="row g-3">
-                          <!-- 姓名 -->
-                          <div class="col-md-6">
-                            <label class="form-label"> 姓名 </label>
+                      <div class="form-grid">
+                        <div class="form-group">
+                          <label> 姓名 </label>
 
-                            <input
-                              v-model="editMember.name"
-                              type="text"
-                              class="form-control"
-                            />
-                          </div>
-
-                          <!-- Email -->
-                          <div class="col-md-6">
-                            <label class="form-label"> Email </label>
-
-                            <input
-                              v-model="editMember.email"
-                              type="email"
-                              class="form-control"
-                            />
-                          </div>
-
-                          <!-- 手機 -->
-                          <div class="col-md-6">
-                            <label class="form-label"> 手機 </label>
-
-                            <input
-                              v-model="editMember.phone"
-                              type="tel"
-                              maxlength="10"
-                              class="form-control"
-                            />
-                          </div>
-
-                          <!-- 地址 -->
-                          <div class="col-md-6">
-                            <label class="form-label"> 地址 </label>
-
-                            <input
-                              v-model="editMember.address"
-                              type="text"
-                              class="form-control"
-                            />
-                          </div>
+                          <input v-model="editMember.name" type="text" />
                         </div>
 
-                        <div class="d-flex justify-content-end gap-2 mt-3">
-                          <button
-                            type="button"
-                            class="btn btn-outline-secondary"
-                            @click="cancelEditMember"
-                          >
-                            取消
-                          </button>
+                        <div class="form-group">
+                          <label> Email </label>
 
-                          <button
-                            type="button"
-                            class="btn btn-primary"
-                            :disabled="updating"
-                            @click="handleUpdateMember(member.memberId)"
-                          >
-                            {{ updating ? "儲存中..." : "儲存修改" }}
-                          </button>
+                          <input v-model="editMember.email" type="email" />
                         </div>
+
+                        <div class="form-group">
+                          <label> 手機 </label>
+
+                          <input
+                            v-model="editMember.phone"
+                            type="tel"
+                            maxlength="10"
+                          />
+                        </div>
+
+                        <div class="form-group">
+                          <label> 地址 </label>
+
+                          <input v-model="editMember.address" type="text" />
+                        </div>
+                      </div>
+
+                      <div class="form-actions">
+                        <button
+                          type="button"
+                          class="secondary-button"
+                          @click="cancelEditMember"
+                        >
+                          取消
+                        </button>
+
+                        <button
+                          type="button"
+                          class="primary-button"
+                          :disabled="updating"
+                          @click="handleUpdateMember(member.memberId)"
+                        >
+                          {{ updating ? "儲存中..." : "儲存修改" }}
+                        </button>
                       </div>
                     </div>
                   </td>
@@ -956,109 +893,410 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* =====================================================
-   地址
-===================================================== */
+.admin-member-page {
+  width: 100%;
+}
 
-.address-cell {
-  width: 100px;
+/* =========================================
+   HEADER
+========================================= */
 
-  min-width: 100px;
+.page-header {
+  display: flex;
 
-  max-width: 100px;
+  align-items: flex-start;
+
+  justify-content: space-between;
+
+  gap: 30px;
+
+  margin-bottom: 30px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+
+  color: #777777;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  letter-spacing: 0.16em;
+}
+
+.page-header h1 {
+  margin: 0;
+
+  font-size: 30px;
+
+  font-weight: 500;
+
+  color: #111111;
+}
+
+.page-description {
+  margin: 10px 0 6px;
+
+  color: #666666;
+
+  font-size: 14px;
+}
+
+.admin-info {
+  margin: 0;
+
+  color: #777777;
+
+  font-size: 13px;
+}
+
+/* =========================================
+   PANEL
+========================================= */
+
+.panel {
+  margin-bottom: 24px;
+
+  padding: 28px;
+
+  background: #ffffff;
+
+  border: 1px solid #dddddd;
+
+  border-radius: 6px;
+}
+
+.panel-header {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  margin-bottom: 24px;
+}
+
+.panel-header h2 {
+  margin: 0;
+
+  font-size: 21px;
+
+  font-weight: 500;
+
+  color: #111111;
+}
+
+.panel-header p {
+  margin: 6px 0 0;
+
+  color: #777777;
+
+  font-size: 13px;
+}
+
+/* =========================================
+   BUTTON
+========================================= */
+
+.create-button,
+.primary-button,
+.secondary-button {
+  min-height: 40px;
+
+  padding: 9px 16px;
+
+  border-radius: 4px;
+
+  font-size: 13px;
+
+  cursor: pointer;
+}
+
+.create-button,
+.primary-button {
+  border: 1px solid #111111;
+
+  background: #111111;
+
+  color: #ffffff;
+}
+
+.create-button:hover,
+.primary-button:hover {
+  background: #2b2b2b;
+}
+
+.secondary-button {
+  border: 1px solid #999999;
+
+  background: #ffffff;
+
+  color: #111111;
+}
+
+.primary-button:disabled {
+  opacity: 0.5;
+
+  cursor: not-allowed;
+}
+
+/* =========================================
+   FORM
+========================================= */
+
+.form-grid {
+  display: grid;
+
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 18px 24px;
+}
+
+.form-group {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+.form-group label {
+  color: #555555;
+
+  font-size: 12px;
+}
+
+.form-group input {
+  width: 100%;
+
+  height: 42px;
+
+  padding: 0 12px;
+
+  border: 1px solid #cccccc;
+
+  border-radius: 4px;
+
+  outline: none;
+
+  background: #ffffff;
+
+  color: #111111;
+}
+
+.form-group input:focus {
+  border-color: #111111;
+}
+
+.form-actions {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 10px;
+
+  margin-top: 24px;
+}
+
+/* =========================================
+   MESSAGE
+========================================= */
+
+.message-box,
+.status-box {
+  margin-bottom: 20px;
+
+  padding: 14px 16px;
+
+  border: 1px solid #dddddd;
+
+  background: #ffffff;
+
+  border-radius: 4px;
+
+  color: #444444;
+
+  font-size: 13px;
+}
+
+.success-box {
+  border-color: #cfcfcf;
+}
+
+.error-box {
+  border-color: #888888;
+
+  color: #111111;
+}
+
+/* =========================================
+   TABLE
+========================================= */
+
+.member-table-wrapper {
+  width: 100%;
+
+  overflow-x: auto;
+}
+
+.member-table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  font-size: 13px;
+}
+
+.member-table th {
+  padding: 13px 12px;
+
+  border-bottom: 1px solid #111111;
+
+  color: #555555;
+
+  font-size: 11px;
+
+  font-weight: 600;
+
+  text-align: left;
 
   white-space: nowrap;
 }
 
-.address-header {
-  width: 100px;
+.member-table td {
+  padding: 16px 12px;
 
-  min-width: 100px;
+  border-bottom: 1px solid #eeeeee;
+
+  vertical-align: middle;
+
+  color: #222222;
 
   white-space: nowrap;
 }
 
-.address-preview {
+.member-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.truncate-cell {
   display: inline-block;
 
   max-width: 90px;
-
-  white-space: nowrap;
 
   overflow: hidden;
 
   text-overflow: ellipsis;
 
+  white-space: nowrap;
+
   vertical-align: middle;
-
-  /*
-   * 一般箭頭。
-   *
-   * 不使用 cursor: help，
-   * 所以不會出現 ?
-   */
-  cursor: default;
 }
 
-/* =====================================================
-   ★ 註冊時間
-===================================================== */
-
-/*
- * 固定時間欄位寬度。
- *
- * 防止瀏覽器放大之後變成：
- *
- * 2026-
- * 09-
- * 15
- * 11:50
- *
- * 這種換行情況。
- */
-.datetime-cell {
-  width: 90px;
-
-  min-width: 90px;
-
-  max-width: 90px;
-
-  white-space: nowrap;
-}
-
-/*
- * Table Header
- */
-.datetime-header {
-  width: 90px;
-
-  min-width: 90px;
-
-  white-space: nowrap;
-}
-
-/*
- * 畫面只顯示：
- *
- * 2026...
- *
- * title 則保留：
- *
- * 2026-09-15 11:50:48
- */
-.datetime-preview {
+.role-badge {
   display: inline-block;
 
-  max-width: 80px;
+  padding: 4px 7px;
 
-  white-space: nowrap;
+  border: 1px solid #cccccc;
 
-  overflow: hidden;
+  border-radius: 3px;
 
-  text-overflow: ellipsis;
+  background: #fafafa;
 
-  vertical-align: middle;
+  font-size: 10px;
+}
 
-  cursor: default;
+.table-actions {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+}
+
+/* =========================================
+   修改 / 刪除
+========================================= */
+
+.text-button {
+  padding: 0;
+
+  border: none;
+
+  background: transparent;
+
+  font-size: 12px;
+
+  cursor: pointer;
+
+  text-decoration: underline;
+
+  text-underline-offset: 3px;
+
+  transition:
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+/* 修改：藍色 */
+.edit-text {
+  color: #2563eb;
+}
+
+.edit-text:hover {
+  color: #1d4ed8;
+}
+
+/* 刪除：紅色 */
+.delete-text {
+  color: #dc2626;
+}
+
+.delete-text:hover {
+  color: #b91c1c;
+}
+
+.current-admin-text {
+  color: #999999;
+
+  font-size: 11px;
+}
+
+/* =========================================
+   EDIT
+========================================= */
+
+.edit-row td {
+  padding: 0;
+
+  background: #fafafa;
+}
+
+.edit-panel {
+  padding: 24px;
+
+  border-bottom: 1px solid #dddddd;
+}
+
+.edit-title {
+  margin-bottom: 20px;
+
+  font-size: 14px;
+}
+
+/* =========================================
+   RWD
+========================================= */
+
+@media (max-width: 900px) {
+  .page-header {
+    flex-direction: column;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

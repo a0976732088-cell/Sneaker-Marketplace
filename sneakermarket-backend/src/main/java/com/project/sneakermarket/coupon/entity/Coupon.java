@@ -56,7 +56,8 @@ public class Coupon {
     @Column(
             name = "coupon_name",
             nullable = false,
-            length = 100
+            length = 100,
+            columnDefinition="NVARCHAR(100)"
     )
     private String couponName;
 
