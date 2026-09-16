@@ -46,6 +46,7 @@ class AuctionOrderServiceTests {
         members = mock(MemberRepository.class);
         service = new AuctionOrderService(results, orders, auctions, products, members,
                 new AuctionTime(Clock.fixed(Instant.parse("2026-09-10T04:00:00Z"), ZoneOffset.UTC)),
+                new AuctionOrderSettings(24),
                 mock(org.springframework.context.ApplicationEventPublisher.class));
         result = new AuctionResult();
         result.setAuctionId(1L);
@@ -91,6 +92,8 @@ class AuctionOrderServiceTests {
         assertEquals(AuctionOrderStatus.PENDING_PAYMENT, order.getOrderStatus());
         assertEquals(NOW, order.getCreatedAt());
         assertEquals(NOW, order.getUpdatedAt());
+        assertEquals(NOW.plusHours(24), order.getPaymentDueAt());
+        assertNull(order.getAbandonedAt());
         assertNull(order.getPaidAt());
         assertNull(order.getShippedAt());
         assertNull(order.getCompletedAt());

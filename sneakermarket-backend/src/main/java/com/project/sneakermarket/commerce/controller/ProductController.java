@@ -22,10 +22,10 @@ public class ProductController {
     public List<ProductListItemResponse> getAllProducts(
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String  size) {
-        return productService.getAllProducts(categoryId, keyword,size);
+            @RequestParam(required = false) String size,
+            @RequestParam(required = false) Long brandId) {
+        return productService.getAllProducts(categoryId, keyword, size, brandId);
     }
-
     //單一商品明細（給明細頁用）
     @GetMapping("/api/products/{id}")
     public ProductDetailResponse getProductDetail(@PathVariable Long id) {

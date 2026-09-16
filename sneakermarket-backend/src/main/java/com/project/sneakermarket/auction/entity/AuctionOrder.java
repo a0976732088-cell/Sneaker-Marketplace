@@ -17,14 +17,16 @@ import lombok.Setter;
         @UniqueConstraint(name = "UQ_auction_orders_order_number", columnNames = "order_number")
 }, indexes = {
         @Index(name = "IX_auction_orders_buyer_created_at", columnList = "buyer_id, created_at"),
-        @Index(name = "IX_auction_orders_seller_created_at", columnList = "seller_id, created_at")
+        @Index(name = "IX_auction_orders_seller_created_at", columnList = "seller_id, created_at"),
+        @Index(name = "IX_auction_orders_payment_deadline",
+                columnList = "payment_status, order_status, payment_due_at")
 }, check = {
         @CheckConstraint(name = "CK_auction_orders_payment_status",
                 constraint = "payment_status IN ('PENDING', 'PAID', 'FAILED')"),
         @CheckConstraint(name = "CK_auction_orders_shipping_status",
                 constraint = "shipping_status IN ('NOT_SHIPPED', 'SHIPPED', 'DELIVERED')"),
         @CheckConstraint(name = "CK_auction_orders_order_status",
-                constraint = "order_status IN ('PENDING_PAYMENT', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED')")
+                constraint = "order_status IN ('PENDING_PAYMENT', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED', 'ABANDONED')")
 })
 @Getter
 @Setter
@@ -95,6 +97,12 @@ public class AuctionOrder {
 
     @Column(nullable = false, columnDefinition = "DATETIME2(0)")
     private LocalDateTime updatedAt;
+
+    @Column(columnDefinition = "DATETIME2(0)")
+    private LocalDateTime paymentDueAt;
+
+    @Column(columnDefinition = "DATETIME2(0)")
+    private LocalDateTime abandonedAt;
 
     @Column(columnDefinition = "DATETIME2(0)")
     private LocalDateTime paidAt;

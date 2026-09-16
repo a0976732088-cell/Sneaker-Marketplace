@@ -1,5 +1,5 @@
 <template>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm sticky-top">
     <div class="container">
       <!-- Logo -->
       <RouterLink class="navbar-brand fw-bold" to="/">
@@ -26,7 +26,7 @@
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <!-- 首頁 -->
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/"> 首頁 </RouterLink>
+            <RouterLink class="nav-link" to="/ads/storefront"> 首頁 </RouterLink>
           </li>
 
           <!-- 一般商城 -->

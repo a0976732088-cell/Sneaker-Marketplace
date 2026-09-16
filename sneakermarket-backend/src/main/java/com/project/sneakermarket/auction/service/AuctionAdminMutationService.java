@@ -11,6 +11,8 @@ import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 import com.project.sneakermarket.common.exception.BusinessException;
 import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 
@@ -22,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class AuctionAdminMutationService {
     private final AuctionRepository auctions;
     private final AuctionTime time;
+    private final AuctionRealtimeEventPublisher realtimeEvents;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void removeAuction(Long auctionId, Long adminId, String reason) {
@@ -42,6 +45,7 @@ public class AuctionAdminMutationService {
         auction.setRemovedFromStatus(auction.getStatus());
         auction.setUpdatedAt(now);
         auctions.save(auction);
+        realtimeEvents.publish(AuctionRealtimeEventType.AUCTION_REMOVED, auction);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

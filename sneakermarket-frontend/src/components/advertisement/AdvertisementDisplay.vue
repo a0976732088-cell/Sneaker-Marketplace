@@ -6,19 +6,57 @@ import {
   resolveAdvertisementImageUrl,
 } from "@/service/advertisementService";
 
+const props = defineProps({
+  placements: {
+    type: Array,
+    default: () => ["BANNER", "POPUP", "SMALL_BLOCK", "CATEGORY_CARD"],
+  },
+});
+const emit = defineEmits(["select-category"]);
+
+function hasPlacement(placement) {
+  return props.placements.includes(placement);
+}
+
 const ads = ref([]);
 const router = useRouter();
 
 function goToAdvertisementTarget(ad) {
   if (!ad) return;
 
+  if (ad.targetType === "CATEGORY") {
+    if (ad.targetId) {
+      emit("select-category", {
+        categoryId: Number(ad.targetId),
+        categoryName: ad.adName,
+      });
+    }
+
+    return;
+  }
+
   if (ad.targetType === "PRODUCT") {
-    router.push("/products");
+    if (ad.targetId) {
+      router.push({
+        name: "product-detail",
+        params: { id: ad.targetId },
+      });
+    } else {
+      router.push({ name: "commerce" });
+    }
+
     return;
   }
 
   if (ad.targetType === "AUCTION") {
-    router.push("/auctions");
+    if (ad.targetId) {
+      router.push({
+        name: "auction-detail",
+        params: { id: ad.targetId },
+      });
+    } else {
+      router.push({ name: "auction" });
+    }
   }
 }
 const loading = ref(false);
@@ -41,6 +79,13 @@ const smallBlockAds = computed(() =>
     (ad) => ad.adPlacement === "SMALL_BLOCK" && ad.adStatus === "ACTIVE",
   ),
 );
+
+const categoryCardAds = computed(() =>
+  ads.value.filter(
+    (ad) => ad.adPlacement === "CATEGORY_CARD" && ad.adStatus === "ACTIVE",
+  ),
+);
+
 const bannerIndex = ref(0);
 // 儲存自動播放計時器
 let bannerTimer = null;
@@ -157,7 +202,7 @@ onUnmounted(() => {
       {{ errorMessage }}
     </div>
     <template v-else>
-      <section v-if="currentBanner" class="banner-ad">
+      <section v-if="hasPlacement('BANNER') && currentBanner" class="banner-ad">
         <img
           :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
           :alt="currentBanner.adName"
@@ -193,9 +238,67 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <p v-else class="empty-ad">目前沒有上架中的 BANNER 廣告</p>
+      <p v-else-if="hasPlacement('BANNER')" class="empty-ad">
+        目前沒有上架中的 BANNER 廣告
+      </p>
 
-      <aside v-if="showSmallBlock && currentSmallBlock" class="small-block-ad">
+      <section
+        v-if="hasPlacement('CATEGORY_CARD') && categoryCardAds.length"
+        class="category-card-section"
+      >
+        <header class="category-card-header">
+          <h2>(っ•‿•)っ 🎀 【我真的特別愛你】 🎀</h2>
+        </header>
+
+        <div class="category-card-track">
+          <article
+            v-for="ad in categoryCardAds"
+            :key="ad.adId"
+            class="category-card"
+          >
+            <button
+              type="button"
+              class="category-card-image-button"
+              @click="goToAdvertisementTarget(ad)"
+            >
+              <img
+                :src="resolveAdvertisementImageUrl(ad.imageUrl)"
+                :alt="ad.adName"
+              />
+            </button>
+
+            <div class="category-card-footer">
+              <button
+                type="button"
+                class="category-card-title"
+                @click="goToAdvertisementTarget(ad)"
+              >
+                <strong>{{ ad.adName }}</strong>
+              </button>
+
+              <RouterLink
+                v-if="ad.targetType === 'CATEGORY' && ad.targetId"
+                class="category-view-link"
+                :to="{
+                  name: 'commerce',
+                  query: {
+                    categoryId: ad.targetId,
+                  },
+                }"
+              >
+                查看相關
+              </RouterLink>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <aside
+        v-if="
+          hasPlacement('SMALL_BLOCK') && showSmallBlock && currentSmallBlock
+        "
+        class="small-block-ad"
+      >
         <button
           type="button"
           class="small-close"
@@ -211,7 +314,10 @@ onUnmounted(() => {
         />
       </aside>
 
-      <div v-if="showPopup && currentPopup" class="popup-background">
+      <div
+        v-if="hasPlacement('POPUP') && showPopup && currentPopup"
+        class="popup-background"
+      >
         <article class="popup-ad">
           <button type="button" class="popup-close" @click="showPopup = false">
             ×
@@ -228,4 +334,4 @@ onUnmounted(() => {
   </section>
 </template>
 
-<style scoped src="./AdvertisementPreviewView.css"></style>
+<style scoped src="./AdvertisementDisplay.css"></style>

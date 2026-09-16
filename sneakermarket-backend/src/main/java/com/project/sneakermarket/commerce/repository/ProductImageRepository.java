@@ -12,4 +12,7 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Long
 
     // 查某商品「全部」的圖片
     List<ProductImage> findByProductProductId(Long productId);
+
+    //刪除某商品所有圖片
+    void deleteByProductProductId(Long productId);
 }

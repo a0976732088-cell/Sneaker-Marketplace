@@ -16,6 +16,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import org.hibernate.SessionFactory;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+
 import com.project.sneakermarket.auction.dto.AuctionAdminBatchResponse;
 import com.project.sneakermarket.auction.dto.AuctionAdminManagementState;
 import com.project.sneakermarket.auction.dto.AuctionAdminSearchCriteria;
@@ -31,7 +36,8 @@ import com.project.sneakermarket.member.repository.MemberRepository;
 /** 真實 MSSQL：驗證管理下架、恢復、Soft Delete、公開可見性與帳本資料保留。 */
 @SpringBootTest(properties = {
         "auction.lifecycle.enabled=false", "auction.order.enabled=false",
-        "auction.email.enabled=false", "spring.jpa.hibernate.ddl-auto=update"
+        "auction.email.enabled=false", "spring.jpa.hibernate.ddl-auto=update",
+        "spring.jpa.properties.hibernate.generate_statistics=true"
 })
 class AuctionAdminIntegrationTests {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 12, 10, 0);
@@ -51,6 +57,8 @@ class AuctionAdminIntegrationTests {
     @Autowired private AuctionOrderRepository orders;
     @Autowired private AuctionEmailLogRepository emailLogs;
     @Autowired private MemberRepository members;
+    @Autowired private EntityManager em;
+    @Autowired private EntityManagerFactory emf;
     @MockitoBean private AuctionTime time;
 
     private final List<Long> auctionIds = new ArrayList<>();
@@ -66,6 +74,231 @@ class AuctionAdminIntegrationTests {
         adminId = member("管理員", "ROLE_ADMIN");
         sellerId = member("賣家", "ROLE_MEMBER");
         buyerId = member("買家", "ROLE_MEMBER");
+    }
+
+    @Test
+    void adminDetailReturnsActiveAuctionWithoutInventingResultOrOrder() {
+        Long auctionId = fixture(AuctionStatus.ACTIVE, false, "ACTIVE 生命週期");
+
+        var detail = adminQueries.detail(auctionId);
+
+        assertEquals(AuctionStatus.ACTIVE, detail.auction().status());
+        assertNull(detail.auction().orderStatus());
+        assertAmount("5000.00", detail.startPrice());
+        assertAmount("500.00", detail.minIncrement());
+        assertEquals(NOW.minusHours(2), detail.updatedAt());
+        assertNotNull(detail.brandName());
+        assertTrue(detail.bids().isEmpty());
+        assertNull(detail.result());
+        assertNull(detail.order());
+    }
+
+    @Test
+    void adminDetailOrdersBidsDeterministicallyWhenTheyWereCreatedInTheSameSecond() {
+        Long auctionId = fixture(AuctionStatus.ACTIVE, false, "同秒出價排序");
+        LocalDateTime sameSecond = NOW.minusMinutes(5);
+        AuctionBid first = new AuctionBid();
+        first.setAuctionId(auctionId);
+        first.setBidderId(buyerId);
+        first.setBidAmount(new BigDecimal("5500.00"));
+        first.setCreatedAt(sameSecond);
+        first = bids.saveAndFlush(first);
+        AuctionBid later = new AuctionBid();
+        later.setAuctionId(auctionId);
+        later.setBidderId(adminId);
+        later.setBidAmount(new BigDecimal("6000.00"));
+        later.setCreatedAt(sameSecond);
+        later = bids.saveAndFlush(later);
+        Auction auction = persisted(auctionId);
+        auction.setCurrentPrice(new BigDecimal("6000.00"));
+        auction.setHighestBidderId(adminId);
+        auction.setBidCount(2);
+        auctions.saveAndFlush(auction);
+        assertTrue(later.getBidId() > first.getBidId());
+        em.clear();
+
+        var detail = adminQueries.detail(auctionId);
+
+        assertEquals(List.of(new BigDecimal("6000.00"), new BigDecimal("5500.00")),
+                detail.bids().stream().map(bid -> bid.bidAmount()).toList());
+        assertEquals(List.of("管理員", "買家"),
+                detail.bids().stream().map(bid -> bid.bidderName()).toList());
+        assertEquals(List.of(sameSecond, sameSecond),
+                detail.bids().stream().map(bid -> bid.createdAt()).toList());
+    }
+
+    @Test
+    void adminDetailReturnsSoldPendingPaymentLifecycleFromPersistedOrder() {
+        Long auctionId = fixture(AuctionStatus.SOLD, true, "待付款生命週期");
+        soldResult(auctionId);
+        AuctionOrder pending = soldOrder(auctionId);
+        pending.setPaymentDueAt(NOW.plusDays(1));
+        orders.saveAndFlush(pending);
+
+        var detail = adminQueries.detail(auctionId);
+
+        assertEquals(AuctionStatus.SOLD, detail.auction().status());
+        assertEquals(AuctionOrderStatus.PENDING_PAYMENT, detail.auction().orderStatus());
+        assertEquals(1, detail.bids().size());
+        assertEquals("買家", detail.bids().get(0).bidderName());
+        assertEquals(AuctionResultStatus.SOLD, detail.result().resultStatus());
+        assertEquals("買家", detail.result().winnerName());
+        assertAmount("5500.00", detail.result().finalPrice());
+        assertEquals(pending.getOrderNumber(), detail.order().orderNumber());
+        assertEquals(AuctionOrderStatus.PENDING_PAYMENT, detail.order().orderStatus());
+        assertEquals(AuctionPaymentStatus.PENDING, detail.order().paymentStatus());
+        assertEquals(AuctionShippingStatus.NOT_SHIPPED, detail.order().shippingStatus());
+        assertEquals(NOW.plusDays(1), detail.order().paymentDueAt());
+        assertEquals("買家", detail.order().buyerName());
+        assertEquals("賣家", detail.order().sellerName());
+    }
+
+    @Test
+    void adminDetailReturnsSoldPaidLifecycleTimestamp() {
+        Long auctionId = fixture(AuctionStatus.SOLD, true, "已付款生命週期");
+        soldResult(auctionId);
+        AuctionOrder paid = soldOrder(auctionId);
+        paid.setPaymentDueAt(NOW.plusDays(1));
+        paid.setPaymentStatus(AuctionPaymentStatus.PAID);
+        paid.setOrderStatus(AuctionOrderStatus.PAID);
+        paid.setPaidAt(NOW.minusMinutes(5));
+        paid.setUpdatedAt(NOW.minusMinutes(5));
+        orders.saveAndFlush(paid);
+
+        var detail = adminQueries.detail(auctionId);
+
+        assertEquals(AuctionStatus.SOLD, detail.auction().status());
+        assertEquals(AuctionResultStatus.SOLD, detail.result().resultStatus());
+        assertEquals(AuctionOrderStatus.PAID, detail.order().orderStatus());
+        assertEquals(AuctionPaymentStatus.PAID, detail.order().paymentStatus());
+        assertEquals(NOW.minusMinutes(5), detail.order().paidAt());
+        assertNull(detail.order().abandonedAt());
+    }
+
+    @Test
+    void adminDetailKeepsSoldHistoryWhenOrderWasAbandoned() {
+        Long auctionId = fixture(AuctionStatus.SOLD, true, "棄標生命週期");
+        soldResult(auctionId);
+        AuctionOrder abandoned = soldOrder(auctionId);
+        abandoned.setPaymentDueAt(NOW.minusMinutes(1));
+        abandoned.setOrderStatus(AuctionOrderStatus.ABANDONED);
+        abandoned.setAbandonedAt(NOW);
+        abandoned.setUpdatedAt(NOW);
+        orders.saveAndFlush(abandoned);
+
+        var detail = adminQueries.detail(auctionId);
+
+        assertEquals(AuctionStatus.SOLD, detail.auction().status());
+        assertEquals(AuctionOrderStatus.ABANDONED, detail.auction().orderStatus());
+        assertEquals(AuctionResultStatus.SOLD, detail.result().resultStatus());
+        assertEquals("買家", detail.result().winnerName());
+        assertAmount("5500.00", detail.result().finalPrice());
+        assertEquals(AuctionOrderStatus.ABANDONED, detail.order().orderStatus());
+        assertEquals(AuctionPaymentStatus.PENDING, detail.order().paymentStatus());
+        assertEquals(AuctionShippingStatus.NOT_SHIPPED, detail.order().shippingStatus());
+        assertEquals(NOW.minusMinutes(1), detail.order().paymentDueAt());
+        assertEquals(NOW, detail.order().abandonedAt());
+        assertNull(detail.order().paidAt());
+    }
+
+    @Test
+    void adminDetailReturnsUnsoldResultWithoutWinnerOrOrder() {
+        Long auctionId = fixture(AuctionStatus.UNSOLD, false, "流標生命週期");
+        unsoldResult(auctionId);
+
+        var detail = adminQueries.detail(auctionId);
+
+        assertEquals(AuctionStatus.UNSOLD, detail.auction().status());
+        assertNull(detail.auction().orderStatus());
+        assertEquals(AuctionResultStatus.UNSOLD, detail.result().resultStatus());
+        assertNull(detail.result().winnerName());
+        assertNull(detail.result().finalPrice());
+        assertNull(detail.order());
+    }
+
+    @Test
+    void adminListFiltersByPersistedOrderStatusAndExcludesOtherOrMissingOrders() {
+        String keyword = "訂單狀態篩選-" + UUID.randomUUID();
+        Long pendingId = fixture(AuctionStatus.SOLD, true, keyword + "-pending");
+        soldResult(pendingId);
+        soldOrder(pendingId);
+        Long abandonedId = fixture(AuctionStatus.SOLD, true, keyword + "-abandoned");
+        soldResult(abandonedId);
+        AuctionOrder abandoned = soldOrder(abandonedId);
+        abandoned.setOrderStatus(AuctionOrderStatus.ABANDONED);
+        abandoned.setPaymentDueAt(NOW.minusMinutes(1));
+        abandoned.setAbandonedAt(NOW);
+        orders.saveAndFlush(abandoned);
+        Long noOrderId = fixture(AuctionStatus.SOLD, true, keyword + "-no-order");
+        soldResult(noOrderId);
+
+        AuctionAdminSearchCriteria allCriteria = new AuctionAdminSearchCriteria();
+        allCriteria.setKeyword(keyword);
+        var allPage = adminQueries.search(allCriteria, PageRequest.of(0, 10));
+
+        assertEquals(3, allPage.totalElements());
+        assertTrue(allPage.items().stream().anyMatch(item -> item.auctionId().equals(noOrderId)));
+
+        AuctionAdminSearchCriteria abandonedCriteria = new AuctionAdminSearchCriteria();
+        abandonedCriteria.setKeyword(keyword);
+        abandonedCriteria.setOrderStatus(AuctionOrderStatus.ABANDONED);
+        var abandonedPage = adminQueries.search(abandonedCriteria, PageRequest.of(0, 10));
+
+        assertEquals(1, abandonedPage.totalElements());
+        assertEquals(List.of(abandonedId), abandonedPage.items().stream()
+                .map(item -> item.auctionId()).toList());
+        assertEquals(AuctionOrderStatus.ABANDONED, abandonedPage.items().get(0).orderStatus());
+        assertFalse(abandonedPage.items().stream().anyMatch(item -> item.auctionId().equals(pendingId)));
+        assertFalse(abandonedPage.items().stream().anyMatch(item -> item.auctionId().equals(noOrderId)));
+
+        AuctionAdminSearchCriteria pendingCriteria = new AuctionAdminSearchCriteria();
+        pendingCriteria.setKeyword(keyword);
+        pendingCriteria.setOrderStatus(AuctionOrderStatus.PENDING_PAYMENT);
+        var pendingPage = adminQueries.search(pendingCriteria, PageRequest.of(0, 10));
+
+        assertEquals(1, pendingPage.totalElements());
+        assertEquals(pendingId, pendingPage.items().get(0).auctionId());
+        assertEquals(AuctionOrderStatus.PENDING_PAYMENT, pendingPage.items().get(0).orderStatus());
+    }
+
+    @Test
+    void adminListAndDetailUseBoundedReadOnlyQueries() {
+        String prefix = "查詢數量-" + UUID.randomUUID();
+        Long detailAuctionId = null;
+        for (int index = 0; index < 6; index++) {
+            Long auctionId = fixture(AuctionStatus.SOLD, true, prefix + "-" + index);
+            soldResult(auctionId);
+            AuctionOrder order = soldOrder(auctionId);
+            if (index == 0) {
+                detailAuctionId = auctionId;
+                order.setOrderStatus(AuctionOrderStatus.ABANDONED);
+                order.setPaymentDueAt(NOW.minusMinutes(1));
+                order.setAbandonedAt(NOW);
+                orders.saveAndFlush(order);
+            }
+        }
+        em.clear();
+        var statistics = emf.unwrap(SessionFactory.class).getStatistics();
+        AuctionAdminSearchCriteria criteria = new AuctionAdminSearchCriteria();
+        criteria.setKeyword(prefix);
+
+        statistics.clear();
+        var page = adminQueries.search(criteria, PageRequest.of(0, 5));
+        assertEquals(6, page.totalElements());
+        assertEquals(5, page.items().size());
+        assertEquals(6, statistics.getPrepareStatementCount());
+        assertEquals(0, statistics.getEntityInsertCount());
+        assertEquals(0, statistics.getEntityUpdateCount());
+        assertEquals(0, statistics.getEntityDeleteCount());
+
+        em.clear();
+        statistics.clear();
+        var detail = adminQueries.detail(detailAuctionId);
+        assertEquals(AuctionOrderStatus.ABANDONED, detail.order().orderStatus());
+        assertEquals(8, statistics.getPrepareStatementCount());
+        assertEquals(0, statistics.getEntityInsertCount());
+        assertEquals(0, statistics.getEntityUpdateCount());
+        assertEquals(0, statistics.getEntityDeleteCount());
     }
 
     @AfterEach
@@ -131,6 +364,8 @@ class AuctionAdminIntegrationTests {
         var removedDetail = adminQueries.detail(auctionId);
         assertEquals(AuctionAdminManagementState.REMOVED, removedDetail.auction().managementState());
         assertEquals(1, removedDetail.imageUrls().size());
+        assertEquals(AuctionResultStatus.SOLD, removedDetail.result().resultStatus());
+        assertEquals(order.getOrderNumber(), removedDetail.order().orderNumber());
 
         AuctionConflictException restoreError = assertThrows(AuctionConflictException.class,
                 () -> mutations.restoreAuction(auctionId, adminId));
@@ -220,7 +455,7 @@ class AuctionAdminIntegrationTests {
     void batchRemoveRestoreAndDeleteUseDistinctIdsAndKeepPartialSuccess() {
         Long first = fixture(AuctionStatus.DRAFT, false, "批次一");
         Long second = fixture(AuctionStatus.DRAFT, false, "批次二");
-        Long stillVisible = fixture(AuctionStatus.DRAFT, false, "批次三");
+        Long untouched = fixture(AuctionStatus.DRAFT, false, "批次三");
         Long missing = Long.MAX_VALUE - 12345;
 
         AuctionAdminBatchResponse remove = batches.removeAuctions(
@@ -238,18 +473,18 @@ class AuctionAdminIntegrationTests {
         assertEquals(1, restore.failureCount());
         assertNull(persisted(first).getRemovedAt());
         assertNull(persisted(second).getRemovedAt());
-        assertPubliclyVisible(first);
-        assertPubliclyVisible(second);
+        assertPubliclyHidden(first);
+        assertPubliclyHidden(second);
 
         batches.removeAuctions(List.of(first, second), adminId, "刪除前下架");
         AuctionAdminBatchResponse delete = batches.deleteAuctions(
-                List.of(first, stillVisible, missing, first), adminId, "批次刪除");
+                List.of(first, untouched, missing, first), adminId, "批次刪除");
         assertEquals(3, delete.totalCount());
         assertEquals(1, delete.successCount());
         assertEquals(2, delete.failureCount());
         assertNotNull(persisted(first).getDeletedAt());
-        assertNull(persisted(stillVisible).getRemovedAt());
-        assertNull(persisted(stillVisible).getDeletedAt());
+        assertNull(persisted(untouched).getRemovedAt());
+        assertNull(persisted(untouched).getDeletedAt());
         assertNotNull(persisted(second).getRemovedAt());
         assertNull(persisted(second).getDeletedAt());
 
@@ -391,6 +626,16 @@ class AuctionAdminIntegrationTests {
         return results.saveAndFlush(result);
     }
 
+    private AuctionResult unsoldResult(Long auctionId) {
+        AuctionResult result = new AuctionResult();
+        result.setAuctionId(auctionId);
+        result.setResultStatus(AuctionResultStatus.UNSOLD);
+        result.setEndedAt(NOW.minusMinutes(10));
+        result.setCreatedAt(NOW.minusMinutes(10));
+        result.setReason("無有效出價");
+        return results.saveAndFlush(result);
+    }
+
     private AuctionOrder soldOrder(Long auctionId) {
         AuctionOrder order = new AuctionOrder();
         order.setOrderNumber("ADM-" + UUID.randomUUID().toString().replace("-", ""));
@@ -407,6 +652,7 @@ class AuctionAdminIntegrationTests {
         order.setShippingAddress("台北市測試路 11 號");
         order.setCreatedAt(NOW.minusMinutes(9));
         order.setUpdatedAt(NOW.minusMinutes(9));
+        order.setPaymentDueAt(NOW.plusDays(1));
         return orders.saveAndFlush(order);
     }
 

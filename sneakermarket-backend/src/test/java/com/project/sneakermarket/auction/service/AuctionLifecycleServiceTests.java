@@ -20,12 +20,15 @@ import org.mockito.ArgumentCaptor;
 
 import com.project.sneakermarket.auction.entity.*;
 import com.project.sneakermarket.auction.repository.*;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 
 class AuctionLifecycleServiceTests {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 10, 12, 0);
     private AuctionRepository auctions;
     private AuctionResultRepository results;
     private org.springframework.context.ApplicationEventPublisher events;
+    private AuctionRealtimeEventPublisher realtimeEvents;
     private AuctionLifecycleService service;
     private Auction auction;
 
@@ -34,8 +37,9 @@ class AuctionLifecycleServiceTests {
         auctions = mock(AuctionRepository.class);
         results = mock(AuctionResultRepository.class);
         events = mock(org.springframework.context.ApplicationEventPublisher.class);
+        realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
         var time = new AuctionTime(Clock.fixed(Instant.parse("2026-09-10T04:00:00Z"), ZoneOffset.UTC));
-        service = new AuctionLifecycleService(auctions, results, time, events);
+        service = new AuctionLifecycleService(auctions, results, time, events, realtimeEvents);
         auction = new Auction();
         auction.setAuctionId(1L);
         auction.setStatus(AuctionStatus.SCHEDULED);
@@ -64,6 +68,7 @@ class AuctionLifecycleServiceTests {
         order.verify(auctions).findByIdForUpdate(1L);
         order.verify(auctions).save(auction);
         verifyNoInteractions(results);
+        verify(realtimeEvents).publish(AuctionRealtimeEventType.AUCTION_STARTED, auction);
     }
 
     @Test
@@ -232,7 +237,13 @@ class AuctionLifecycleServiceTests {
     void timeIsReadOnlyAfterLockHasReturned() {
         AuctionTime time = mock(AuctionTime.class);
         when(time.now()).thenReturn(NOW);
-        new AuctionLifecycleService(auctions, results, time, mock(org.springframework.context.ApplicationEventPublisher.class)).processAuction(1L);
+        new AuctionLifecycleService(
+                auctions,
+                results,
+                time,
+                mock(org.springframework.context.ApplicationEventPublisher.class),
+                mock(AuctionRealtimeEventPublisher.class)
+        ).processAuction(1L);
         var order = inOrder(auctions, time);
         order.verify(auctions).findByIdForUpdate(1L);
         order.verify(time).now();
@@ -247,12 +258,20 @@ class AuctionLifecycleServiceTests {
         assertEquals(NOW, captor.getValue().getCreatedAt());
         assertEquals(NOW, auction.getUpdatedAt());
         verify(auctions, times(1)).save(auction);
+        AuctionRealtimeEventType expectedType = switch (auction.getStatus()) {
+            case SOLD -> AuctionRealtimeEventType.AUCTION_SOLD;
+            case UNSOLD -> AuctionRealtimeEventType.AUCTION_UNSOLD;
+            case REMOVED -> AuctionRealtimeEventType.AUCTION_REMOVED;
+            default -> throw new AssertionError("Unexpected closed status: " + auction.getStatus());
+        };
+        verify(realtimeEvents).publish(expectedType, auction);
         return captor.getValue();
     }
 
     private void noWrites() {
         verify(auctions, never()).save(any());
         verify(results, never()).save(any());
+        verifyNoInteractions(realtimeEvents);
         assertEquals(NOW.minusDays(1), auction.getUpdatedAt());
     }
 }

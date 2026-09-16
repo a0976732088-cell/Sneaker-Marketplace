@@ -30,13 +30,14 @@ public interface AuctionRepository extends JpaRepository<Auction, Long>, JpaSpec
     @Query("select a from Auction a where a.auctionId = :auctionId")
     Optional<Auction> findByIdForUpdate(@Param("auctionId") Long auctionId);
 
-    /** 公開端點共同使用；舊資料只有 REMOVED status 時也不可重新曝光。 */
+    /** 公開端點共同使用；保留的 DRAFT 與舊資料 REMOVED status 均不可曝光。 */
     @Query("""
             select a from Auction a
             where a.auctionId = :auctionId
               and a.removedAt is null
               and a.deletedAt is null
               and a.status <> com.project.sneakermarket.auction.entity.AuctionStatus.REMOVED
+              and a.status <> com.project.sneakermarket.auction.entity.AuctionStatus.DRAFT
             """)
     Optional<Auction> findPublicById(@Param("auctionId") Long auctionId);
 

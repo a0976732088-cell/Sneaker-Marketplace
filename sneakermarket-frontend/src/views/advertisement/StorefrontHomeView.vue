@@ -1,12 +1,12 @@
 <script setup>
-import AdvertisementDisplay from "./AdvertisementDisplay.vue";
+import AdvertisementShowcase from "@/components/advertisement/AdvertisementShowcase.vue";
 </script>
 
 <template>
   <h1>SneakerMarket</h1>
   <p>球鞋商城與競標平台</p>
   <main class="demo-home">
-    <AdvertisementDisplay />
+    <AdvertisementShowcase />
 
     <section class="demo-content">
       <div class="demo-grid">

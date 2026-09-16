@@ -3,10 +3,10 @@ package com.project.sneakermarket.advertisement.repository;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementPlacement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 
 import java.time.LocalDateTime;
@@ -18,57 +18,47 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
             List<AdvertisementStatus> adStatuses,
             LocalDateTime endAt
     );
-    Page<Advertisement> findByAdStatus(
-        AdvertisementStatus adStatus,
-        Pageable pageable
-    );
+
     List<Advertisement>
     findByAdStatusAndStartAtLessThanEqualAndEndAtAfterOrderBySortOrderAsc(
             AdvertisementStatus adStatus,
             LocalDateTime startAt,
             LocalDateTime endAt
     );
-    long countByAdPlacementAndAdStatusAndStartAtLessThanEqualAndEndAtAfter(
-            AdvertisementPlacement adPlacement,
-            AdvertisementStatus adStatus,
-            LocalDateTime startAt,
-            LocalDateTime endAt
-    );
-    Page<Advertisement> findByAdStatusAndStartAtAfter(
-            AdvertisementStatus adStatus,
-            LocalDateTime startAt,
-            Pageable pageable
-    );
 
-    Page<Advertisement> findByAdStatusAndStartAtLessThanEqualAndEndAtAfter(
-            AdvertisementStatus adStatus,
-            LocalDateTime startAt,
-            LocalDateTime endAt,
-            Pageable pageable
-    );
-    Page<Advertisement> findByAdPlacement(
+    /**
+     * 查詢同一版位、投放時間重疊的廣告。
+     * 重疊條件：既有廣告開始時間 < 新廣告結束時間且既有廣告結束時間 > 新廣告開始時間
+     */
+    @Query("""
+        SELECT advertisement
+        FROM Advertisement advertisement
+        WHERE advertisement.adPlacement = :adPlacement
+          AND advertisement.adStatus = :adStatus
+          AND advertisement.adId <> :excludedAdId
+          AND advertisement.startAt < :newEndAt
+          AND advertisement.endAt > :newStartAt
+        ORDER BY advertisement.startAt ASC
+        """)
+    List<Advertisement> findOverlappingAdvertisements(
+            // 只檢查相同版位
+            @Param("adPlacement")
             AdvertisementPlacement adPlacement,
-            Pageable pageable
-    );
 
-    Page<Advertisement> findByAdStatusAndAdPlacement(
+            // 目前只讓 ACTIVE（包含已排程、進行中）占用時段
+            @Param("adStatus")
             AdvertisementStatus adStatus,
-            AdvertisementPlacement adPlacement,
-            Pageable pageable
-    );
 
-    Page<Advertisement> findByAdStatusAndAdPlacementAndStartAtAfter(
-            AdvertisementStatus adStatus,
-            AdvertisementPlacement adPlacement,
-            LocalDateTime startAt,
-            Pageable pageable
-    );
+            // 排除目前正在發布的廣告自己
+            @Param("excludedAdId")
+            Long excludedAdId,
 
-    Page<Advertisement> findByAdStatusAndAdPlacementAndStartAtLessThanEqualAndEndAtAfter(
-            AdvertisementStatus adStatus,
-            AdvertisementPlacement adPlacement,
-            LocalDateTime startAt,
-            LocalDateTime endAt,
-            Pageable pageable
+            // 新廣告的開始時間
+            @Param("newStartAt")
+            LocalDateTime newStartAt,
+
+            // 新廣告的結束時間
+            @Param("newEndAt")
+            LocalDateTime newEndAt
     );
 }

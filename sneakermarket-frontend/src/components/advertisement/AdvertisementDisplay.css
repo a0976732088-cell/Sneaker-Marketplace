@@ -121,25 +121,25 @@
 .small-block-ad img {
   width: 90px;
   height: 90px;
-  border: 4px solid white;
+  border: 2px solid white;
   border-radius: 50%;
   object-fit: cover;
-  box-shadow: 0 5px 18px rgb(0 0 0 / 30%);
+  box-shadow: 0 5px 18px rgb(0 0 0 / 10%);
   cursor: pointer;
 }
 
 /* SMALL_BLOCK 關閉按鈕 */
 .small-close {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -12px;
+  right: -12px;
   width: 28px;
   height: 28px;
   padding: 0;
-  border: 2px solid white;
+  border: 1px solid white;
   border-radius: 50%;
   color: white;
-  background-color: #495057;
+  background-color: #14171a;
   font-size: 18px;
 }
 
@@ -177,19 +177,164 @@
 /* POPUP 關閉按鈕 */
 .popup-close {
   position: absolute;
-  top: -15px;
-  right: -15px;
+  top: -40px;
+  right: -30px;
   z-index: 1;
   width: 38px;
   height: 38px;
   padding: 0;
-  border: 3px solid white;
+  border: 1px solid white;
   border-radius: 50%;
   color: white;
-  background-color: #495057;
-  font-size: 25px;
+  background-color: #14171a;
+  font-size: 20px;
 }
 
+/* ==================== */
+/* CATEGORY_CARD */
+/* ==================== */
+
+.category-card-section {
+  margin-top: 40px;
+}
+
+.category-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.category-card-header h2 {
+  margin: 0;
+  color: #111;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.category-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.category-card-actions button {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: #111;
+  background: #ececec;
+  font-size: 26px;
+  cursor: pointer;
+}
+
+.category-card-actions button:hover {
+  background: #dcdcdc;
+}
+
+.category-card-track {
+  display: grid;
+  grid-auto-columns: calc((100% - 32px) / 3);
+  grid-auto-flow: column;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 14px;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  scrollbar-color: #777 #e5e5e5;
+  scrollbar-width: thin;
+}
+
+.category-card {
+  min-width: 0;
+  overflow: hidden;
+  color: #111;
+  background: #fff;
+  scroll-snap-align: start;
+}
+
+.category-card-image-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.category-card-image-button img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  background: #ececec;
+  object-fit: cover;
+}
+
+.category-card-footer {
+  display: flex;
+  min-height: 60px;
+  padding: 12px 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.category-card-title {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  color: #111;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.category-card-title strong {
+  display: block;
+  padding: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.category-view-link {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border: 1px solid #111;
+  border-radius: 999px;
+  color: #111;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.category-view-link:hover {
+  color: #fff;
+  background: #111;
+}
+
+@media (max-width: 992px) {
+  .category-card-track {
+    grid-auto-columns: calc((100% - 16px) / 2);
+  }
+}
+
+@media (max-width: 576px) {
+  .category-card-header h2 {
+    font-size: 23px;
+  }
+
+  .category-card-track {
+    grid-auto-columns: 85%;
+  }
+}
 /* 手機版調整
 @media (max-width: 767px) {
   .banner-ad {

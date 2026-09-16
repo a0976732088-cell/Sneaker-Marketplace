@@ -14,7 +14,7 @@ import lombok.Setter;
                 columnNames = {"auction_id", "recipient_member_id", "email_type"}), indexes =
         @Index(name = "IX_auction_email_logs_retry", columnList = "send_status, retry_count, created_at"), check = {
         @CheckConstraint(name = "CK_auction_email_logs_role", constraint = "recipient_role IN ('SELLER', 'WINNER', 'BIDDER')"),
-        @CheckConstraint(name = "CK_auction_email_logs_type", constraint = "email_type IN ('SOLD_SELLER', 'UNSOLD_SELLER', 'WON', 'LOST')"),
+        @CheckConstraint(name = "CK_auction_email_logs_type", constraint = "email_type IN ('SOLD_SELLER', 'UNSOLD_SELLER', 'WON', 'LOST', 'ORDER_ABANDONED_BUYER', 'ORDER_ABANDONED_SELLER')"),
         @CheckConstraint(name = "CK_auction_email_logs_status", constraint = "send_status IN ('PENDING', 'SENT', 'FAILED')"),
         @CheckConstraint(name = "CK_auction_email_logs_retry_count", constraint = "retry_count >= 0")
 })

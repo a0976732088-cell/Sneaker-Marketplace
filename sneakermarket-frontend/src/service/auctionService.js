@@ -13,6 +13,21 @@ export function getMyAuctionOrders({ page = 0, size = 10 } = {}) {
   return httpClient.get("/auction-orders/me", { params: { page, size } });
 }
 
+export function getMyAuctionSales({ page = 0, size = 10 } = {}) {
+  return httpClient.get("/auction-orders/me/sales", { params: { page, size } });
+}
+
+/** 單筆競標訂單由後端 Session 驗證 buyer 身分。 */
+export function getAuctionOrderDetail(orderNumber) {
+  return httpClient.get("/auction-orders/" + encodeURIComponent(orderNumber));
+}
+
+/** 付款內容完全由後端既有訂單決定，不傳 Request Body。 */
+export function payAuctionOrder(orderNumber) {
+  return httpClient.post(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/pay",
+  );
+}
 
 
 /**

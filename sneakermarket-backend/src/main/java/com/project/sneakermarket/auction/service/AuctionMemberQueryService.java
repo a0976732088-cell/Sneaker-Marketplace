@@ -14,7 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.project.sneakermarket.auction.dto.*;
 import com.project.sneakermarket.auction.entity.*;
 import com.project.sneakermarket.auction.repository.*;
+import com.project.sneakermarket.commerce.repository.BrandRepository;
 import com.project.sneakermarket.common.exception.BusinessException;
+import com.project.sneakermarket.common.exception.ForbiddenException;
+import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -28,6 +31,8 @@ public class AuctionMemberQueryService {
     private final AuctionProductRepository products;
     private final AuctionResultRepository results;
     private final AuctionOrderRepository orders;
+    private final AuctionProductImageRepository images;
+    private final BrandRepository brands;
 
     public PageData<AuctionMyBidResponse> getMyBids(Long memberId, int page, int size) {
         var summaries = bids.findMemberBidSummaries(memberId, pageRequest(page, size, Sort.unsorted()));
@@ -84,6 +89,16 @@ public class AuctionMemberQueryService {
     public PageData<AuctionOrderSummaryResponse> getMyAuctionOrders(Long memberId, int page, int size) {
         var orderPage = orders.findByBuyerId(memberId,
                 pageRequest(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("auctionOrderId"))));
+        return orderSummaries(orderPage);
+    }
+
+    public PageData<AuctionOrderSummaryResponse> getMyAuctionSales(Long memberId, int page, int size) {
+        var orderPage = orders.findBySellerId(memberId,
+                pageRequest(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("auctionOrderId"))));
+        return orderSummaries(orderPage);
+    }
+
+    private PageData<AuctionOrderSummaryResponse> orderSummaries(Page<AuctionOrder> orderPage) {
         var auctionMap = auctionMap(orderPage.getContent().stream().map(AuctionOrder::getAuctionId).toList());
         var productMap = productMap(List.copyOf(auctionMap.values()));
         return pageData(orderPage.map(order -> new AuctionOrderSummaryResponse(
@@ -91,6 +106,34 @@ public class AuctionMemberQueryService {
                 productMap.get(auctionMap.get(order.getAuctionId()).getAuctionProductId()).getProductName(),
                 order.getFinalPrice(), order.getPaymentMethod(), order.getPaymentStatus(),
                 order.getShippingStatus(), order.getOrderStatus(), order.getCreatedAt(), order.getUpdatedAt())));
+    }
+
+    public AuctionOrderDetailResponse getAuctionOrderDetail(Long memberId, String orderNumber) {
+        AuctionOrder order = orders.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("找不到指定的競標訂單"));
+        if (!order.getBuyerId().equals(memberId)) {
+            throw new ForbiddenException("無權查看此競標訂單");
+        }
+
+        Auction auction = auctions.findById(order.getAuctionId())
+                .orElseThrow(() -> new ResourceNotFoundException("找不到此訂單的競標資料"));
+        AuctionProduct product = products.findById(auction.getAuctionProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("找不到此訂單的商品資料"));
+        String brandName = brands.findById(product.getBrandId())
+                .map(brand -> brand.getBrandName()).orElse(null);
+        String imageUrl = images.findByAuctionProductIdOrderBySortOrderAsc(product.getAuctionProductId())
+                .stream().map(AuctionProductImage::getImageUrl).findFirst().orElse(null);
+
+        return new AuctionOrderDetailResponse(
+                order.getOrderNumber(), order.getAuctionId(), product.getProductName(),
+                product.getBrandId(), brandName, product.getModel(), product.getSize(), imageUrl,
+                order.getFinalPrice(), product.getShippingFee(),
+                order.getFinalPrice().add(product.getShippingFee()),
+                product.getShippingMethod(), order.getPaymentMethod(),
+                order.getPaymentStatus(), order.getShippingStatus(), order.getOrderStatus(),
+                order.getReceiverName(), order.getReceiverPhone(), order.getShippingAddress(),
+                order.getCreatedAt(), order.getPaymentDueAt(), order.getAbandonedAt(),
+                order.getPaidAt(), order.getUpdatedAt());
     }
 
     private PageRequest pageRequest(int page, int size, Sort sort) {

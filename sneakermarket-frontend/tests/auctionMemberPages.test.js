@@ -11,13 +11,13 @@ const script = source.match(/<script setup>([\s\S]*?)<\/script>/)[1]
 const serviceSource = (await readFile(new URL("../src/service/auctionService.js", import.meta.url), "utf8"))
   .replace(/^import[^\n]+\n/gm, "").replace(/^export /gm, "");
 const serviceContext = { httpClient: { get: (url, config) => ({ url, config }) } };
-vm.runInNewContext(serviceSource + "\nglobalThis.service = { getMyBids, getMyListings, getMyAuctionOrders, handleAuctionAccessError };", serviceContext);
+vm.runInNewContext(serviceSource + "\nglobalThis.service = { getMyBids, getMyListings, getMyAuctionOrders, getMyAuctionSales, handleAuctionAccessError };", serviceContext);
 
 function harness(fetchPage) {
   let unmount;
   const routes = [];
   const context = {
-    ref, defineProps: () => ({ fetchPage }),
+    ref, defineProps: () => ({ fetchPage, errorMessageFallback: "無法載入資料，請稍後重試" }),
     useRouter: () => ({ replace: async (route) => routes.push(route.name) }),
     onMounted: () => {},
     onUnmounted: (callback) => { unmount = callback; },
@@ -34,6 +34,7 @@ for (const [method, url] of [
   ["getMyBids", "/auctions/me/bids"],
   ["getMyListings", "/auctions/me/listings"],
   ["getMyAuctionOrders", "/auction-orders/me"],
+  ["getMyAuctionSales", "/auction-orders/me/sales"],
 ]) {
   test(method + " uses existing client and strips every supplied member identity", () => {
     const request = serviceContext.service[method]({
@@ -142,12 +143,13 @@ test("bid outcomes distinguish leading, outbid, won and lost without depending o
   assert.equal(formatMemberPublicDetailNotice("REMOVED"), "已由平台下架，公開詳細頁不可查看");
   assert.equal(formatMemberPublicDetailNotice("DELETED"), "已由平台刪除，公開詳細頁不可查看");
   assert.equal(formatMemberAuctionStatus(null), "尚未結標");
-  assert.equal(formatAuctionOrderStatus("PENDING_PAYMENT"), "待付款");
+  assert.equal(formatAuctionOrderStatus("PENDING_PAYMENT"), "等待付款");
   assert.equal(formatAuctionOrderStatus("NOT_SHIPPED"), "未出貨");
+  assert.equal(formatAuctionOrderStatus("ABANDONED"), "已棄標");
 });
 
-test("all three views wire the shared page and use existing money/time formatters", async () => {
-  for (const [file, api] of [["AuctionMyBidsView", "getMyBids"], ["AuctionMyListingsView", "getMyListings"], ["AuctionOrderListView", "getMyAuctionOrders"]]) {
+test("member views wire the shared page and use existing money/time formatters", async () => {
+  for (const [file, api] of [["AuctionMyBidsView", "getMyBids"], ["AuctionMyListingsView", "getMyListings"]]) {
     const view = await readFile(new URL("../src/views/auction/" + file + ".vue", import.meta.url), "utf8");
     assert.ok(view.startsWith("<template>"));
     assert.ok(view.includes(':fetch-page="' + api + '"'));
@@ -155,8 +157,16 @@ test("all three views wire the shared page and use existing money/time formatter
     assert.ok(view.includes("formatAuctionTime("));
     assert.ok(view.includes("查看競標"));
   }
-});
 
+  const orderView = await readFile(new URL("../src/views/auction/AuctionOrderListView.vue", import.meta.url), "utf8");
+  assert.ok(orderView.startsWith("<template>"));
+  assert.ok(orderView.includes(':fetch-page="fetchActiveOrders"'));
+  assert.ok(orderView.includes("getMyAuctionOrders(params)"));
+  assert.ok(orderView.includes("getMyAuctionSales(params)"));
+  assert.ok(orderView.includes("formatTwd("));
+  assert.ok(orderView.includes("formatAuctionTime("));
+  assert.ok(orderView.includes("查看競標"));
+});
 test("member bid and listing views link public detail only for visible auctions", async () => {
   for (const file of ["AuctionMyBidsView", "AuctionMyListingsView"]) {
     const view = await readFile(new URL("../src/views/auction/" + file + ".vue", import.meta.url), "utf8");

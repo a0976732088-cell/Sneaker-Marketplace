@@ -37,14 +37,15 @@ class AuctionMemberAccessTests {
         // 同時註冊既有 Controller，確認 /me/bids 不會被 /{auctionId}/bids 攔截。
         mvc = MockMvcBuilders.standaloneSetup(
                 new AuctionMemberController(queries, resolver),
-                new AuctionOrderController(queries, resolver),
+                new AuctionOrderController(queries, mock(AuctionOrderPaymentService.class), resolver),
                 new AuctionController(mock(AuctionQueryService.class), mock(AuctionCommandService.class),
                         mock(AuctionBidService.class), resolver, references))
                 .setControllerAdvice(new AuctionExceptionHandler(), new GlobalExceptionHandler()).build();
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me"})
+    @ValueSource(strings = {"/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me",
+            "/api/auction-orders/me/sales"})
     void anonymousReturns401WithoutCreatingSession(String path) throws Exception {
         var response = mvc.perform(get(path))
                 .andExpect(status().isUnauthorized())
@@ -54,7 +55,8 @@ class AuctionMemberAccessTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me"})
+    @ValueSource(strings = {"/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me",
+            "/api/auction-orders/me/sales"})
     void malformedMissingAndInactiveSessionMembersReturn401(String path) throws Exception {
         var session = new MockHttpSession();
         for (Object id : List.of("77", 77, 0L, -1L, 999L)) {
@@ -77,12 +79,14 @@ class AuctionMemberAccessTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me"})
+    @ValueSource(strings = {"/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me",
+            "/api/auction-orders/me/sales"})
     void sessionIsSoleIdentityEvenWithForgedQueryParameters(String path) throws Exception {
         var session = activeSession();
         when(queries.getMyBids(77L, 2, 3)).thenReturn(new PageData<>(List.of(), 2, 3, 0, 0));
         when(queries.getMyListings(77L, 2, 3)).thenReturn(new PageData<>(List.of(), 2, 3, 0, 0));
         when(queries.getMyAuctionOrders(77L, 2, 3)).thenReturn(new PageData<>(List.of(), 2, 3, 0, 0));
+        when(queries.getMyAuctionSales(77L, 2, 3)).thenReturn(new PageData<>(List.of(), 2, 3, 0, 0));
         mvc.perform(get(path).session(session).param("page", "2").param("size", "3")
                         .param("memberId", "999").param("bidderId", "999").param("sellerId", "999")
                         .param("buyerId", "999").param("winnerId", "999").param("highestBidderId", "999"))
@@ -90,6 +94,7 @@ class AuctionMemberAccessTests {
                 .andExpect(jsonPath("$.data.page").value(2)).andExpect(jsonPath("$.data.size").value(3));
         if (path.endsWith("/bids")) verify(queries).getMyBids(77L, 2, 3);
         else if (path.endsWith("/listings")) verify(queries).getMyListings(77L, 2, 3);
+        else if (path.endsWith("/sales")) verify(queries).getMyAuctionSales(77L, 2, 3);
         else verify(queries).getMyAuctionOrders(77L, 2, 3);
         verifyNoMoreInteractions(queries);
     }
@@ -108,7 +113,12 @@ class AuctionMemberAccessTests {
                 new AuctionOrderSummaryResponse("AO-test", 1L, "Shoe", money, "Transfer",
                         AuctionPaymentStatus.PENDING, AuctionShippingStatus.NOT_SHIPPED,
                         AuctionOrderStatus.PENDING_PAYMENT, at, at)), 0, 10, 1, 1));
-        for (String path : List.of("/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me")) {
+        when(queries.getMyAuctionSales(77L, 0, 10)).thenReturn(new PageData<>(List.of(
+                new AuctionOrderSummaryResponse("AO-sale", 1L, "Shoe", money, "Transfer",
+                        AuctionPaymentStatus.PAID, AuctionShippingStatus.NOT_SHIPPED,
+                        AuctionOrderStatus.PAID, at, at)), 0, 10, 1, 1));
+        for (String path : List.of("/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me",
+                "/api/auction-orders/me/sales")) {
             var request = mvc.perform(get(path).session(activeSession()))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data.size").value(10))
                     .andExpect(jsonPath("$.data.items[0].auctionId").value(1));
@@ -126,7 +136,8 @@ class AuctionMemberAccessTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me"})
+    @ValueSource(strings = {"/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me",
+            "/api/auction-orders/me/sales"})
     void nonNumericPaginationReturns400(String path) throws Exception {
         mvc.perform(get(path).session(activeSession()).param("page", "oops"))
                 .andExpect(status().isBadRequest());

@@ -59,6 +59,15 @@ public class LocalAdvertisementImageStorageService implements AdvertisementImage
                             300,
                             1.0,
                             "1:1"
+                    ),
+
+                    AdvertisementPlacement.CATEGORY_CARD,
+                    new ImageRule(
+                            "分類卡片",
+                            600,
+                            750,
+                            4.0/5.0,
+                            "4:5"
                     )
             );
 
@@ -75,82 +84,106 @@ public class LocalAdvertisementImageStorageService implements AdvertisementImage
                 .normalize();
     }
 
+    /**
+     * 驗證剛上傳的 MultipartFile。
+     */
     private void validateImageDimensions(
             MultipartFile file,
             AdvertisementPlacement adPlacement
     ) {
+        try (
+                ImageInputStream imageInputStream =
+                        ImageIO.createImageInputStream(file.getInputStream())
+        ) {
+            // 呼叫下面共用的圖片驗證方法
+            validateImageDimensions(imageInputStream, adPlacement);
+
+        } catch (IOException e) {
+            throw new BusinessException("圖片內容讀取失敗");
+        }
+    }
+
+    /**
+     * 共用的圖片尺寸與比例驗證。
+     */
+    private void validateImageDimensions(
+            ImageInputStream imageInputStream,
+            AdvertisementPlacement adPlacement
+    ) throws IOException {
+
+        // 根據 BANNER、POPUP、SMALL_BLOCK 取得對應規格
         ImageRule rule = IMAGE_RULES.get(adPlacement);
 
         if (rule == null) {
             throw new BusinessException("廣告版位不可為空或不合法");
         }
 
-        try (
-                ImageInputStream imageInputStream =
-                        ImageIO.createImageInputStream(file.getInputStream())
-        ) {
-            if (imageInputStream == null) {
-                throw new BusinessException("無法讀取圖片內容");
-            }
+        if (imageInputStream == null) {
+            throw new BusinessException("無法讀取圖片內容");
+        }
 
-            Iterator<ImageReader> readers =
-                    ImageIO.getImageReaders(imageInputStream);
+        // 尋找可以讀取該圖片格式的工具
+        Iterator<ImageReader> readers =
+                ImageIO.getImageReaders(imageInputStream);
 
-            if (!readers.hasNext()) {
+        if (!readers.hasNext()) {
+            throw new BusinessException(
+                    "檔案不是有效的 JPG、PNG 或 WEBP 圖片"
+            );
+        }
+
+        ImageReader reader = readers.next();
+
+        try {
+            reader.setInput(imageInputStream, true, true);
+
+            // 取得圖片實際寬度與高度
+            int width = reader.getWidth(0);
+            int height = reader.getHeight(0);
+
+            // 檢查最小尺寸
+            if (width < rule.minimumWidth()
+                    || height < rule.minimumHeight()) {
+
                 throw new BusinessException(
-                        "檔案不是有效的 JPG、PNG 或 WEBP 圖片"
+                        rule.label()
+                                + "圖片至少需要 "
+                                + rule.minimumWidth()
+                                + " × "
+                                + rule.minimumHeight()
+                                + " px，目前圖片為 "
+                                + width
+                                + " × "
+                                + height
+                                + " px"
                 );
             }
 
-            ImageReader reader = readers.next();
+            // 計算圖片目前的長寬比例
+            double actualRatio = (double) width / height;
 
-            try {
-                reader.setInput(imageInputStream, true, true);
+            // 計算與規定比例之間的差距
+            double ratioDifference =
+                    Math.abs(actualRatio - rule.ratio())
+                            / rule.ratio();
 
-                int width = reader.getWidth(0);
-                int height = reader.getHeight(0);
-
-                if (
-                        width < rule.minimumWidth()
-                                || height < rule.minimumHeight()
-                ) {
-                    throw new BusinessException(
-                            rule.label()
-                                    + "圖片至少需要 "
-                                    + rule.minimumWidth()
-                                    + " × "
-                                    + rule.minimumHeight()
-                                    + " px，目前圖片為 "
-                                    + width
-                                    + " × "
-                                    + height
-                                    + " px"
-                    );
-                }
-
-                double actualRatio = (double) width / height;
-
-                double ratioDifference =
-                        Math.abs(actualRatio - rule.ratio())
-                                / rule.ratio();
-
-                if (ratioDifference > 0.02) {
-                    throw new BusinessException(
-                            rule.label()
-                                    + "圖片比例需要接近 "
-                                    + rule.ratioLabel()
-                                    + "，目前圖片為 "
-                                    + width
-                                    + " × "
-                                    + height
-                                    + " px"
-                    );
-                }
-            } finally {
-                reader.dispose();
+            // 允許2%的比例誤差
+            if (ratioDifference > 0.02) {
+                throw new BusinessException(
+                        rule.label()
+                                + "圖片比例需要接近 "
+                                + rule.ratioLabel()
+                                + "，目前圖片為 "
+                                + width
+                                + " × "
+                                + height
+                                + " px"
+                );
             }
-        } catch (IOException e) {
-            throw new BusinessException("圖片內容讀取失敗");
+
+        } finally {
+            // 使用完畢後釋放圖片讀取資源
+            reader.dispose();
         }
     }
 
@@ -195,6 +228,58 @@ public class LocalAdvertisementImageStorageService implements AdvertisementImage
         }
 
         return URL_PREFIX + storedFileName;
+    }
+
+    @Override
+    public void validateStoredImage(
+            String imageUrl,
+            AdvertisementPlacement adPlacement
+    ) {
+        // 必須是由廣告圖片上傳API產生的路徑
+        if (imageUrl == null || !imageUrl.startsWith(URL_PREFIX)) {
+            throw new BusinessException(
+                    "廣告圖片必須使用本機上傳的圖片"
+            );
+        }
+
+        // 從圖片網址取出實際檔名
+        String fileName =
+                imageUrl.substring(URL_PREFIX.length());
+
+        // 組合出圖片在伺服器中的實際位置
+        Path targetFile = uploadRoot
+                .resolve(fileName)
+                .normalize();
+
+        /*
+         * startsWith：防止讀取到廣告圖片資料夾以外的位置
+         * isRegularFile：確認檔案真的存在
+         */
+        if (!targetFile.startsWith(uploadRoot)
+                || !Files.isRegularFile(targetFile)) {
+
+            throw new BusinessException(
+                    "找不到指定的廣告圖片"
+            );
+        }
+
+        try (
+                ImageInputStream imageInputStream =
+                        ImageIO.createImageInputStream(
+                                targetFile.toFile()
+                        )
+        ) {
+            // 根據目前選擇的廣告版位重新驗證圖片
+            validateImageDimensions(
+                    imageInputStream,
+                    adPlacement
+            );
+
+        } catch (IOException e) {
+            throw new BusinessException(
+                    "圖片內容讀取失敗"
+            );
+        }
     }
 
     @Override

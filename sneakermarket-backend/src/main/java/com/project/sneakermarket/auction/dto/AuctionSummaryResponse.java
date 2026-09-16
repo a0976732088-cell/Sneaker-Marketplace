@@ -24,6 +24,9 @@ public record AuctionSummaryResponse(
         // 商品名稱
         String productName,
 
+        // 賣家會員名稱
+        String sellerName,
+
         // 球鞋型號
         String model,
 

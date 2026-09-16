@@ -5,10 +5,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.project.sneakermarket.auction.controller.AuctionController;
+import com.project.sneakermarket.auction.dto.AuctionDetailResponse;
 import com.project.sneakermarket.auction.dto.AuctionLookupOption;
 import com.project.sneakermarket.auction.dto.AuctionOptionsResponse;
+import com.project.sneakermarket.auction.dto.AuctionSummaryResponse;
+import com.project.sneakermarket.auction.dto.BidHistoryResponse;
+import com.project.sneakermarket.auction.dto.PageData;
 import com.project.sneakermarket.auction.dto.AuctionStatusResponse;
 import com.project.sneakermarket.auction.dto.BidCreateRequest;
+import com.project.sneakermarket.auction.entity.AuctionCondition;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.exception.AuctionExceptionHandler;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
@@ -20,6 +25,7 @@ import com.project.sneakermarket.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -45,6 +51,7 @@ class AuctionAccessTests {
         queries = mock(AuctionQueryService.class);
         mvc = MockMvcBuilders.standaloneSetup(
                 new AuctionController(queries, commands, bids, resolver, references))
+                .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .setControllerAdvice(new AuctionExceptionHandler(), new GlobalExceptionHandler()).build();
     }
 
@@ -238,6 +245,70 @@ class AuctionAccessTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"bidAmount\":5500}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void publicResponsesExposeOnlySellerAndBidderNamesFromMemberData() throws Exception {
+        when(queries.searchAuctions(any(), any())).thenReturn(new PageData<>(
+                List.of(publicSummary()), 0, 12, 1, 1));
+        when(queries.getAuctionDetail(12L, null)).thenReturn(publicDetail());
+        when(queries.getBidHistory(12L)).thenReturn(List.of(new BidHistoryResponse(
+                new BigDecimal("5500"), LocalDateTime.of(2026, 9, 8, 12, 0), "陳小華")));
+
+        mvc.perform(get("/api/auctions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].sellerName").value("王小明"))
+                .andExpect(jsonPath("$.data.items[0].sellerId").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].account").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].email").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].phone").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].address").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].role").doesNotExist());
+
+        mvc.perform(get("/api/auctions/12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sellerName").value("王小明"))
+                .andExpect(jsonPath("$.data.sellerId").doesNotExist())
+                .andExpect(jsonPath("$.data.account").doesNotExist())
+                .andExpect(jsonPath("$.data.email").doesNotExist())
+                .andExpect(jsonPath("$.data.phone").doesNotExist())
+                .andExpect(jsonPath("$.data.address").doesNotExist())
+                .andExpect(jsonPath("$.data.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.data.role").doesNotExist());
+
+        mvc.perform(get("/api/auctions/12/bids"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].bidderName").value("陳小華"))
+                .andExpect(jsonPath("$.data[0].maskedBidder").doesNotExist())
+                .andExpect(jsonPath("$.data[0].bidderId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].memberId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].account").doesNotExist())
+                .andExpect(jsonPath("$.data[0].email").doesNotExist())
+                .andExpect(jsonPath("$.data[0].phone").doesNotExist())
+                .andExpect(jsonPath("$.data[0].address").doesNotExist())
+                .andExpect(jsonPath("$.data[0].passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.data[0].role").doesNotExist());
+    }
+
+    private AuctionSummaryResponse publicSummary() {
+        return new AuctionSummaryResponse(
+                12L, 3L, "Air Jordan 1", "王小明", "AJ1", "US 9",
+                AuctionCondition.NEW, new BigDecimal("5000"), 2,
+                LocalDateTime.of(2026, 9, 7, 12, 0),
+                LocalDateTime.of(2026, 9, 8, 12, 0),
+                AuctionStatus.ACTIVE, 71L, 92L, "Nike", "球鞋");
+    }
+
+    private AuctionDetailResponse publicDetail() {
+        return new AuctionDetailResponse(
+                12L, 3L, 71L, 92L, "Air Jordan 1", "王小明", "AJ1", "US 9",
+                AuctionCondition.NEW, "商品描述", null, null, "台北", List.of(),
+                "宅配", BigDecimal.ZERO, "信用卡", false, false, null,
+                new BigDecimal("4500"), new BigDecimal("5000"), new BigDecimal("500"),
+                new BigDecimal("5500"), LocalDateTime.of(2026, 9, 7, 12, 0),
+                LocalDateTime.of(2026, 9, 8, 12, 0), AuctionStatus.ACTIVE, 2,
+                LocalDateTime.of(2026, 9, 7, 11, 0), false, "Nike", "球鞋", false, true);
     }
 
     @Test

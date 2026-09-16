@@ -17,4 +17,6 @@ public class ProductDetailResponse {
     private String description;
     private List<String> images;
     private List<ProductVariantResponse> variants;
+    private Long categoryId;
+    private Long brandId;
 }

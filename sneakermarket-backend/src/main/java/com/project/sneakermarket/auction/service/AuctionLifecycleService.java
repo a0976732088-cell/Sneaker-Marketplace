@@ -11,6 +11,8 @@ import com.project.sneakermarket.auction.entity.AuctionResultStatus;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
 import com.project.sneakermarket.auction.repository.AuctionRepository;
 import com.project.sneakermarket.auction.repository.AuctionResultRepository;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventPublisher;
+import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,6 +25,7 @@ public class AuctionLifecycleService {
     private final AuctionResultRepository auctionResultRepository;
     private final AuctionTime auctionTime;
     private final org.springframework.context.ApplicationEventPublisher events;
+    private final AuctionRealtimeEventPublisher realtimeEvents;
 
     @Transactional
     public void processAuction(Long auctionId) {
@@ -48,6 +51,7 @@ public class AuctionLifecycleService {
             auction.setStatus(AuctionStatus.ACTIVE);
             auction.setUpdatedAt(now);
             auctionRepository.save(auction);
+            realtimeEvents.publish(AuctionRealtimeEventType.AUCTION_STARTED, auction);
         }
     }
 
@@ -64,6 +68,7 @@ public class AuctionLifecycleService {
             auction.setUpdatedAt(now);
             auctionRepository.save(auction);
             auctionResultRepository.save(result);
+            realtimeEvents.publish(AuctionRealtimeEventType.AUCTION_REMOVED, auction);
             // 廢標不發布既有 SOLD／UNSOLD Email 工作事件。
             return;
         }
@@ -92,6 +97,10 @@ public class AuctionLifecycleService {
         auctionRepository.save(auction);
         // UNIQUE(auction_id) 為最後防線；寫入或提交失敗時 Auction 一併回滾。
         auctionResultRepository.save(result);
+        realtimeEvents.publish(
+                sold ? AuctionRealtimeEventType.AUCTION_SOLD : AuctionRealtimeEventType.AUCTION_UNSOLD,
+                auction
+        );
         events.publishEvent(new com.project.sneakermarket.auction.email.AuctionEmailReadyEvent(auction.getAuctionId()));
     }
 

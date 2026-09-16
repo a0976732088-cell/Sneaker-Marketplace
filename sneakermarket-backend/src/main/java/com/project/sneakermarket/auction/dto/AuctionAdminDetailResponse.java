@@ -1,6 +1,7 @@
 package com.project.sneakermarket.auction.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.project.sneakermarket.auction.entity.AuctionCondition;
@@ -8,6 +9,7 @@ import com.project.sneakermarket.auction.entity.AuctionCondition;
 /** 管理員專用唯讀詳情，包含下架及刪除後仍保留的商品資料。 */
 public record AuctionAdminDetailResponse(
         AuctionAdminSummaryResponse auction,
+        String brandName,
         String size,
         AuctionCondition condition,
         String description,
@@ -20,6 +22,12 @@ public record AuctionAdminDetailResponse(
         Boolean allowMeetup,
         Boolean allowReturn,
         String warrantyNote,
-        List<String> imageUrls
+        List<String> imageUrls,
+        BigDecimal startPrice,
+        BigDecimal minIncrement,
+        LocalDateTime updatedAt,
+        List<BidHistoryResponse> bids,
+        AuctionAdminResultResponse result,
+        AuctionAdminOrderResponse order
 ) {
 }

@@ -24,6 +24,7 @@ public class AuctionOrderService {
     private final AuctionProductRepository products;
     private final MemberRepository members;
     private final AuctionTime time;
+    private final AuctionOrderSettings settings;
     private final org.springframework.context.ApplicationEventPublisher events;
 
     // 訂單不加入呼叫端交易；呼叫端只應傳入已 commit 的 Result 所屬 auctionId。
@@ -74,6 +75,7 @@ public class AuctionOrderService {
         order.setShippingAddress(winner.getAddress());
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
+        order.setPaymentDueAt(now.plusHours(settings.paymentTimeoutHours()));
         orders.saveAndFlush(order);
         events.publishEvent(new com.project.sneakermarket.auction.email.AuctionEmailReadyEvent(auctionId));
     }

@@ -1,5 +1,6 @@
 package com.project.sneakermarket.auction.email;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import com.project.sneakermarket.auction.entity.*;
 import com.project.sneakermarket.auction.repository.*;
@@ -49,8 +50,29 @@ public class AuctionEmailService {
         return logs.findDispatchCandidateIds(auctionId, settings.maxRetries());
     }
 
+    /** 與訂單棄標狀態同交易建立 outbox 工作；SMTP 只在提交後執行。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void ensureAbandonedEmailLogs(AuctionOrder order) {
+        if (!settings.enabled()) return;
+        if (order == null || order.getOrderStatus() != AuctionOrderStatus.ABANDONED
+                || order.getAbandonedAt() == null) return;
+
+        Auction auction = auctions.findById(order.getAuctionId()).orElseThrow();
+        AuctionProduct product = products.findById(auction.getAuctionProductId()).orElseThrow();
+        ensureLog(order.getAuctionId(), order.getBuyerId(), AuctionEmailRecipientRole.WINNER,
+                AuctionEmailType.ORDER_ABANDONED_BUYER, product.getProductName(), order.getAbandonedAt());
+        ensureLog(order.getAuctionId(), order.getSellerId(), AuctionEmailRecipientRole.SELLER,
+                AuctionEmailType.ORDER_ABANDONED_SELLER, product.getProductName(), order.getAbandonedAt());
+        logs.flush();
+    }
+
     private void ensureLog(Long auctionId, Long memberId, AuctionEmailRecipientRole role,
             AuctionEmailType type, String productName) {
+        ensureLog(auctionId, memberId, role, type, productName, time.now());
+    }
+
+    private void ensureLog(Long auctionId, Long memberId, AuctionEmailRecipientRole role,
+            AuctionEmailType type, String productName, LocalDateTime createdAt) {
         if (logs.existsByAuctionIdAndRecipientMemberIdAndEmailType(auctionId, memberId, type)) return;
         var member = members.findById(memberId).orElseThrow();
         var log = new AuctionEmailLog();
@@ -64,8 +86,8 @@ public class AuctionEmailService {
         log.setSubject(subject.substring(0, Math.min(200, subject.length())));
         log.setSendStatus(AuctionEmailSendStatus.PENDING);
         log.setRetryCount(0);
-        log.setCreatedAt(time.now());
-        log.setUpdatedAt(log.getCreatedAt());
+        log.setCreatedAt(createdAt);
+        log.setUpdatedAt(createdAt);
         logs.save(log);
     }
 
@@ -75,6 +97,8 @@ public class AuctionEmailService {
             case UNSOLD_SELLER -> "商品流標";
             case WON -> "恭喜得標";
             case LOST -> "本次未得標";
+            case ORDER_ABANDONED_BUYER -> "競標訂單已因逾期未付款而棄標";
+            case ORDER_ABANDONED_SELLER -> "競標訂單買家逾期未付款";
         };
     }
 }
