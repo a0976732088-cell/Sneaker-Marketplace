@@ -506,7 +506,7 @@ public class AdvertisementService {
         }
 
         if (targetId == null){
-            throw new BusinessException("分類卡片必須選擇商品分類");
+            throw new BusinessException("分類導向必須選擇商品分類");
         }
 
         if(!categoryRepo.existsById(targetId)){

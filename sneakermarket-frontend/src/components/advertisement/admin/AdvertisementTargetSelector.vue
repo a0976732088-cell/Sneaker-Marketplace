@@ -18,14 +18,47 @@ const loading = ref(false);
 const errorMessage = ref("");
 const hasSearched = ref(false);
 
+const CATEGORY_OPTIONS = [
+  {
+    id: 1,
+    name: "籃球鞋",
+    detail: "籃球鞋分類商品",
+    imageUrl: null,
+  },
+  {
+    id: 2,
+    name: "慢跑鞋",
+    detail: "慢跑鞋分類商品",
+    imageUrl: null,
+  },
+  {
+    id: 3,
+    name: "休閒鞋",
+    detail: "休閒鞋分類商品",
+    imageUrl: null,
+  },
+  {
+    id: 4,
+    name: "滑板鞋",
+    detail: "滑板鞋分類商品",
+    imageUrl: null,
+  },
+];
+
 watch(
   () => props.targetType,
-  () => {
+  (targetType) => {
     keyword.value = "";
     results.value = [];
     errorMessage.value = "";
     hasSearched.value = false;
+
+    if (targetType === "CATEGORY") {
+      results.value = [...CATEGORY_OPTIONS];
+      hasSearched.value = true;
+    }
   },
+  { immediate: true },
 );
 
 async function searchTargets() {
@@ -75,6 +108,26 @@ async function searchTargets() {
 function selectTarget(target) {
   emit("select", target);
 }
+
+function getTargetTitle(targetType) {
+  const titles = {
+    PRODUCT: "一般商品",
+    AUCTION: "競標商品",
+    CATEGORY: "商品分類",
+  };
+
+  return titles[targetType] || "導向目標";
+}
+
+function getSearchPlaceholder(targetType) {
+  const placeholders = {
+    PRODUCT: "搜尋商品名稱",
+    AUCTION: "搜尋競標商品名稱或型號",
+    CATEGORY: "搜尋分類名稱",
+  };
+
+  return placeholders[targetType] || "搜尋導向目標";
+}
 </script>
 
 <template>
@@ -82,25 +135,25 @@ function selectTarget(target) {
     <header class="target-drawer-header">
       <div>
         <span>SELECT TARGET</span>
-        <h2>
-          {{ props.targetType === "PRODUCT" ? "一般商品" : "競標商品" }}
-        </h2>
-        <p>搜尋後選擇一筆資料，作為廣告導向目標。</p>
+        <h2>{{ getTargetTitle(props.targetType) }}</h2>
+        <p>
+          {{
+            props.targetType === "CATEGORY"
+              ? "直接選擇一個商品分類，作為廣告導向目標。"
+              : "搜尋後選擇一筆資料，作為廣告導向目標。"
+          }}
+        </p>
       </div>
 
       <button type="button" aria-label="關閉" @click="emit('close')">×</button>
     </header>
 
     <div class="target-drawer-body">
-      <div class="search-row">
+      <div v-if="props.targetType !== 'CATEGORY'" class="search-row">
         <input
           v-model.trim="keyword"
           type="search"
-          :placeholder="
-            props.targetType === 'PRODUCT'
-              ? '搜尋商品名稱'
-              : '搜尋競標商品名稱或型號'
-          "
+          :placeholder="getSearchPlaceholder(props.targetType)"
           @keyup.enter="searchTargets"
         />
 
@@ -130,7 +183,7 @@ function selectTarget(target) {
         </li>
       </ul>
       <p v-else-if="hasSearched" class="hint">
-        查無符合條件的{{ props.targetType === "PRODUCT" ? "商品" : "競標商品" }}
+        查無符合條件的{{ getTargetTitle(props.targetType) }}
       </p>
     </div>
   </aside>

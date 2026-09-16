@@ -66,6 +66,16 @@ export function useAdvertisementManagement() {
       ratio: 1,
       ratioLabel: "1:1",
     },
+
+    CATEGORY_CARD: {
+      label: "分類卡片",
+      width: 1080,
+      height: 1350,
+      minimumWidth: 600,
+      minimumHeight: 750,
+      ratio: 4 / 5,
+      ratioLabel: "4:5",
+    },
   };
 
   // Spring Data 的頁碼從 0 開始，畫面顯示時再加 1。
@@ -91,11 +101,13 @@ export function useAdvertisementManagement() {
     BANNER: "首頁橫幅",
     POPUP: "首頁彈窗",
     SMALL_BLOCK: "商品頁側欄",
+    CATEGORY_CARD: "分類卡片",
   };
   const placementApiValues = {
     首頁橫幅: "BANNER",
     首頁彈窗: "POPUP",
     商品頁側欄: "SMALL_BLOCK",
+    分類卡片: "CATEGORY_CARD",
   };
   function resolveDisplayStatus(ad) {
     if (ad.adStatus === "DRAFT") return "草稿";
@@ -192,6 +204,15 @@ export function useAdvertisementManagement() {
     form.imageUrl = "";
 
     notify("顯示版位已變更，請依照新版位規格重新上傳圖片", "error");
+  }
+
+  function validateTargetSelection() {
+    if (form.targetType === "CATEGORY" && !form.targetId) {
+      notify("請選擇商品分類", "error");
+      return false;
+    }
+
+    return true;
   }
 
   function readImageDimensions(file) {
@@ -324,7 +345,7 @@ export function useAdvertisementManagement() {
 
       // 4. 顯示成功訊息。
 
-      notify(result.message || `廣告${actionName}成功`);
+      notify(`廣告${actionName}成功`);
     } catch (error) {
       console.error(`廣告${actionName}失敗`, error);
 
@@ -390,6 +411,7 @@ export function useAdvertisementManagement() {
   }
 
   function openCreateDrawer() {
+    toast.value = "";
     resetForm();
     editingAdId.value = null;
     isStartAtLocked.value = false;
@@ -405,6 +427,7 @@ export function useAdvertisementManagement() {
   }
 
   function openEditDrawer(ad) {
+    toast.value = "";
     editingAdId.value = ad.id;
     minimumStartAt.value = getCurrentMinute();
 
@@ -435,6 +458,7 @@ export function useAdvertisementManagement() {
 
   async function createDraft() {
     if (!validateAdvertisementTime()) return;
+    if (!validateTargetSelection()) return;
     const payload = {
       createdBy: form.createdBy,
       adName: form.adName,
@@ -577,8 +601,8 @@ export function useAdvertisementManagement() {
   async function updateAd() {
     // 沒有編輯 ID 時不送出修改
     if (editingAdId.value === null) return;
-
     if (!validateAdvertisementTime()) return;
+    if (!validateTargetSelection()) return;
 
     const payload = {
       adName: form.adName,

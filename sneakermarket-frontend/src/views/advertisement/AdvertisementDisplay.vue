@@ -9,9 +9,10 @@ import {
 const props = defineProps({
   placements: {
     type: Array,
-    default: () => ["BANNER", "POPUP", "SMALL_BLOCK"],
+    default: () => ["BANNER", "POPUP", "SMALL_BLOCK", "CATEGORY_CARD"],
   },
 });
+const emit = defineEmits(["select-category"]);
 
 function hasPlacement(placement) {
   return props.placements.includes(placement);
@@ -22,6 +23,17 @@ const router = useRouter();
 
 function goToAdvertisementTarget(ad) {
   if (!ad) return;
+
+  if (ad.targetType === "CATEGORY") {
+    if (ad.targetId) {
+      emit("select-category", {
+        categoryId: Number(ad.targetId),
+        categoryName: ad.adName,
+      });
+    }
+
+    return;
+  }
 
   if (ad.targetType === "PRODUCT") {
     if (ad.targetId) {
@@ -67,6 +79,13 @@ const smallBlockAds = computed(() =>
     (ad) => ad.adPlacement === "SMALL_BLOCK" && ad.adStatus === "ACTIVE",
   ),
 );
+
+const categoryCardAds = computed(() =>
+  ads.value.filter(
+    (ad) => ad.adPlacement === "CATEGORY_CARD" && ad.adStatus === "ACTIVE",
+  ),
+);
+
 const bannerIndex = ref(0);
 // 儲存自動播放計時器
 let bannerTimer = null;
@@ -222,6 +241,32 @@ onUnmounted(() => {
       <p v-else-if="hasPlacement('BANNER')" class="empty-ad">
         目前沒有上架中的 BANNER 廣告
       </p>
+
+      <section
+        v-if="hasPlacement('CATEGORY_CARD') && categoryCardAds.length"
+        class="category-card-section"
+      >
+        <header class="category-card-header">
+          <h2>為您推薦</h2>
+        </header>
+
+        <div class="category-card-track">
+          <button
+            v-for="ad in categoryCardAds"
+            :key="ad.adId"
+            type="button"
+            class="category-card"
+            @click="goToAdvertisementTarget(ad)"
+          >
+            <img
+              :src="resolveAdvertisementImageUrl(ad.imageUrl)"
+              :alt="ad.adName"
+            />
+
+            <strong>{{ ad.adName }}</strong>
+          </button>
+        </div>
+      </section>
 
       <aside
         v-if="

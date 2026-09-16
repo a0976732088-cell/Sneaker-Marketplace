@@ -183,7 +183,7 @@ onUnmounted(() => {
         :class="toastType"
         role="status"
       >
-        {{ toastType === "success" ? "✓" : "!" }} {{ toast }}
+        {{ toastType === "success" ? "✓" : "X" }} {{ toast }}
       </div>
     </Transition>
   </section>
