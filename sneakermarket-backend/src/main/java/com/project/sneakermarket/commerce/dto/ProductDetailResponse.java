@@ -19,4 +19,5 @@ public class ProductDetailResponse {
     private List<ProductVariantResponse> variants;
     private Long categoryId;
     private Long brandId;
+    private String categoryName;
 }

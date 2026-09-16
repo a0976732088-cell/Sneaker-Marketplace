@@ -90,7 +90,8 @@ public class ProductService {
                 imageUrls,
                 variantResponses,
                 product.getCategory().getCategoryId(),
-                product.getBrand().getBrandId());
+                product.getBrand().getBrandId(),
+                product.getCategory().getCategoryName());
     }
 
 
