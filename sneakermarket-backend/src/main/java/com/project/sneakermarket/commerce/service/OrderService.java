@@ -14,7 +14,8 @@ import com.project.sneakermarket.member.service.MemberService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
+import com.project.sneakermarket.commerce.entity.ProductImage;
+import com.project.sneakermarket.commerce.repository.ProductImageRepository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -31,6 +32,7 @@ public class OrderService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final ProductImageRepository productImageRepository;
     private final MemberService memberService;
     private final CouponService couponService;
 
@@ -72,7 +74,8 @@ public class OrderService {
                         orderItem.getSpecification(),
                         orderItem.getUnitPrice(),
                         orderItem.getQuantity(),
-                        orderItem.getLineTotal()
+                        orderItem.getLineTotal(),
+                        orderItem.getImageUrl()
                 ))
                 .collect(Collectors.toList());
 
@@ -161,6 +164,13 @@ public class OrderService {
             orderItem.setUnitPrice(item.getVariant().getPrice());
             orderItem.setQuantity(item.getQuantity());
             orderItem.setLineTotal(item.getVariant().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
+
+            Long productId = item.getVariant().getProduct().getProductId();
+            List<ProductImage> images =
+                    productImageRepository.findByProductProductIdAndIsPrimaryTrue(productId);
+            String imageUrl = images.isEmpty() ? null : images.get(0).getImageUrl();
+            orderItem.setImageUrl(imageUrl);
+
             orderItemRepository.save(orderItem);
 
             int newStock = item.getVariant().getStock() - item.getQuantity();
