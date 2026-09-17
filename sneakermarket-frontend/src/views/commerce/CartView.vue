@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import httpClient from '@/service/httpClient'
 import { useRouter } from 'vue-router'
-
+import CheckoutSteps from '@/components/commerce/CheckoutSteps.vue'
 
 const loading = ref(true)
 const errorMessage = ref('')
@@ -90,7 +90,7 @@ onMounted(() => {
 </script>
  
 <template>
-<h2>購物車</h2>
+<CheckoutSteps :current-step="1" />
  
 <div v-if="loading" class="text-secondary mt-3">載入中...</div>
  
