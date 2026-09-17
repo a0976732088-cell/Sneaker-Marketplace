@@ -251,7 +251,10 @@ public class NotificationService {
                             .toList();
 
 
-            notificationRepo.saveAll(batchNotifications);
+            List<Notification> savedNotifications =
+                    notificationRepo.saveAll(batchNotifications);
+
+            createEmailJobs(savedNotifications);
 
             entityManager.flush();
 

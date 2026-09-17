@@ -8,6 +8,9 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
+import java.time.LocalDateTime;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
@@ -16,9 +19,18 @@ public interface NotificationEmailJobRepository
 
     boolean existsByNotificationId(Long notificationId);
 
-    List<NotificationEmailJob>
-    findTop50ByStatusOrderByCreatedAtAsc(
-            NotificationEmailStatus status
+    @Query("""
+    SELECT job
+    FROM NotificationEmailJob job
+    WHERE job.status = :pending
+       OR (job.status = :waiting AND job.nextRetryAt <= :now)
+    ORDER BY job.createdAt ASC
+    """)
+    List<NotificationEmailJob> findReadyJobs(
+            @Param("pending") NotificationEmailStatus pending,
+            @Param("waiting") NotificationEmailStatus waiting,
+            @Param("now") LocalDateTime now,
+            Pageable pageable
     );
 
 //    單筆鎖定查詢
@@ -30,5 +42,10 @@ public interface NotificationEmailJobRepository
     """)
     Optional<NotificationEmailJob> findByIdForUpdate(
             @Param("jobId") Long jobId
+    );
+
+    Page<NotificationEmailJob> findByStatusOrderByCreatedAtDesc(
+            NotificationEmailStatus status,
+            Pageable pageable
     );
 }

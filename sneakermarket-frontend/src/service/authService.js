@@ -2,6 +2,7 @@ const AUTH_API_BASE_URL = "http://localhost:8080/api/auth";
 
 const MEMBER_API_BASE_URL = "http://localhost:8080/api/members";
 
+
 async function readErrorResponse(response, defaultMessage) {
   let data = null;
 

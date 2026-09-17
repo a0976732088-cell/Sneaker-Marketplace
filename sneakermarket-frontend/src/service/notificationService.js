@@ -67,3 +67,11 @@ export const getNotificationCalendarDashboard = () => {
     "/dashboard/notification-calendar",
   );
 };
+
+export const getEmailJobs = (status = "FAILED", page = 0) =>
+  httpClient.get("/admin/notification-email-jobs", {
+    params: { status, page },
+  });
+
+export const retryEmailJob = (jobId) =>
+  httpClient.post(`/admin/notification-email-jobs/${jobId}/retry`);

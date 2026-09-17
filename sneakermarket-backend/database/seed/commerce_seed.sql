@@ -82,4 +82,4 @@ INSERT INTO SneakerMarketDB.dbo.product_images (product_id,image_url,sort_order,
                                                                                                            (17,N'https://commons.wikimedia.org/wiki/Special:FilePath/New_Balance_custom_574.jpg',0,1,'2026-09-05 15:58:24'),
                                                                                                            (18,N'https://commons.wikimedia.org/wiki/Special:FilePath/New_balance_shoe.jpg',0,1,'2026-09-05 15:58:24'),
                                                                                                            (19,N'https://commons.wikimedia.org/wiki/Special:FilePath/Vans_shoes.JPG',0,1,'2026-09-05 15:58:24'),
-                                                                                                           (20,N'https://commons.wikimedia.org/wiki/Special:FilePath/A_pair_of_Vans_shoes.JPG',0,1,'2026-09-05 15:58:24'
+                                                                                                           (20,N'https://commons.wikimedia.org/wiki/Special:FilePath/A_pair_of_Vans_shoes.JPG',0,1,'2026-09-05 15:58:24');

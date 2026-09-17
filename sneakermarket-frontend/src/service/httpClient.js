@@ -4,6 +4,7 @@ import axios from 'axios'
 // 若沒有另外建立 .env.local，預設直接連到目前 SneakerMarket Backend。
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
 
+
 const httpClient = axios.create({
   baseURL: apiBaseUrl,
   timeout: 10000,

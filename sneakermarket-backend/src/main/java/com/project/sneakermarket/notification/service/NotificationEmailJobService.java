@@ -4,7 +4,10 @@ import com.project.sneakermarket.notification.entity.NotificationEmailJob;
 import com.project.sneakermarket.notification.entity.NotificationEmailStatus;
 import com.project.sneakermarket.notification.repository.NotificationEmailJobRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -34,5 +37,26 @@ public class NotificationEmailJobService {
         job.setRetryCount(0);
 
         jobRepository.save(job);
+    }
+
+
+    @Transactional
+    public void retryFailed(Long jobId) {
+        NotificationEmailJob job = jobRepository.findByIdForUpdate(jobId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "找不到 Email 任務"
+                ));
+
+        if (job.getStatus() != NotificationEmailStatus.FAILED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "只有最終失敗的 Email 任務可以手動重試"
+            );
+        }
+
+        job.setStatus(NotificationEmailStatus.PENDING);
+        job.setRetryCount(0);
+        job.setNextRetryAt(null);
+        job.setLastError(null);
+        job.setSentAt(null);
     }
 }

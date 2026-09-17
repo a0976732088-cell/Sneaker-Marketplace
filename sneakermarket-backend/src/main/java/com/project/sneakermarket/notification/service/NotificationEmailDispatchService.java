@@ -1,7 +1,5 @@
 package com.project.sneakermarket.notification.service;
 
-import com.project.sneakermarket.calendar.entity.CalendarEvent;
-import com.project.sneakermarket.calendar.repository.CalendarEventRepository;
 import com.project.sneakermarket.notification.entity.Notification;
 import com.project.sneakermarket.notification.entity.NotificationEmailJob;
 import com.project.sneakermarket.notification.entity.NotificationEmailStatus;
@@ -11,7 +9,6 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -32,7 +29,6 @@ public class NotificationEmailDispatchService {
     private final NotificationEmailJobRepository jobRepository;
     private final NotificationRepository notificationRepository;
     private final JavaMailSender mailSender;
-    private final CalendarEventRepository calendarEventRepository;
 
     @Value("${notification.email.from:}")
     private String mailFrom;
@@ -47,8 +43,18 @@ public class NotificationEmailDispatchService {
                 .findByIdForUpdate(jobId)
                 .orElse(null);
 
-        if (job == null
-                || job.getStatus() != NotificationEmailStatus.PENDING) {
+        if (job == null) {
+            return;
+        }
+
+        if (job.getStatus() != NotificationEmailStatus.PENDING
+                && job.getStatus() != NotificationEmailStatus.RETRY_WAIT) {
+            return;
+        }
+
+        if (job.getStatus() == NotificationEmailStatus.RETRY_WAIT
+                && (job.getNextRetryAt() == null
+                || job.getNextRetryAt().isAfter(LocalDateTime.now(TAIPEI)))) {
             return;
         }
 
@@ -61,15 +67,6 @@ public class NotificationEmailDispatchService {
             return;
         }
 
-        CalendarEvent event = calendarEventRepository
-                .findById(notification.getTargetId())
-                .orElse(null);
-
-        if (event == null) {
-            markFailed(job);
-            jobRepository.save(job);
-            return;
-        }
 
         try {
             if (mailFrom == null || mailFrom.isBlank()) {
@@ -79,16 +76,18 @@ public class NotificationEmailDispatchService {
             }
 
             String subject = "SneakerMarket - "
-                    + event.getTitle().replaceAll("[\\r\\n]+", " ");
+                    + notification.getTitle().replaceAll("[\\r\\n]+", " ");
 
 
-            String activityUrl = frontendBaseUrl.replaceAll("/+$", "")
-                    + "/calendar";
+            boolean isEvent = "EVENT".equals(notification.getTargetType());
+            String destinationUrl = frontendBaseUrl.replaceAll("/+$", "")
+                    + (isEvent ? "/calendar" : "/");
+            String linkLabel = isEvent ? "開啟行事曆" : "前往 SneakerMarket";
 
-// 所有動態文字先跳脫，避免活動描述被當成 HTML 執行
-            String safeTitle = HtmlUtils.htmlEscape(event.getTitle());
+            String safeTitle = HtmlUtils.htmlEscape(notification.getTitle());
             String safeContent = HtmlUtils.htmlEscape(notification.getContent());
-            String safeUrl = HtmlUtils.htmlEscape(activityUrl);
+            String safeUrl = HtmlUtils.htmlEscape(destinationUrl);
+            String safeLinkLabel = HtmlUtils.htmlEscape(linkLabel);
 
             String html = """
         <!doctype html>
@@ -194,15 +193,16 @@ public class NotificationEmailDispatchService {
         """.formatted(
                     safeTitle,
                     safeContent,
-                    safeUrl
+                    safeUrl,
+                    safeLinkLabel
             );
 
             String plainText =
-                    "SneakerMarket - " + event.getTitle()
+                    "SneakerMarket - " + notification.getTitle()
                             + "\n\n"
                             + notification.getContent()
-                            + "\n\n查看活動："
-                            + activityUrl
+                            + "\n\n查看詳情："
+                            + destinationUrl
                             + "\n\n※ 防詐騙提醒 ※"
                             + "\nSneakerMarket 不會透過 Email"
                             + "要求您提供密碼、驗證碼或匯款。"
@@ -230,6 +230,7 @@ public class NotificationEmailDispatchService {
             job.setStatus(NotificationEmailStatus.SENT);
             job.setSentAt(LocalDateTime.now(TAIPEI));
             job.setLastError(null);
+            job.setNextRetryAt(null);
 
         } catch (Exception exception) {
             // 不把 SMTP 例外原文寫入資料庫，避免洩漏憑證
@@ -240,10 +241,18 @@ public class NotificationEmailDispatchService {
     }
 
     private void markFailed(NotificationEmailJob job) {
-        job.setStatus(NotificationEmailStatus.FAILED);
-        job.setRetryCount(job.getRetryCount() + 1);
-        job.setLastError(
-                "Email 準備或寄送失敗，請檢查後端設定與日誌"
-        );
+        int failedAttempts = job.getRetryCount() + 1;
+        job.setRetryCount(failedAttempts);
+        job.setLastError("Email 準備或寄送失敗，請檢查後端設定與日誌");
+
+        if (failedAttempts >= 3) {
+            job.setStatus(NotificationEmailStatus.FAILED);
+            job.setNextRetryAt(null);
+            return;
+        }
+
+        job.setStatus(NotificationEmailStatus.RETRY_WAIT);
+        long delayMinutes = failedAttempts == 1 ? 1 : 5;
+        job.setNextRetryAt(LocalDateTime.now(TAIPEI).plusMinutes(delayMinutes));
     }
 }

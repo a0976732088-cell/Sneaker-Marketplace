@@ -48,6 +48,9 @@ public class NotificationEmailJob {
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
 
+    @Column(name = "next_retry_at")
+    private LocalDateTime nextRetryAt;
+
     @Column(name = "last_error", length = 300)
     private String lastError;
 

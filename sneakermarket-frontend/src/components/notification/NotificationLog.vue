@@ -112,18 +112,116 @@
         </li>
       </ul>
     </nav>
+    <section class="card border-0 shadow-sm mt-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">Email 失敗任務</h5>
+      <button class="btn btn-outline-secondary btn-sm" @click="fetchEmailJobs(emailPage)">
+        重新整理
+      </button>
+    </div>
+
+    <p v-if="emailError" class="text-danger">{{ emailError }}</p>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>任務 ID</th>
+            <th>收件信箱</th>
+            <th>失敗次數</th>
+            <th>錯誤狀態</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="job in emailJobs" :key="job.id">
+            <td>{{ job.id }}</td>
+            <td>{{ job.recipientEmail }}</td>
+            <td>{{ job.retryCount }}</td>
+            <td>{{ job.lastError }}</td>
+            <td>
+              <button
+                class="btn btn-outline-primary btn-sm"
+                :disabled="retryingId === job.id"
+                @click="retryEmail(job)"
+              >
+                手動重試
+              </button>
+            </td>
+          </tr>
+          <tr v-if="emailJobs.length === 0">
+            <td colspan="5" class="text-center text-muted">目前沒有失敗任務</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="emailTotalPages > 1" class="d-flex gap-2 justify-content-end">
+      <button
+        class="btn btn-outline-secondary btn-sm"
+        :disabled="emailPage === 0"
+        @click="fetchEmailJobs(emailPage - 1)"
+      >上一頁</button>
+      <span>第 {{ emailPage + 1 }} / {{ emailTotalPages }} 頁</span>
+      <button
+        class="btn btn-outline-secondary btn-sm"
+        :disabled="emailPage + 1 >= emailTotalPages"
+        @click="fetchEmailJobs(emailPage + 1)"
+      >下一頁</button>
+    </div>
+  </div>
+</section>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { getNotificationLogs } from "@/service/notificationService";
+import {
+  getNotificationLogs,
+  getEmailJobs,
+  retryEmailJob,
+} from "@/service/notificationService";
 
 const currentPage = ref(1);
 const totalPages = ref(1);
 const notificationLogList = ref([]);
 
-// 🎯 1. 補上搜尋條件變數定義
+const emailJobs = ref([]);
+const emailPage = ref(0);
+const emailTotalPages = ref(0);
+const emailError = ref("");
+const retryingId = ref(null);
+
+const fetchEmailJobs = async (page = 0) => {
+  try {
+    emailError.value = "";
+    const res = await getEmailJobs("FAILED", page);
+    emailJobs.value = res.data.content || [];
+    emailPage.value = page;
+    emailTotalPages.value = res.data.totalPages || 0;
+  } catch (error) {
+    emailError.value = "讀取 Email 失敗任務失敗";
+    console.error(error);
+  }
+};
+
+const retryEmail = async (job) => {
+  if (!confirm(`確定重試寄給 ${job.recipientEmail} 的 Email？`)) return;
+
+  try {
+    retryingId.value = job.id;
+    await retryEmailJob(job.id);
+    await fetchEmailJobs(emailPage.value);
+    alert("已重新加入寄送佇列");
+  } catch (error) {
+    alert(error.response?.data?.message || "重試失敗");
+  } finally {
+    retryingId.value = null;
+  }
+};
+
+// 補上搜尋條件變數定義
 const searchParams = ref({
   title: "",
   sendType: "",
@@ -131,6 +229,7 @@ const searchParams = ref({
 
 onMounted(() => {
   fetchLogs(1);
+  fetchEmailJobs(0);
 });
 
 // 🎯 2. 對接後台 Log 查詢 API (/api/notification/logs)
