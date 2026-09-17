@@ -428,8 +428,8 @@ public class AdvertisementService {
 
     /**
      * 檢查廣告版位的投放時段是否可以使用。
-     * BANNER、CATEGORY_CARD 可以同時存在多則廣告，因為前端會輪播。
-     * POPUP、SMALL_BLOCK 同一時段只能有一則。
+     * BANNER、CATEGORY_CARD、SMALL_BLOCK 可以同時存在多則廣告，因為前端會輪播。
+     * POPUP同一時段只能有一則。
      */
     private void validatePlacementAvailability(
             Advertisement advertisement
@@ -437,8 +437,10 @@ public class AdvertisementService {
         AdvertisementPlacement placement =
                 advertisement.getAdPlacement();
 
-        // BANNER 可以同時投放多則，不需要檢查時段重疊
-        if (placement == AdvertisementPlacement.BANNER || placement == AdvertisementPlacement.CATEGORY_CARD) {
+        // 三種版位可以同時投放多則，不需要檢查時段重疊
+        if (placement == AdvertisementPlacement.BANNER ||
+                placement == AdvertisementPlacement.CATEGORY_CARD ||
+                placement == AdvertisementPlacement.SMALL_BLOCK) {
             return;
         }
 
@@ -459,24 +461,36 @@ public class AdvertisementService {
                         advertisement.getEndAt()
                 );
 
-        // 沒有查到資料，代表這個時段可以使用
-        if (overlappingAdvertisements.isEmpty()) {
+        /*
+         * 再從重疊資料中找出相同 sortOrder 的 POPUP。
+         *
+         * sortOrder 不同，代表顯示對象不同：
+         * 0 = 未登入會員
+         * 1 = 已登入會員
+         */
+        List<Advertisement> conflictingAdvertisements =
+                overlappingAdvertisements.stream()
+                        .filter(existingAdvertisement ->
+                                Objects.equals(
+                                        existingAdvertisement.getSortOrder(),
+                                        advertisement.getSortOrder()
+                                )
+                        )
+                        .toList();
+
+        // 沒有相同顯示對象的 POPUP，代表可以上架
+        if (conflictingAdvertisements.isEmpty()) {
             return;
         }
 
         // 取出第一則衝突的廣告，讓錯誤訊息更清楚
         Advertisement conflictingAdvertisement =
-                overlappingAdvertisements.get(0);
+                conflictingAdvertisements.get(0);
 
         throw new BusinessException(
-                placement == AdvertisementPlacement.POPUP
-                        ? "此 POPUP 投放時段與廣告「"
+                "此 POPUP 投放時段與廣告「"
                         + conflictingAdvertisement.getAdName()
-                        + "」重疊，請調整時間"
-                        : "此 SMALL_BLOCK 投放時段與廣告「"
-                        + conflictingAdvertisement.getAdName()
-                        + "」重疊，請調整時間"
-        );
+                        + "」重疊，請調整時間");
     }
 
     @Transactional
@@ -505,11 +519,11 @@ public class AdvertisementService {
             return;
         }
 
-        if (targetId == null){
+        if (targetId == null) {
             throw new BusinessException("分類導向必須選擇商品分類");
         }
 
-        if(!categoryRepo.existsById(targetId)){
+        if (!categoryRepo.existsById(targetId)) {
             throw new BusinessException("找不到指定的商品分類");
         }
     }

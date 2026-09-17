@@ -25,6 +25,11 @@
   cursor: pointer;
 }
 
+/* 商城的靜態 BANNER 不可點擊，所以使用一般滑鼠游標 */
+.banner-ad > img.static-banner-image {
+  cursor: default;
+}
+
 /* 左右切換按鈕 */
 .banner-arrow {
   position: absolute;

@@ -9,22 +9,7 @@ import AdvertisementShowcase from "@/components/advertisement/AdvertisementShowc
     <AdvertisementShowcase />
 
     <section class="demo-content">
-      <div class="demo-grid">
-        <article>
-          <h2>熱門商品</h2>
-          <p>未來放熱門商品清單。</p>
-        </article>
-
-        <article>
-          <h2>最新上架</h2>
-          <p>未來放新品商品清單。</p>
-        </article>
-
-        <article>
-          <h2>競標活動</h2>
-          <p>未來放競標活動清單。</p>
-        </article>
-      </div>
+      <div class="demo-grid"></div>
     </section>
   </main>
 </template>

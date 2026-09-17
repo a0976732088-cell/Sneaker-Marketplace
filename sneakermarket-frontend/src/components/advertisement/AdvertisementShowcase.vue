@@ -39,7 +39,11 @@ async function handleCategorySelect({ categoryId, categoryName }) {
 </script>
 
 <template>
-  <AdvertisementDisplay @select-category="handleCategorySelect" />
+  <AdvertisementDisplay
+    :banner-order="0"
+    :small-block-order="0"
+    @select-category="handleCategorySelect"
+  />
 
   <!-- 分類商品區塊 -->
   <section v-if="selectedCategoryId" class="category-products-section">

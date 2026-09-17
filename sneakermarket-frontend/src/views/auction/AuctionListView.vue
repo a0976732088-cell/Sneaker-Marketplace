@@ -1,5 +1,12 @@
 <template>
   <div class="container py-4">
+    <!-- 競標商城顯示專用的靜態 BANNER 與 SMALL_BLOCK -->
+    <AdvertisementDisplay
+      :placements="['BANNER', 'SMALL_BLOCK']"
+      :banner-order="2"
+      :static-banner="true"
+      :small-block-order="2"
+    />
     <h1 class="mb-4">競標商城</h1>
     <nav aria-label="我的競標導覽"></nav>
     <!-- <nav class="d-flex flex-wrap gap-2 mb-4" aria-label="我的競標導覽">
@@ -270,6 +277,8 @@ import { parseAuctionTime, formatAuctionTime } from "@/utils/auctionTime";
 import { formatTwd } from "@/utils/auctionMoney";
 import { onMounted, onUnmounted, ref } from "vue";
 import { getAuctions, getAuctionOptions } from "@/service/auctionService";
+// 引入廣告顯示元件
+import AdvertisementDisplay from "@/components/advertisement/AdvertisementDisplay.vue";
 
 // 競標列表資料
 const auctions = ref([]);

@@ -199,6 +199,7 @@ export function useAdvertisementManagement() {
   }
 
   function handlePlacementChange() {
+    form.sortOrder = 0;
     if (!form.imageUrl) return;
 
     form.imageUrl = "";

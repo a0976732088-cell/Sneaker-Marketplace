@@ -5,11 +5,27 @@ import {
   getPublicActiveAdvertisements,
   resolveAdvertisementImageUrl,
 } from "@/service/advertisementService";
+import { getCurrentMember } from "@/service/authService";
 
 const props = defineProps({
   placements: {
     type: Array,
     default: () => ["BANNER", "POPUP", "SMALL_BLOCK", "CATEGORY_CARD"],
+  },
+  // 指定目前頁面要顯示哪一組 BANNER
+  bannerOrder: {
+    type: Number,
+    default: null,
+  },
+  // true 表示單張靜態 BANNER，不輪播也不能點擊
+  staticBanner: {
+    type: Boolean,
+    default: false,
+  },
+  // 這個頁面要顯示哪一個排序的 SMALL_BLOCK
+  smallBlockOrder: {
+    type: Number,
+    default: null,
   },
 });
 const emit = defineEmits(["select-category"]);
@@ -20,6 +36,37 @@ function hasPlacement(placement) {
 
 const ads = ref([]);
 const router = useRouter();
+// 是否已有會員登入
+const isLoggedIn = ref(false);
+
+// 是否已完成 Session 檢查
+// 避免檢查完成前先閃出未登入者的 POPUP
+const sessionChecked = ref(false);
+
+async function loadLoginStatus() {
+  // 沒有使用 POPUP 的頁面，不需要呼叫會員 Session API
+  if (!hasPlacement("POPUP")) {
+    sessionChecked.value = true;
+    return;
+  }
+
+  try {
+    // 成功取得會員資料，代表 Session 仍然有效
+    await getCurrentMember();
+    isLoggedIn.value = true;
+  } catch (error) {
+    // 401 代表目前沒有登入
+    isLoggedIn.value = false;
+
+    // 不是正常的 401 才輸出錯誤
+    if (error.status !== 401) {
+      console.error("會員登入狀態讀取失敗：", error);
+    }
+  } finally {
+    // 不論有沒有登入，都表示檢查已完成
+    sessionChecked.value = true;
+  }
+}
 
 function goToAdvertisementTarget(ad) {
   if (!ad) return;
@@ -68,6 +115,19 @@ const bannerAds = computed(() =>
   ),
 );
 
+// 根據目前頁面指定的 bannerOrder，取得這個頁面可以顯示的 BANNER
+const displayedBannerAds = computed(() => {
+  // 沒有指定 bannerOrder 時，維持原本行為：顯示全部 BANNER
+  if (props.bannerOrder === null) {
+    return bannerAds.value;
+  }
+
+  // 只保留 sortOrder 符合目前頁面的 BANNER
+  return bannerAds.value.filter(
+    (ad) => Number(ad.sortOrder) === props.bannerOrder,
+  );
+});
+
 const popupAds = computed(() =>
   ads.value.filter(
     (ad) => ad.adPlacement === "POPUP" && ad.adStatus === "ACTIVE",
@@ -97,8 +157,8 @@ function restartBannerTimer() {
     window.clearTimeout(bannerTimer);
   }
 
-  // 只有一張或沒有 BANNER 時，不需要自動切換
-  if (bannerAds.value.length <= 1) return;
+  // 靜態 BANNER，或目前只有一張圖片時，不啟動自動輪播
+  if (props.staticBanner || displayedBannerAds.value.length <= 1) return;
 
   // 重新從三秒開始倒數
   bannerTimer = window.setTimeout(() => {
@@ -109,33 +169,66 @@ const showPopup = ref(true);
 const showSmallBlock = ref(true);
 
 const currentBanner = computed(() => {
-  return bannerAds.value[bannerIndex.value] || null;
+  return displayedBannerAds.value[bannerIndex.value] || null;
 });
 
 const currentPopup = computed(() => {
-  return popupAds.value[0] || null;
+  // Session 還沒確認完成時，先不要顯示 POPUP
+  if (!sessionChecked.value) return null;
+
+  // 未登入使用 0，已登入使用 1
+  const popupOrder = isLoggedIn.value ? 1 : 0;
+
+  // 找到對應使用者狀態的 POPUP
+  return (
+    popupAds.value.find((ad) => Number(ad.sortOrder) === popupOrder) || null
+  );
 });
+// 點擊目前顯示的 POPUP
+function handlePopupClick() {
+  if (!currentPopup.value) return;
+
+  // 未登入者固定前往註冊頁
+  if (!isLoggedIn.value) {
+    router.push({ name: "register" });
+    return;
+  }
+
+  // 已登入者按照廣告設定前往指定商品
+  goToAdvertisementTarget(currentPopup.value);
+}
 
 const currentSmallBlock = computed(() => {
-  return smallBlockAds.value[0] || null;
+  // 沒有指定排序時，維持原本行為：取得第一則廣告
+  if (props.smallBlockOrder === null) {
+    return smallBlockAds.value[0] || null;
+  }
+
+  // 找到 sortOrder 符合目前頁面的 SMALL_BLOCK
+  return (
+    smallBlockAds.value.find(
+      (ad) => Number(ad.sortOrder) === props.smallBlockOrder,
+    ) || null
+  );
 });
 
 function nextBanner() {
-  if (bannerAds.value.length === 0) return;
+  if (displayedBannerAds.value.length === 0) return;
 
   // 切換到下一張，到最後一張會回到第一張
-  bannerIndex.value = (bannerIndex.value + 1) % bannerAds.value.length;
+  bannerIndex.value = (bannerIndex.value + 1) % displayedBannerAds.value.length;
 
   // 切換完成後，重新倒數三秒
   restartBannerTimer();
 }
 
 function previousBanner() {
-  if (bannerAds.value.length === 0) return;
+  if (displayedBannerAds.value.length === 0) return;
 
   // 切換到上一張，第一張再往前會回到最後一張
   bannerIndex.value =
-    (bannerIndex.value - 1 + bannerAds.value.length) % bannerAds.value.length;
+    (bannerIndex.value - 1 + displayedBannerAds.value.length) %
+    displayedBannerAds.value.length;
 
   // 使用者操作後，重新倒數三秒
   restartBannerTimer();
@@ -159,7 +252,7 @@ async function loadAdvertisements(silent = false) {
     const result = await getPublicActiveAdvertisements();
     ads.value = result.data || [];
     errorMessage.value = "";
-    if (bannerIndex.value >= bannerAds.value.length) {
+    if (bannerIndex.value >= displayedBannerAds.value.length) {
       bannerIndex.value = 0;
     }
   } catch (error) {
@@ -175,7 +268,8 @@ async function loadAdvertisements(silent = false) {
 }
 let advertisementRefreshTimer = null;
 onMounted(async () => {
-  await loadAdvertisements();
+  // 廣告與 Session 狀態可以同時讀取
+  await Promise.all([loadAdvertisements(), loadLoginStatus()]);
   restartBannerTimer();
 
   advertisementRefreshTimer = window.setInterval(async () => {
@@ -206,11 +300,12 @@ onUnmounted(() => {
         <img
           :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
           :alt="currentBanner.adName"
-          @click="goToAdvertisementTarget(currentBanner)"
+          :class="{ 'static-banner-image': staticBanner }"
+          @click="!staticBanner && goToAdvertisementTarget(currentBanner)"
         />
 
         <button
-          v-if="bannerAds.length > 1"
+          v-if="!staticBanner && displayedBannerAds.length > 1"
           type="button"
           class="banner-arrow left"
           @click="previousBanner"
@@ -219,7 +314,7 @@ onUnmounted(() => {
         </button>
 
         <button
-          v-if="bannerAds.length > 1"
+          v-if="!staticBanner && displayedBannerAds.length > 1"
           type="button"
           class="banner-arrow right"
           @click="nextBanner"
@@ -227,9 +322,12 @@ onUnmounted(() => {
           ›
         </button>
 
-        <div v-if="bannerAds.length > 1" class="banner-dots">
+        <div
+          v-if="!staticBanner && displayedBannerAds.length > 1"
+          class="banner-dots"
+        >
           <button
-            v-for="(ad, index) in bannerAds"
+            v-for="(ad, index) in displayedBannerAds"
             :key="ad.adId"
             type="button"
             :class="{ active: index === bannerIndex }"
@@ -247,7 +345,7 @@ onUnmounted(() => {
         class="category-card-section"
       >
         <header class="category-card-header">
-          <h2>(っ•‿•)っ 🎀 【我真的特別愛你】 🎀</h2>
+          <h2>推薦分類</h2>
         </header>
 
         <div class="category-card-track">
@@ -326,7 +424,7 @@ onUnmounted(() => {
           <img
             :src="resolveAdvertisementImageUrl(currentPopup.imageUrl)"
             :alt="currentPopup.adName"
-            @click="goToAdvertisementTarget(currentPopup)"
+            @click="handlePopupClick"
           />
         </article>
       </div>
