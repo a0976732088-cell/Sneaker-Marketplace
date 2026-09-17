@@ -416,9 +416,9 @@ onMounted(() => {
 
 .list-header {
   position: sticky;
-  top: 0;
+  top: 56px;
   z-index: 20;
-  background-color: #f8f9fa;
+  background-color: #ffffff;
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
 }
@@ -441,7 +441,7 @@ onMounted(() => {
 
 .filter-sidebar {
   position: sticky;
-  top: 4.5rem;
+  top: 103px;
   font-size: 0.82rem;
 }
 
