@@ -58,7 +58,7 @@ export const mapEventData = (rawData = []) => {
       color: getEventType(item.eventType).color,
       status: item.status,
       targetUrl: item.targetUrl,
-      photoUrl: item.hasPhoto ? getEventPhotoUrl(item.eventId) : "",
+      photoUrl: item.photoUrl || (item.hasPhoto ? getEventPhotoUrl(item.eventId) : ""),
     };
   });
 };

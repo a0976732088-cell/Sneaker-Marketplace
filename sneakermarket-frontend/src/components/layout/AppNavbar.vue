@@ -122,16 +122,6 @@
       </div>
     </div>
   </nav>
-
-  <NotificationDrawer
-    :is-open="isNoticeOpen"
-    :notifications="notifications"
-    :mark-all-loading="markAllLoading"
-    :error="notificationError"
-    @close="isNoticeOpen = false"
-    @mark-as-read="handleMarkAsRead"
-    @mark-all-as-read="handleMarkAllAsRead"
-  />
 </template>
 
 <script setup>

@@ -37,6 +37,9 @@ CREATE TABLE dbo.calendar_events
     -- 點擊前往的頁面連結 URL
     target_url NVARCHAR(500) NULL,
 
+    -- 可直接使用現成的網路活動圖片
+    photo_url NVARCHAR(500) NULL,
+
     -- 事件來源類型：MANUAL, AUCTION, ADVERTISEMENT, COUPON
     source_type VARCHAR(30) NOT NULL,
 

@@ -15,6 +15,7 @@ public class CalendarEventDTO {
     private LocalDateTime startAt;
     private LocalDateTime endAt;
     private String targetUrl;
+    private String photoUrl;
     private String sourceType;
     private Long sourceId;
     private String status;

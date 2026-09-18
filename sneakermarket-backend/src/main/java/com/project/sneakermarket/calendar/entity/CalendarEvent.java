@@ -45,6 +45,9 @@ public class CalendarEvent {
     @Column(name = "target_url", length = 500)
     private String targetUrl;
 
+    @Column(name = "photo_url", length = 500)
+    private String photoUrl;
+
     @Column(name = "source_type", nullable = false, length = 30)
     private String sourceType;
 

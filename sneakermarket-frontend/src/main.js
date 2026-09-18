@@ -4,7 +4,7 @@ import router from './router'
 import axios from 'axios'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
-import 'bootstrap/dist/js/bootstrap.bundle.min.js'
+import 'bootstrap'
 import '@/assets/css/global.css'
 import '@/assets/css/layout.css'
 import '@/assets/css/components.css'

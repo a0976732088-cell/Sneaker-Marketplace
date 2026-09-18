@@ -43,6 +43,7 @@ public class CalendarEventService {
         event.setStartAt(dto.getStartAt());
         event.setEndAt(dto.getEndAt());
         event.setTargetUrl(dto.getTargetUrl());
+        event.setPhotoUrl(dto.getPhotoUrl());
         event.setSourceType(dto.getSourceType());
         event.setSourceId(dto.getSourceId());
         event.setStatus(dto.getStatus());
@@ -88,6 +89,7 @@ public class CalendarEventService {
         calendarEvent.setStartAt(dto.getStartAt());
         calendarEvent.setEndAt(dto.getEndAt());
         calendarEvent.setTargetUrl(dto.getTargetUrl());
+        calendarEvent.setPhotoUrl(dto.getPhotoUrl());
         calendarEvent.setSourceType(dto.getSourceType());
         calendarEvent.setSourceId(dto.getSourceId());
         calendarEvent.setStatus(dto.getStatus());
