@@ -1,5 +1,5 @@
 package com.project.sneakermarket.commerce.service;
-
+import com.project.sneakermarket.commerce.email.OrderCreatedEvent;
 import com.project.sneakermarket.commerce.dto.OrderDetailResponse;
 import com.project.sneakermarket.commerce.dto.OrderItemResponse;
 import com.project.sneakermarket.commerce.dto.OrderListItemResponse;
@@ -11,6 +11,7 @@ import com.project.sneakermarket.commerce.repository.*;
 import com.project.sneakermarket.common.exception.ForbiddenException;
 import com.project.sneakermarket.coupon.service.CouponService;
 import com.project.sneakermarket.member.service.MemberService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class OrderService {
     private final ProductImageRepository productImageRepository;
     private final MemberService memberService;
     private final CouponService couponService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 查看「我的訂單列表」：一次列出這個會員的所有訂單摘要
     public List<OrderListItemResponse> getMyOrders(Long memberId) {
@@ -180,6 +182,9 @@ public class OrderService {
 
         // 迴圈跑完、全部品項都處理完才清空購物車，不能提早清
         cartItemRepository.deleteAll(selectedItems);
+
+        // 交易完成後要通知會員的下訂單事件（此時交易尚未 commit，事件會排隊等 commit 後才觸發）
+        eventPublisher.publishEvent(new OrderCreatedEvent(order.getOrderId(), memberId));
 
         // 全部存完才組回傳值（借用 getOrderDetail 邏輯）
         return getOrderDetail(memberId,order.getOrderId());
