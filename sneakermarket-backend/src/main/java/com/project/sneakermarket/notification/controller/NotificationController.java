@@ -214,5 +214,17 @@ public class NotificationController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/api/notification/read-all")
+    public ResponseEntity<Void> markAllAsRead(
+            HttpServletRequest request
+    ) {
+        Long memberId =
+                sessionMemberResolver.requireMemberId(request);
+
+        notificationService.markAllAsRead(memberId);
+
+        return ResponseEntity.noContent().build();
+    }
+
 
 }

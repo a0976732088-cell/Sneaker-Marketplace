@@ -29,3 +29,13 @@ export const formatDateKey = (year, month, day) => {
   const d = String(day).padStart(2, "0");
   return `${year}-${m}-${d}`;
 };
+
+export const isEventOnDate = (event, dateKey) => {
+  if (!event.date) return false;
+
+  const endDate = event.endAt
+    ? event.endAt.replace(" ", "T").split("T")[0]
+    : event.date;
+
+  return event.date <= dateKey && dateKey <= endDate;
+};

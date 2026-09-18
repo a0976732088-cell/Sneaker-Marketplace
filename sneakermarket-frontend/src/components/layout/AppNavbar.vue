@@ -1,12 +1,13 @@
 <template>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm sticky-top">
+  <nav
+    class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top"
+  >
     <div class="container">
-      <!-- Logo -->
-      <RouterLink class="navbar-brand fw-bold" to="/">
-        SneakerMarket
+      <RouterLink class="navbar-brand brand" to="/">
+        <img src="/images/brand/logo-circle.png" alt="" />
+        <span>SneakerMarket</span>
       </RouterLink>
 
-      <!-- 手機版 Navbar 按鈕 -->
       <button
         class="navbar-toggler"
         type="button"
@@ -20,105 +21,98 @@
       </button>
 
       <div id="mainNavbar" class="collapse navbar-collapse">
-        <!-- ================================
-             左側 Navbar
-        ================================= -->
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <!-- 首頁 -->
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0 main-links">
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/ads/storefront"> 首頁 </RouterLink>
+            <RouterLink class="nav-link" to="/ads/storefront">首頁</RouterLink>
           </li>
-
-          <!-- 一般商城 -->
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/products"> 一般商城 </RouterLink>
+            <RouterLink class="nav-link" to="/products">一般商城</RouterLink>
           </li>
-
-          <!-- 競標商城 -->
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/auctions"> 競標商城 </RouterLink>
+            <RouterLink class="nav-link" to="/auctions">競標商城</RouterLink>
           </li>
-
-          <!-- 行事曆 -->
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/calendar"> 行事曆 </RouterLink>
-          </li>
-
-          <!-- 通知彈窗 -->
-          <li class="nav-item">
-            <button
-              type="button"
-              class="nav-link btn border-0 position-relative"
-              @click="toggleNotice"
-            >
-              通知
-
-              <span
-                v-if="unreadCount > 0"
-                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-              >
-                {{ unreadCount }}
-              </span>
-            </button>
+            <RouterLink class="nav-link" to="/calendar">活動</RouterLink>
           </li>
         </ul>
 
-        <!-- ================================
-             右側 Navbar
-        ================================= -->
-        <ul class="navbar-nav ms-auto">
-          <!-- 購物車 -->
+        <ul class="navbar-nav ms-auto align-items-lg-center right-links">
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/cart"> 購物車 </RouterLink>
+            <RouterLink class="nav-link" to="/cart">購物車</RouterLink>
           </li>
 
-          <!-- =================================
-               尚未登入
-          ================================== -->
-          <template v-if="!currentMember">
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/member"> 登入/註冊 </RouterLink>
-            </li>
-          </template>
+          <li class="nav-item notification-menu">
+            <button
+              type="button"
+              class="nav-link notification-button"
+              aria-label="通知"
+              @click="toggleNotice"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"
+                />
+              </svg>
+              <span v-if="unreadCount > 0" class="notification-count">
+                {{ unreadCount }}
+              </span>
+            </button>
 
-          <!-- =================================
-               已登入
-          ================================== -->
-          <template v-else>
-            <!-- 顯示會員帳號 -->
-            <li class="nav-item">
-              <span class="nav-link"> 您好，{{ currentMember.account }} </span>
-            </li>
+            <NotificationDrawer
+              :is-open="isNoticeOpen"
+              :notifications="notifications"
+              :mark-all-loading="markAllLoading"
+              :error="notificationError"
+              @close="isNoticeOpen = false"
+              @mark-as-read="handleMarkAsRead"
+              @mark-all-as-read="handleMarkAllAsRead"
+            />
+          </li>
 
-            <!-- 會員中心 -->
-            <li class="nav-item">
-              <RouterLink class="nav-link" to="/member"> 會員中心 </RouterLink>
-            </li>
+          <li v-if="!currentMember" class="nav-item">
+            <RouterLink class="nav-link" to="/member">登入／註冊</RouterLink>
+          </li>
 
-            <!-- =================================
-                 管理後台
-                 只有 ROLE_ADMIN 才顯示
-            ================================== -->
-            <li v-if="isAdmin" class="nav-item">
-              <RouterLink class="nav-link" to="/admin"> 管理後台 </RouterLink>
-            </li>
+          <li v-else class="nav-item dropdown">
+            <button
+              type="button"
+              class="account-trigger dropdown-toggle"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <span class="account-avatar" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="8" r="3.5" />
+                  <path d="M5 20c0-4 3-6 7-6s7 2 7 6" />
+                </svg>
+              </span>
+              <span>您好，{{ currentMember.account }}</span>
+            </button>
 
-            <!-- 登出 -->
-            <li class="nav-item">
-              <button
-                type="button"
-                class="nav-link btn border-0"
-                @click="handleLogout"
-              >
-                登出
-              </button>
-            </li>
-          </template>
+            <ul class="dropdown-menu dropdown-menu-end account-menu">
+              <li>
+                <RouterLink class="dropdown-item" to="/member">
+                  會員中心
+                </RouterLink>
+              </li>
+              <li v-if="isAdmin">
+                <RouterLink class="dropdown-item" to="/admin">
+                  管理後台
+                </RouterLink>
+              </li>
+              <li><hr class="dropdown-divider" /></li>
+              <li>
+                <button
+                  type="button"
+                  class="dropdown-item"
+                  @click="handleLogout"
+                >
+                  登出
+                </button>
+              </li>
+            </ul>
+          </li>
 
-          <!--
-            只有目前位於競標商城相關頁面
-            才顯示建立競標
-          -->
           <li v-if="isAuctionPage" class="nav-item">
             <RouterLink class="nav-link" to="/auctions/create">
               建立競標
@@ -132,8 +126,11 @@
   <NotificationDrawer
     :is-open="isNoticeOpen"
     :notifications="notifications"
+    :mark-all-loading="markAllLoading"
+    :error="notificationError"
     @close="isNoticeOpen = false"
     @mark-as-read="handleMarkAsRead"
+    @mark-all-as-read="handleMarkAllAsRead"
   />
 </template>
 
@@ -143,6 +140,7 @@ import { useRoute, useRouter } from "vue-router";
 import {
   getMemberNotifications,
   markNotificationAsRead,
+  markAllNotificationsAsRead,
 } from "@/service/notificationService";
 import NotificationDrawer from "@/components/notification/NotificationDrawer.vue";
 
@@ -242,6 +240,8 @@ const isAuctionPage = computed(() => {
 const isNoticeOpen = ref(false);
 
 const notifications = ref([]);
+const markAllLoading = ref(false);
+const notificationError = ref("");
 
 const unreadCount = computed(() => {
   return notifications.value.filter((n) => !n.isRead).length;
@@ -348,6 +348,27 @@ const handleMarkAsRead = async (id) => {
   }
 };
 
+const handleMarkAllAsRead = async () => {
+  if (markAllLoading.value || unreadCount.value === 0) return;
+
+  markAllLoading.value = true;
+  notificationError.value = "";
+
+  try {
+    await markAllNotificationsAsRead();
+
+    notifications.value = notifications.value.map((item) => ({
+      ...item,
+      isRead: true,
+    }));
+  } catch (error) {
+    notificationError.value = "標為全部已讀失敗，請再試一次。";
+    console.error("標為全部已讀失敗", error);
+  } finally {
+    markAllLoading.value = false;
+  }
+};
+
 let timer = null;
 onMounted(() => {
   // Navbar 登入會員由 watch
@@ -369,3 +390,147 @@ onUnmounted(() => {
   void disconnectAuctionPrivateSocket();
 });
 </script>
+
+<style scoped>
+.navbar {
+  border-bottom: 1px solid #e8eaeb;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #202326;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.brand img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.main-links {
+  gap: 12px;
+  margin-left: 28px;
+}
+
+.main-links .nav-link,
+.right-links .nav-link {
+  color: #4c5459;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.main-links .nav-link {
+  border-bottom: 2px solid transparent;
+}
+
+.main-links .nav-link.router-link-active {
+  border-bottom-color: #e7664e;
+  color: #202326;
+}
+
+.notification-button {
+  position: relative;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+}
+
+.notification-button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.notification-count {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  place-items: center;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #e7664e;
+  color: #fff;
+  font-size: 10px;
+}
+
+.account-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 7px;
+  border: 0;
+  background: transparent;
+  color: #202326;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.account-avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: #24282b;
+  color: #fff;
+}
+
+.account-avatar svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+}
+
+.account-menu {
+  min-width: 150px;
+  padding: 8px;
+  border: 1px solid #e8eaeb;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 10%);
+}
+
+.account-menu .dropdown-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.account-menu .dropdown-item:hover {
+  background: #eef1f0;
+}
+
+.notification-menu {
+  position: relative;
+}
+
+@media (max-width: 991px) {
+  .main-links {
+    gap: 0;
+    margin-left: 0;
+  }
+
+  .main-links .nav-link.router-link-active {
+    border-bottom-color: transparent;
+    color: #e7664e;
+  }
+}
+</style>

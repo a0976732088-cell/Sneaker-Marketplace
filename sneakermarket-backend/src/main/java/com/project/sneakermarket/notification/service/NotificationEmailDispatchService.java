@@ -220,9 +220,9 @@ public class NotificationEmailDispatchService {
             helper.addInline(
                     "brandLogo",
                     new ClassPathResource(
-                            "logoPhoto/05_banner_white.jpg"
+                            "logoPhoto/05_banner_white.png"
                     ),
-                    "image/jpeg"
+                    "image/png"
             );
 
             mailSender.send(mimeMessage);

@@ -52,11 +52,12 @@ public class CalendarEventController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)LocalDateTime startAt,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)LocalDateTime endAt,
+            @RequestParam(defaultValue = "false") boolean overlap,
             @RequestParam(defaultValue = "1") Integer pageNumber,
             @RequestParam(defaultValue = "10") Integer pageSize) {
 
         Page<CalendarEvent> events = calendarEventService.searchEvent(
-                title, eventType, status, startAt, endAt, pageNumber, pageSize);
+                title, eventType, status, startAt, endAt, overlap, pageNumber, pageSize);
 
         return ResponseEntity.ok(events);
     }

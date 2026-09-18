@@ -55,6 +55,10 @@ export const markNotificationAsRead = (
   );
 };
 
+export const markAllNotificationsAsRead = () => {
+  return httpClient.put("/notification/read-all");
+};
+
 export const getNotificationLogs = (params) => {
   return httpClient.get(
     "/notificationLog/searchlogs",
