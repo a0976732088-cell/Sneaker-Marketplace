@@ -415,9 +415,7 @@ public class NotificationService {
         LocalDateTime now = LocalDateTime.now();
 
         List<Notification> notifications = notificationRepo
-                .findByMemberIdAndInAppVisibleTrueAndIsSentTrueOrderByCreatedAtDesc(
-                        memberId
-                );
+                .findByMemberIdAndIsSentTrueOrderByCreatedAtDesc(memberId);
 
         for (Notification notification : notifications) {
             if (!Boolean.TRUE.equals(notification.getIsRead())) {
