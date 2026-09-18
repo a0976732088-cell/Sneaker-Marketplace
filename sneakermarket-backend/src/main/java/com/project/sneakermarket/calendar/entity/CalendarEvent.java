@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 
@@ -64,6 +65,11 @@ public class CalendarEvent {
     @JsonIgnore
     @Lob
     private byte[] photo;
+
+    @JsonProperty("hasPhoto")
+    public boolean getHasPhoto() {
+        return photo != null && photo.length > 0;
+    }
 
     @PrePersist
     public void onCreate() {

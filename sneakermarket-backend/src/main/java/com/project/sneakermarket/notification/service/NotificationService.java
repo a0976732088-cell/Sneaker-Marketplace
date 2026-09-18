@@ -350,6 +350,21 @@ public class NotificationService {
     }
 
     @Transactional
+    public void markAllAsRead(Long memberId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        List<Notification> notifications = notificationRepo
+                .findByMemberIdAndIsSentTrueOrderByCreatedAtDesc(memberId);
+
+        for (Notification notification : notifications) {
+            if (!Boolean.TRUE.equals(notification.getIsRead())) {
+                notification.setIsRead(true);
+                notification.setReadAt(now);
+            }
+        }
+    }
+
+    @Transactional
     public List<MemberNotificationResponse> getMemberNotifications(
             Long memberId
     ) {

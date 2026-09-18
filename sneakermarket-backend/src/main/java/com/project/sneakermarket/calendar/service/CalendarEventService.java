@@ -91,7 +91,9 @@ public class CalendarEventService {
         calendarEvent.setSourceType(dto.getSourceType());
         calendarEvent.setSourceId(dto.getSourceId());
         calendarEvent.setStatus(dto.getStatus());
-        calendarEvent.setPhoto(dto.getPhoto());
+        if (dto.getPhoto() != null) {
+            calendarEvent.setPhoto(dto.getPhoto());
+        }
 
         boolean startTimeChanged =
                 !Objects.equals(
@@ -193,6 +195,7 @@ public class CalendarEventService {
             String status,
             LocalDateTime startDate,
             LocalDateTime endDate,
+            boolean overlap,
             Integer pageNumber,
             Integer pageSize){
         Specification<CalendarEvent> spec = (root, query, cb) -> {
@@ -209,13 +212,32 @@ public class CalendarEventService {
             if (status != null && !status.trim().isEmpty()) {
                 predicates.add(cb.equal(root.get("status"), status));
             }
-            // 4. 開始時間起 (>= startDate)
-            if (startDate != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("startAt"), startDate));
-            }
-            // 5. 結束時間止 (<= endDate)
-            if (endDate != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("endAt"), endDate));
+            if (overlap && startDate != null && endDate != null) {
+                // 活動開始時間不晚於月底，且結束時間不早於月初。
+                predicates.add(
+                        cb.lessThanOrEqualTo(root.get("startAt"), endDate)
+                );
+                predicates.add(
+                        cb.or(
+                                cb.greaterThanOrEqualTo(root.get("endAt"), startDate),
+                                cb.and(
+                                        cb.isNull(root.get("endAt")),
+                                        cb.greaterThanOrEqualTo(root.get("startAt"), startDate)
+                                )
+                        )
+                );
+            } else {
+                // 保留原本管理頁使用的時間篩選語意。
+                if (startDate != null) {
+                    predicates.add(
+                            cb.greaterThanOrEqualTo(root.get("startAt"), startDate)
+                    );
+                }
+                if (endDate != null) {
+                    predicates.add(
+                            cb.lessThanOrEqualTo(root.get("endAt"), endDate)
+                    );
+                }
             }
             // 將所有條件用 AND 串起來
             return cb.and(predicates.toArray(new Predicate[0]));
