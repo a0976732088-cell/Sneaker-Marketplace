@@ -6,4 +6,5 @@ public enum AdvertisementTargetType {
     COUPON,
     URL,
     CATEGORY,
+    EVENT,
 }

@@ -68,6 +68,7 @@ function getTargetLabel(targetType) {
     PRODUCT: "商品",
     AUCTION: "競標商品",
     CATEGORY: "商品分類",
+    EVENT: "活動",
   };
 
   return labels[targetType] || "目標";
@@ -89,6 +90,7 @@ function getTargetLabel(targetType) {
           <option value="PRODUCT">一般商品</option>
           <option value="AUCTION">競標商品</option>
           <option value="CATEGORY">商品分類</option>
+          <option value="EVENT">活動行事曆</option>
         </select>
       </label>
     </div>
@@ -109,16 +111,18 @@ function getTargetLabel(targetType) {
             分類導向必須選擇一個商品分類。
           </small>
 
+          <small v-else-if="targetType === 'EVENT'">
+            點擊廣告後，將前往活動行事曆。
+          </small>
+
           <small v-else>
             未指定時，廣告會前往{{
-              targetType === "PRODUCT"
-                ? "一般商城列表"
-                : "競標商城列表"
+              targetType === "PRODUCT" ? "一般商城列表" : "競標商城列表"
             }}。
           </small>
         </div>
 
-        <div class="target-picker-actions">
+        <div v-if="targetType !== 'EVENT'" class="target-picker-actions">
           <button
             v-if="targetId"
             type="button"

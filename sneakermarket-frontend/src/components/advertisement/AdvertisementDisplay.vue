@@ -106,7 +106,16 @@ function goToAdvertisementTarget(ad) {
       router.push({ name: "auction" });
     }
   }
+
+  if (ad.targetType === "EVENT") {
+    router.push({
+      name: "calendar",
+      query: ad.targetId ? { eventId: ad.targetId } : {},
+    });
+    return;
+  }
 }
+
 const loading = ref(false);
 const errorMessage = ref("");
 
@@ -186,9 +195,7 @@ watch(
 
     if (allowPopupThisMount.value) return;
 
-    const hasMemberPopup = popups.some(
-      (ad) => Number(ad.sortOrder) === 1,
-    );
+    const hasMemberPopup = popups.some((ad) => Number(ad.sortOrder) === 1);
 
     if (!hasMemberPopup) return;
 
