@@ -53,7 +53,10 @@ public record AuctionSummaryResponse(
         Long brandId,
         Long categoryId,
         String brandName,
-        String categoryName
+        String categoryName,
+
+        // 商品主圖；沒有圖片時為 null
+        String imageUrl
 
 ) {
 }

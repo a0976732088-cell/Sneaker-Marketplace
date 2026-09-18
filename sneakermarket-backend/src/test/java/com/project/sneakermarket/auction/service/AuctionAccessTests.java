@@ -258,6 +258,8 @@ class AuctionAccessTests {
         mvc.perform(get("/api/auctions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].sellerName").value("王小明"))
+                .andExpect(jsonPath("$.data.items[0].imageUrl")
+                        .value("/uploads/auctions/3/main.jpg"))
                 .andExpect(jsonPath("$.data.items[0].sellerId").doesNotExist())
                 .andExpect(jsonPath("$.data.items[0].account").doesNotExist())
                 .andExpect(jsonPath("$.data.items[0].email").doesNotExist())
@@ -297,7 +299,8 @@ class AuctionAccessTests {
                 AuctionCondition.NEW, new BigDecimal("5000"), 2,
                 LocalDateTime.of(2026, 9, 7, 12, 0),
                 LocalDateTime.of(2026, 9, 8, 12, 0),
-                AuctionStatus.ACTIVE, 71L, 92L, "Nike", "球鞋");
+                AuctionStatus.ACTIVE, 71L, 92L, "Nike", "球鞋",
+                "/uploads/auctions/3/main.jpg");
     }
 
     private AuctionDetailResponse publicDetail() {
