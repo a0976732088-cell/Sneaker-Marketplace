@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import AdvertisementDisplay from "@/components/advertisement/AdvertisementDisplay.vue";
 import httpClient from "@/service/httpClient";
 import { resolveProductImageUrl } from "@/utils/productImageUrl";
@@ -11,7 +11,7 @@ const categoryProducts = ref([]);
 const categoryProductsLoading = ref(false);
 const categoryProductsError = ref("");
 
-async function handleCategorySelect({ categoryId, categoryName }) {
+async function fetchProducts(categoryId = null, categoryName = "") {
   selectedCategoryId.value = categoryId;
   selectedCategoryName.value = categoryName;
   categoryProductsLoading.value = true;
@@ -20,22 +20,28 @@ async function handleCategorySelect({ categoryId, categoryName }) {
 
   try {
     const response = await httpClient.get("/products", {
-      params: {
-        categoryId,
-      },
+      params: categoryId ? { categoryId } : {},
     });
 
     categoryProducts.value = [...response.data]
       .sort((a, b) => Number(b.productId) - Number(a.productId))
       .slice(0, 4);
   } catch (error) {
-    console.error("分類商品載入失敗", error);
+    console.error("商品載入失敗", error);
 
-    categoryProductsError.value = "分類商品載入失敗，請確認後端是否啟動。";
+    categoryProductsError.value = "商品載入失敗，請確認後端是否啟動。";
   } finally {
     categoryProductsLoading.value = false;
   }
 }
+
+function handleCategorySelect({ categoryId, categoryName }) {
+  fetchProducts(categoryId, categoryName);
+}
+
+onMounted(() => {
+  fetchProducts();
+});
 </script>
 
 <template>
@@ -46,10 +52,16 @@ async function handleCategorySelect({ categoryId, categoryName }) {
   />
 
   <!-- 分類商品區塊 -->
-  <section v-if="selectedCategoryId" class="category-products-section">
+  <section class="category-products-section">
     <header class="category-products-header">
       <div>
-        <h3>最新商品</h3>
+        <h3>
+          {{
+            selectedCategoryName
+              ? `${selectedCategoryName}最新商品`
+              : "最新商品"
+          }}
+        </h3>
       </div>
     </header>
 

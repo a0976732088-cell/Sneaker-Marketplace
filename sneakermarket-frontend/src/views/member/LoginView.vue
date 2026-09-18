@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { login } from "@/service/authService";
+import { resetMemberPopup } from "@/components/advertisement/advertisementPopupMemory";
 
 const router = useRouter();
 
@@ -47,9 +48,10 @@ if (member.role === "ROLE_ADMIN") {
   await router.push("/admin");
 
 } else {
-
+  // 新的一次登入，重設會員 POPUP 顯示狀態
+  resetMemberPopup();
   // 一般會員 → 會員中心
-  await router.push("/member");
+  await router.push("/ads/storefront");
 }
   } catch (error) {
     console.error("登入失敗：", error);

@@ -8,3 +8,6 @@ export function claimMemberPopup() {
   hasShownMemberPopup = true;
   return true;
 }
+export function resetMemberPopup() {
+  hasShownMemberPopup = false;
+}
