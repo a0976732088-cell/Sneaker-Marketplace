@@ -1,11 +1,12 @@
 <script setup>
 import { useRouter } from "vue-router";
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   getPublicActiveAdvertisements,
   resolveAdvertisementImageUrl,
 } from "@/service/advertisementService";
 import { getCurrentMember } from "@/service/authService";
+import { claimMemberPopup } from "./advertisementPopupMemory";
 
 const props = defineProps({
   placements: {
@@ -167,14 +168,40 @@ function restartBannerTimer() {
 }
 const showPopup = ref(true);
 const showSmallBlock = ref(true);
+const allowPopupThisMount = ref(false);
 
 const currentBanner = computed(() => {
   return displayedBannerAds.value[bannerIndex.value] || null;
 });
 
+watch(
+  [sessionChecked, isLoggedIn, popupAds],
+  ([checked, loggedIn, popups]) => {
+    if (!checked) return;
+
+    if (!loggedIn) {
+      allowPopupThisMount.value = true;
+      return;
+    }
+
+    if (allowPopupThisMount.value) return;
+
+    const hasMemberPopup = popups.some(
+      (ad) => Number(ad.sortOrder) === 1,
+    );
+
+    if (!hasMemberPopup) return;
+
+    allowPopupThisMount.value = claimMemberPopup();
+  },
+  {
+    immediate: true,
+  },
+);
+
 const currentPopup = computed(() => {
   // Session 還沒確認完成時，先不要顯示 POPUP
-  if (!sessionChecked.value) return null;
+  if (!sessionChecked.value || !allowPopupThisMount.value) return null;
 
   // 未登入使用 0，已登入使用 1
   const popupOrder = isLoggedIn.value ? 1 : 0;

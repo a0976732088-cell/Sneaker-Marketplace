@@ -154,7 +154,7 @@ function getSearchPlaceholder(targetType) {
           v-model.trim="keyword"
           type="search"
           :placeholder="getSearchPlaceholder(props.targetType)"
-          @keyup.enter="searchTargets"
+          @keydown.enter.stop.prevent="searchTargets"
         />
 
         <button type="button" @click="searchTargets">搜尋</button>
