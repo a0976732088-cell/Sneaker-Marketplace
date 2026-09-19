@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, onUnmounted } from "vue";
 import AdvertisementFormDrawer from "@/components/advertisement/admin/AdvertisementFormDrawer.vue";
-import { useAdvertisementManagement } from "./useAdvertisementManagement";
+import { useAdvertisementManagement } from "@/composables/advertisement/useAdvertisementManagement";
 import AdvertisementPagination from "@/components/advertisement/admin/AdvertisementPagination.vue";
 import AdvertisementFilterBar from "@/components/advertisement/admin/AdvertisementFilterBar.vue";
 import AdvertisementTable from "@/components/advertisement/admin/AdvertisementTable.vue";

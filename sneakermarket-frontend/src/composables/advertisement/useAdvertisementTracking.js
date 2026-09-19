@@ -1,3 +1,4 @@
+// 前台追蹤
 import {
   recordAdvertisementClick,
   recordAdvertisementView,
