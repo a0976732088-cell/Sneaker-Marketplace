@@ -4,31 +4,37 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { ref } from "vue";
 
-const listSource = await readFile(
+async function readSource(url) {
+  return (await readFile(url, "utf8")).replace(/\r\n/g, "\n");
+}
+
+const listSource = await readSource(
   new URL("../src/views/auction/AuctionListView.vue", import.meta.url),
-  "utf8",
 );
-const detailSource = await readFile(
+const detailSource = await readSource(
   new URL("../src/views/auction/AuctionDetailView.vue", import.meta.url),
-  "utf8",
 );
-const gallerySource = await readFile(
+const gallerySource = await readSource(
   new URL("../src/components/auction/AuctionImageGallery.vue", import.meta.url),
-  "utf8",
 );
-const countdownSource = await readFile(
+const countdownSource = await readSource(
   new URL("../src/components/auction/AuctionCountdown.vue", import.meta.url),
-  "utf8",
 );
 
 function scriptSetup(source) {
-  const match = source.match(/<script setup>([\s\S]*?)<\/script>/);
+  const match = source.match(
+    /<script\b(?=[^>]*\bsetup\b)[^>]*>([\s\S]*?)<\/script\s*>/,
+  );
   assert.ok(match, "expected an exact <script setup> block");
-  return match[1].replace(/^import[\s\S]*?from\s+["'][^"']+["'];/gm, "");
+  return match[1].replace(
+    /^[ \t]*import\b[\s\S]*?from\s+["'][^"']+["']\s*;?/gm,
+    "",
+  );
 }
 
 function section(source, startMarker, endMarker) {
-  const start = source.indexOf(startMarker);
+  const start =
+    startMarker instanceof RegExp ? source.search(startMarker) : source.indexOf(startMarker);
   const end = source.indexOf(endMarker, start);
   assert.notEqual(start, -1, `missing ${startMarker}`);
   assert.notEqual(end, -1, `missing ${endMarker}`);
@@ -151,21 +157,29 @@ test("public auction list sends every supported filter through server-side pagin
 test("auction cards use the summary image, placeholder and whole-card detail navigation without detail N+1", () => {
   const card = section(
     listSource,
-    '<RouterLink\n                v-for="auction in auctions"',
+    /<RouterLink\b[^>]*\bv-for\s*=\s*["']auction\s+in\s+auctions["']/,
     "<!-- 分頁 -->",
   );
 
+  assert.match(card, /\bv-for\s*=\s*["']auction\s+in\s+auctions["']/);
   assert.match(
     card,
     /auction\.imageUrl\s*&&\s*!failedAuctionImageUrls\.has\(auction\.imageUrl\)/,
   );
-  assert.match(card, /:src="resolveAuctionImageUrl\(auction\.imageUrl\)"/);
-  assert.match(card, /@error="markAuctionImageFailed\(auction\.imageUrl\)"/);
-  assert.match(card, /v-else class="product-image product-image-empty"/);
+  assert.match(card, /:src\s*=\s*["']resolveAuctionImageUrl\(auction\.imageUrl\)["']/);
+  assert.match(card, /@error\s*=\s*["']markAuctionImageFailed\(auction\.imageUrl\)["']/);
+
+  const cardPlaceholderTag =
+    card.match(
+      /<div\b(?=[^>]*\bclass\s*=\s*["']product-image product-image-empty["'])[^>]*>/,
+    )?.[0] ?? "";
+  assert.match(cardPlaceholderTag, /\bv-else\b/);
   assert.match(card, /尚無圖片/);
+  assert.match(card, /name\s*:\s*["']auction-detail["']/);
+  assert.match(card, /id\s*:\s*auction\.auctionId/);
   assert.match(
     card,
-    /<RouterLink[\s\S]*?v-for="auction in auctions"[\s\S]*?name: 'auction-detail'[\s\S]*?id: auction\.auctionId[\s\S]*?<article class="auction-product-card">[\s\S]*?<\/article>\s*<\/RouterLink>/,
+    /<RouterLink\b[^>]*>[\s\S]*?<article\b(?=[^>]*\bclass\s*=\s*["']auction-product-card["'])[^>]*>[\s\S]*?<\/article>\s*<\/RouterLink>/,
   );
   assert.doesNotMatch(
     listSource,
@@ -175,10 +189,20 @@ test("auction cards use the summary image, placeholder and whole-card detail nav
 });
 
 test("auction grid keeps three desktop, two tablet and one mobile columns", () => {
-  const style = section(listSource, "<style scoped>", "</style>");
-  const tabletStart = style.indexOf("@media (max-width: 1199.98px)");
-  const mobileStart = style.indexOf("@media (max-width: 767.98px)");
-  const compactStart = style.indexOf("@media (max-width: 479.98px)");
+  const style = section(
+    listSource,
+    /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
+    "</style>",
+  );
+  const tabletStart = style.search(
+    /@media\s*\(\s*max-width\s*:\s*1199\.98px\s*\)/,
+  );
+  const mobileStart = style.search(
+    /@media\s*\(\s*max-width\s*:\s*767\.98px\s*\)/,
+  );
+  const compactStart = style.search(
+    /@media\s*\(\s*max-width\s*:\s*479\.98px\s*\)/,
+  );
 
   assert.ok(tabletStart > 0, "missing tablet breakpoint");
   assert.ok(mobileStart > tabletStart, "missing mobile breakpoint after tablet");
@@ -189,29 +213,29 @@ test("auction grid keeps three desktop, two tablet and one mobile columns", () =
 
   assert.match(
     desktopCss,
-    /\.auction-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/,
+    /\.auction-grid\s*\{[^}]*grid-template-columns\s*:\s*repeat\s*\(\s*3\s*,\s*minmax\s*\(\s*0\s*,\s*1fr\s*\)\s*\)/,
   );
   assert.match(
     tabletCss,
-    /\.auction-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+    /\.auction-grid\s*\{[^}]*grid-template-columns\s*:\s*repeat\s*\(\s*2\s*,\s*minmax\s*\(\s*0\s*,\s*1fr\s*\)\s*\)/,
   );
   assert.match(
     mobileCss,
-    /\.auction-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+    /\.auction-grid\s*\{[^}]*grid-template-columns\s*:\s*minmax\s*\(\s*0\s*,\s*1fr\s*\)/,
   );
 });
 
 test("auction detail retains gallery, countdown and complete public commerce sections", () => {
-  assert.match(detailSource, /import AuctionImageGallery from/);
-  assert.match(detailSource, /import AuctionCountdown from/);
-  assert.match(
-    detailSource,
-    /<AuctionImageGallery\s+:image-urls="auction\.imageUrls"\s+:product-name="auction\.productName"/,
-  );
-  assert.match(
-    detailSource,
-    /<AuctionCountdown\s+:end-at="auction\.endAt"\s+:status="auction\.status"/,
-  );
+  assert.match(detailSource, /import\s+AuctionImageGallery\s+from\s+["'][^"']+["']/);
+  assert.match(detailSource, /import\s+AuctionCountdown\s+from\s+["'][^"']+["']/);
+
+  const galleryTag = detailSource.match(/<AuctionImageGallery\b[^>]*>/)?.[0] ?? "";
+  assert.match(galleryTag, /:image-urls\s*=\s*["']auction\.imageUrls["']/);
+  assert.match(galleryTag, /:product-name\s*=\s*["']auction\.productName["']/);
+
+  const countdownTag = detailSource.match(/<AuctionCountdown\b[^>]*>/)?.[0] ?? "";
+  assert.match(countdownTag, /:end-at\s*=\s*["']auction\.endAt["']/);
+  assert.match(countdownTag, /:status\s*=\s*["']auction\.status["']/);
 
   assertIncludesAll(
     detailSource,
@@ -251,7 +275,6 @@ test("auction detail retains gallery, countdown and complete public commerce sec
   assertIncludesAll(
     detailSource,
     [
-      '@submit.prevent="handlePlaceBid"',
       "candidateBid",
       "canPlaceBid",
       "submittingBid",
@@ -263,32 +286,49 @@ test("auction detail retains gallery, countdown and complete public commerce sec
     ],
     "bid controls and history",
   );
+  assert.match(detailSource, /@submit\.prevent\s*=\s*["']handlePlaceBid["']/);
   assertIncludesAll(
     detailSource,
     [
-      'v-if="auction.isOwner"',
-      'v-if="canOwnerManageAuction"',
-      "name: 'auction-edit'",
-      '@click="handleCancelAuction"',
       "ownerManageMessage",
     ],
     "seller controls",
   );
+  assert.match(detailSource, /v-if\s*=\s*["']auction\.isOwner["']/);
+  assert.match(detailSource, /v-if\s*=\s*["']canOwnerManageAuction["']/);
+  assert.match(detailSource, /name\s*:\s*["']auction-edit["']/);
+  assert.match(detailSource, /@click\s*=\s*["']handleCancelAuction["']/);
 });
 
 test("image gallery keeps thumbnail selection, backend URL resolution and placeholders", () => {
-  assert.match(gallerySource, /const selectedIndex = ref\(0\)/);
-  assert.match(gallerySource, /v-for="\(imageUrl, index\) in images"/);
-  assert.match(gallerySource, /@click="selectImage\(index\)"/);
-  assert.match(gallerySource, /selectedIndex\.value = index/);
-  assert.match(gallerySource, /:src="resolveAuctionImageUrl\(selectedImage\)"/);
-  assert.match(gallerySource, /v-else class="gallery-placeholder"/);
-  assert.match(gallerySource, /尚無商品圖片/);
-  assert.match(gallerySource, /@error="markImageFailed\(selectedIndex\)"/);
-  assert.match(gallerySource, /@error="markImageFailed\(index\)"/);
-  assert.match(gallerySource, /v-else class="thumbnail-placeholder"/);
+  assert.match(gallerySource, /const\s+selectedIndex\s*=\s*ref\s*\(\s*0\s*\)/);
+  assert.match(gallerySource, /v-for\s*=\s*["']\(imageUrl, index\) in images["']/);
+  assert.match(gallerySource, /@click\s*=\s*["']selectImage\(index\)["']/);
+  assert.match(gallerySource, /selectedIndex\.value\s*=\s*index/);
+  assert.match(gallerySource, /:src\s*=\s*["']resolveAuctionImageUrl\(selectedImage\)["']/);
 
-  assert.match(countdownSource, /parseAuctionTime\(props\.endAt\)/);
-  assert.match(countdownSource, /new Set\(\["SOLD", "UNSOLD", "CANCELLED", "REMOVED"\]\)/);
-  assert.match(countdownSource, /return "已到截止時間"/);
+  const galleryPlaceholderTag =
+    gallerySource.match(
+      /<div\b(?=[^>]*\bclass\s*=\s*["']gallery-placeholder["'])[^>]*>/,
+    )?.[0] ?? "";
+  assert.match(galleryPlaceholderTag, /\bv-else\b/);
+  assert.match(gallerySource, /尚無商品圖片/);
+  assert.match(gallerySource, /@error\s*=\s*["']markImageFailed\(selectedIndex\)["']/);
+  assert.match(gallerySource, /@error\s*=\s*["']markImageFailed\(index\)["']/);
+
+  const thumbnailPlaceholderTag =
+    gallerySource.match(
+      /<span\b(?=[^>]*\bclass\s*=\s*["']thumbnail-placeholder["'])[^>]*>/,
+    )?.[0] ?? "";
+  assert.match(thumbnailPlaceholderTag, /\bv-else\b/);
+
+  assert.match(countdownSource, /parseAuctionTime\s*\(\s*props\.endAt\s*\)/);
+  const terminalStatuses =
+    countdownSource.match(
+      /terminalStatuses\s*=\s*new\s+Set\s*\(\s*\[([\s\S]*?)\]\s*\)/,
+    )?.[1] ?? "";
+  for (const status of ["SOLD", "UNSOLD", "CANCELLED", "REMOVED"]) {
+    assert.match(terminalStatuses, new RegExp(`["']${status}["']`));
+  }
+  assert.match(countdownSource, /return\s*["']已到截止時間["']/);
 });

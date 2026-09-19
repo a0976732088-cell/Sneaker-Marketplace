@@ -905,7 +905,7 @@ const ownerManageMessage = computed(() => {
     return "此競標已到截止時間，無法修改或取消。";
 
   const statusMessageMap = {
-    SOLD: "此競標已成交，無法再修改或取消。",
+    SOLD: "此競標已結標，無法再修改或取消。",
     UNSOLD: "此競標已流標，無法再修改或取消。",
     CANCELLED: "此競標已取消。",
     REMOVED: "此競標已廢標。",
