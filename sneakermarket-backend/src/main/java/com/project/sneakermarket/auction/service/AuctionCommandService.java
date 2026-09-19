@@ -40,7 +40,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuctionCommandService {
 
-    private static final int MAX_IMAGE_COUNT = 5;
+    private static final int MAX_IMAGE_COUNT = 10;
 
     private final AuctionProductRepository auctionProductRepository;
     private final AuctionProductImageRepository auctionProductImageRepository;
@@ -794,7 +794,7 @@ public class AuctionCommandService {
 
         if (images.size() > MAX_IMAGE_COUNT) {
             throw new BusinessException(
-                    "競標商品最多只能上傳 5 張圖片"
+                    "競標商品最多只能上傳 10 張圖片"
             );
         }
     }

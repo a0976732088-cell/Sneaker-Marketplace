@@ -1,19 +1,29 @@
 <template>
   <section class="auction-storefront">
+    <!-- 競標商城廣告：位置與一般商城一致 -->
+    <AdvertisementDisplay
+      :placements="['BANNER', 'SMALL_BLOCK']"
+      :banner-order="2"
+      :static-banner="true"
+      :small-block-order="2"
+    />
+
     <!-- Hero -->
     <div class="auction-hero">
       <div class="container py-5">
         <span class="hero-icon" aria-hidden="true">👟</span>
 
         <div class="hero-content">
-          <p class="hero-brand">SneakerMarket</p>
-          <h1>競標商城</h1>
-          <p class="hero-copy">
-            熱門球鞋限時競價，<br class="d-sm-none" />出價競逐你的下一雙收藏
+          <p class="hero-brand text-uppercase small text-white-50 mb-2 fw-semibold">
+            SneakerMarket
+          </p>
+          <h1 class="display-5 fw-bold mb-2">競標商城</h1>
+          <p class="hero-copy text-white-50 mb-4">
+            熱門球鞋限時競價，出價競逐你的下一雙收藏
           </p>
 
           <form
-            class="hero-search"
+            class="d-flex gap-2 hero-search"
             role="search"
             @submit.prevent="searchAuctions"
           >
@@ -24,12 +34,16 @@
             <input
               id="auction-keyword"
               v-model="keyword"
-              type="search"
+              type="text"
               class="form-control"
               placeholder="搜尋商品名稱或型號"
             />
 
-            <button type="submit" class="btn btn-light" :disabled="loading">
+            <button
+              type="submit"
+              class="btn btn-light px-4 hero-search-btn"
+              :disabled="loading"
+            >
               {{ loading ? "搜尋中" : "搜尋" }}
             </button>
           </form>
@@ -37,37 +51,25 @@
       </div>
     </div>
 
-    <!-- 競標商城廣告 -->
-    <div class="container pt-4">
-      <AdvertisementDisplay
-        :placements="['BANNER', 'SMALL_BLOCK']"
-        :banner-order="2"
-        :static-banner="true"
-        :small-block-order="2"
-      />
-    </div>
-
     <!-- 競標商品區 -->
     <div class="container py-4 auction-catalog">
       <header class="catalog-header">
-        <div>
-          <p class="catalog-eyebrow">限時競價</p>
-          <h2>競標商品</h2>
-
-          <p v-if="!loading" class="catalog-count">
-            共 {{ totalElements }} 件商品
-          </p>
-        </div>
+        <h2 class="h4 fw-bold mb-0">
+          競標商品
+          <span v-if="!loading" class="catalog-count">
+            ({{ totalElements }})
+          </span>
+        </h2>
 
         <div class="catalog-tools">
           <button
             type="button"
-            class="filter-visibility-button"
+            class="btn btn-link btn-sm text-dark text-decoration-none filter-toggle-btn filter-visibility-button"
             :aria-expanded="showFilters"
             aria-controls="auction-filters"
             @click="showFilters = !showFilters"
           >
-            {{ showFilters ? "隱藏篩選" : "顯示篩選" }}
+            {{ showFilters ? "« 隱藏篩選條件" : "» 顯示篩選條件" }}
           </button>
 
           <label class="visually-hidden" for="auction-sort"> 排序方式 </label>
@@ -75,9 +77,9 @@
           <select
             id="auction-sort"
             v-model="sort"
-            class="form-select sort-select"
+            class="form-select form-select-sm w-auto sort-select"
             :disabled="loading"
-            @change="searchAuctions"
+            @change="refreshAuctionsFromFirstPage"
           >
             <option value="endAt,asc">即將結束</option>
             <option value="createdAt,desc">最新上架</option>
@@ -92,159 +94,377 @@
         {{ optionsError }}
       </p>
 
-      <div class="catalog-layout" :class="{ 'filters-hidden': !showFilters }">
+      <div class="row g-4 catalog-layout">
         <!-- 左側篩選 -->
         <aside
           v-if="showFilters"
           id="auction-filters"
-          class="filter-sidebar"
+          class="col-12 col-md-2"
           aria-label="競標商品篩選"
         >
-          <form @submit.prevent="searchAuctions">
-            <div class="filter-heading">
-              <h3>篩選條件</h3>
+          <div class="filter-sidebar">
+            <form @submit.prevent="applyPriceFilters">
+              <!-- 分類 -->
+              <div class="filter-block">
+                <ul class="category-list">
+                  <li>
+                    <button
+                      type="button"
+                      class="category-item"
+                      :class="{ active: selectedCategoryIds.length === 0 }"
+                      :aria-pressed="selectedCategoryIds.length === 0"
+                      @click="clearFacetSelection(selectedCategoryIds)"
+                    >
+                      全部分類
+                    </button>
+                  </li>
 
-              <button type="button" :disabled="loading" @click="clearFilters">
-                清除
-              </button>
-            </div>
-
-            <!-- 品牌 -->
-            <div class="filter-group">
-              <label for="auction-brand">品牌</label>
-
-              <select id="auction-brand" v-model="brandId" class="form-select">
-                <option value="">全部品牌</option>
-
-                <option
-                  v-for="brand in brands"
-                  :key="brand.id"
-                  :value="brand.id"
-                >
-                  {{ brand.name }}
-                </option>
-              </select>
-            </div>
-
-            <!-- 分類 -->
-            <div class="filter-group">
-              <label for="auction-category">分類</label>
-
-              <select
-                id="auction-category"
-                v-model="categoryId"
-                class="form-select"
-              >
-                <option value="">全部分類</option>
-
-                <option
-                  v-for="category in categories"
-                  :key="category.id"
-                  :value="category.id"
-                >
-                  {{ category.name }}
-                </option>
-              </select>
-            </div>
-
-            <!-- 狀態 -->
-            <div class="filter-group">
-              <label for="auction-status">競標狀態</label>
-
-              <select id="auction-status" v-model="status" class="form-select">
-                <option value="">全部狀態</option>
-                <option value="ACTIVE">競標中</option>
-                <option value="SCHEDULED">尚未開始</option>
-                <option value="SOLD">已結標</option>
-                <option value="UNSOLD">流標</option>
-                <option value="CANCELLED">已取消</option>
-              </select>
-            </div>
-
-            <!-- 商品狀況 -->
-            <div class="filter-group">
-              <label for="auction-condition">商品狀況</label>
-
-              <select
-                id="auction-condition"
-                v-model="condition"
-                class="form-select"
-              >
-                <option value="">全部狀況</option>
-                <option value="NEW">全新</option>
-                <option value="LIKE_NEW">近全新</option>
-                <option value="USED">二手</option>
-              </select>
-            </div>
-
-            <!-- 尺寸 -->
-            <div class="filter-group">
-              <label for="auction-size">尺寸</label>
-
-              <select id="auction-size" v-model="shoeSize" class="form-select">
-                <option value="">全部尺寸</option>
-                <option value="US 8">US 8</option>
-                <option value="US 8.5">US 8.5</option>
-                <option value="US 9">US 9</option>
-                <option value="US 9.5">US 9.5</option>
-                <option value="US 10">US 10</option>
-                <option value="US 10.5">US 10.5</option>
-              </select>
-            </div>
-
-            <!-- 價格 -->
-            <fieldset class="filter-group price-filter">
-              <legend>目前價格</legend>
-
-              <div class="price-inputs">
-                <div>
-                  <label class="visually-hidden" for="auction-min-price">
-                    最低價格
-                  </label>
-
-                  <input
-                    id="auction-min-price"
-                    v-model="minPrice"
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="form-control"
-                    placeholder="最低價"
-                  />
-                </div>
-
-                <span aria-hidden="true">—</span>
-
-                <div>
-                  <label class="visually-hidden" for="auction-max-price">
-                    最高價格
-                  </label>
-
-                  <input
-                    id="auction-max-price"
-                    v-model="maxPrice"
-                    type="number"
-                    min="0"
-                    step="1"
-                    class="form-control"
-                    placeholder="最高價"
-                  />
-                </div>
+                  <li v-for="category in categories" :key="category.id">
+                    <button
+                      type="button"
+                      class="category-item"
+                      :class="{
+                        active: selectedCategoryIds.includes(category.id),
+                      }"
+                      :aria-pressed="selectedCategoryIds.includes(category.id)"
+                      @click="
+                        toggleFacetSelection(selectedCategoryIds, category.id)
+                      "
+                    >
+                      {{ category.name }}
+                    </button>
+                  </li>
+                </ul>
               </div>
-            </fieldset>
 
-            <button
-              type="submit"
-              class="apply-filter-button"
-              :disabled="loading"
-            >
-              {{ loading ? "套用中..." : "套用篩選" }}
-            </button>
-          </form>
+              <!-- 品牌 -->
+              <details class="filter-group">
+                <summary class="filter-toggle">
+                  <span>
+                    品牌
+                    <span
+                      v-if="selectedBrandIds.length"
+                      class="filter-count"
+                    >
+                      {{ selectedBrandIds.length }}
+                    </span>
+                  </span>
+                  <span class="filter-icon" aria-hidden="true"></span>
+                </summary>
+
+                <div class="filter-options">
+                  <label
+                    v-for="brand in brands"
+                    :key="brand.id"
+                    class="filter-option"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="selectedBrandIds.includes(brand.id)"
+                      @change="
+                        toggleFacetSelection(selectedBrandIds, brand.id)
+                      "
+                    />
+                    <span>{{ brand.name }}</span>
+                  </label>
+                </div>
+              </details>
+
+              <!-- 狀態 -->
+              <details class="filter-group">
+                <summary class="filter-toggle">
+                  <span>
+                    競標狀態
+                    <span
+                      v-if="selectedStatuses.length"
+                      class="filter-count"
+                    >
+                      {{ selectedStatuses.length }}
+                    </span>
+                  </span>
+                  <span class="filter-icon" aria-hidden="true"></span>
+                </summary>
+
+                <div class="filter-options">
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedStatuses.includes('ACTIVE')"
+                      @change="
+                        toggleFacetSelection(selectedStatuses, 'ACTIVE')
+                      "
+                    />
+                    <span>競標中</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedStatuses.includes('SCHEDULED')"
+                      @change="
+                        toggleFacetSelection(selectedStatuses, 'SCHEDULED')
+                      "
+                    />
+                    <span>尚未開始</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedStatuses.includes('SOLD')"
+                      @change="toggleFacetSelection(selectedStatuses, 'SOLD')"
+                    />
+                    <span>已結標</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedStatuses.includes('UNSOLD')"
+                      @change="
+                        toggleFacetSelection(selectedStatuses, 'UNSOLD')
+                      "
+                    />
+                    <span>流標</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedStatuses.includes('CANCELLED')"
+                      @change="
+                        toggleFacetSelection(selectedStatuses, 'CANCELLED')
+                      "
+                    />
+                    <span>已取消</span>
+                  </label>
+                </div>
+              </details>
+
+              <!-- 商品狀況 -->
+              <details class="filter-group">
+                <summary class="filter-toggle">
+                  <span>
+                    商品狀況
+                    <span
+                      v-if="selectedConditions.length"
+                      class="filter-count"
+                    >
+                      {{ selectedConditions.length }}
+                    </span>
+                  </span>
+                  <span class="filter-icon" aria-hidden="true"></span>
+                </summary>
+
+                <div class="filter-options">
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedConditions.includes('NEW')"
+                      @change="
+                        toggleFacetSelection(selectedConditions, 'NEW')
+                      "
+                    />
+                    <span>全新</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedConditions.includes('LIKE_NEW')"
+                      @change="
+                        toggleFacetSelection(selectedConditions, 'LIKE_NEW')
+                      "
+                    />
+                    <span>近全新</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedConditions.includes('USED')"
+                      @change="
+                        toggleFacetSelection(selectedConditions, 'USED')
+                      "
+                    />
+                    <span>二手</span>
+                  </label>
+                </div>
+              </details>
+
+              <!-- 尺寸 -->
+              <details class="filter-group">
+                <summary class="filter-toggle">
+                  <span>
+                    尺寸
+                    <span v-if="selectedShoeSizes.length" class="filter-count">
+                      {{ selectedShoeSizes.length }}
+                    </span>
+                  </span>
+                  <span class="filter-icon" aria-hidden="true"></span>
+                </summary>
+
+                <div class="filter-options">
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedShoeSizes.includes('US 8')"
+                      @change="
+                        toggleFacetSelection(selectedShoeSizes, 'US 8')
+                      "
+                    />
+                    <span>US 8</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedShoeSizes.includes('US 8.5')"
+                      @change="
+                        toggleFacetSelection(selectedShoeSizes, 'US 8.5')
+                      "
+                    />
+                    <span>US 8.5</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedShoeSizes.includes('US 9')"
+                      @change="
+                        toggleFacetSelection(selectedShoeSizes, 'US 9')
+                      "
+                    />
+                    <span>US 9</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedShoeSizes.includes('US 9.5')"
+                      @change="
+                        toggleFacetSelection(selectedShoeSizes, 'US 9.5')
+                      "
+                    />
+                    <span>US 9.5</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedShoeSizes.includes('US 10')"
+                      @change="
+                        toggleFacetSelection(selectedShoeSizes, 'US 10')
+                      "
+                    />
+                    <span>US 10</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedShoeSizes.includes('US 10.5')"
+                      @change="
+                        toggleFacetSelection(selectedShoeSizes, 'US 10.5')
+                      "
+                    />
+                    <span>US 10.5</span>
+                  </label>
+
+                  <label class="filter-option">
+                    <input
+                      type="checkbox"
+                      :checked="selectedShoeSizes.includes('US 11')"
+                      @change="
+                        toggleFacetSelection(selectedShoeSizes, 'US 11')
+                      "
+                    />
+                    <span>US 11</span>
+                  </label>
+                </div>
+              </details>
+
+              <!-- 價格 -->
+              <details class="filter-group price-filter">
+                <summary class="filter-toggle">
+                  <span>
+                    目前價格
+                    <span
+                      v-if="appliedMinPrice !== '' || appliedMaxPrice !== ''"
+                      class="filter-count"
+                    >
+                      1
+                    </span>
+                  </span>
+                  <span class="filter-icon" aria-hidden="true"></span>
+                </summary>
+
+                <div class="filter-options">
+                  <div class="price-inputs">
+                    <div>
+                      <label class="visually-hidden" for="auction-min-price">
+                        最低價格
+                      </label>
+
+                      <input
+                        id="auction-min-price"
+                        v-model="minPrice"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="form-control form-control-sm"
+                        placeholder="最低價"
+                      />
+                    </div>
+
+                    <span aria-hidden="true">—</span>
+
+                    <div>
+                      <label class="visually-hidden" for="auction-max-price">
+                        最高價格
+                      </label>
+
+                      <input
+                        id="auction-max-price"
+                        v-model="maxPrice"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="form-control form-control-sm"
+                        placeholder="最高價"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    class="btn btn-dark btn-sm w-100 apply-filter-button"
+                    :disabled="loading"
+                  >
+                    {{ loading ? "套用中..." : "套用金額篩選" }}
+                  </button>
+                </div>
+              </details>
+
+              <div class="filter-actions">
+                <button
+                  type="button"
+                  class="btn btn-outline-dark btn-sm w-100 clear-filter-button"
+                  :disabled="loading"
+                  @click="clearFilters"
+                >
+                  清除全部篩選
+                </button>
+              </div>
+            </form>
+          </div>
         </aside>
 
         <!-- 右側商品列表 -->
-        <main class="auction-results" aria-live="polite">
+        <main
+          :class="showFilters ? 'col-12 col-md-10 auction-results' : 'col-12 auction-results'"
+          aria-live="polite"
+        >
           <!-- Loading -->
           <div v-if="loading" class="catalog-state" role="status">
             <span
@@ -434,8 +654,8 @@ const auctions = ref([]);
 const brands = ref([]);
 const categories = ref([]);
 
-const brandId = ref("");
-const categoryId = ref("");
+const selectedBrandIds = ref([]);
+const selectedCategoryIds = ref([]);
 
 const optionsError = ref("");
 
@@ -445,15 +665,16 @@ const failedAuctionImageUrls = ref(new Set());
 
 // 搜尋關鍵字
 const keyword = ref("");
+const appliedKeyword = ref("");
 
 // 競標狀態篩選
-const status = ref("");
+const selectedStatuses = ref([]);
 
 // 商品狀況篩選
-const condition = ref("");
+const selectedConditions = ref([]);
 
 // 球鞋尺寸篩選
-const shoeSize = ref("");
+const selectedShoeSizes = ref([]);
 
 // 競標列表排序方式
 const sort = ref("endAt,asc");
@@ -478,39 +699,60 @@ const totalPages = ref(0);
 
 // 最低價格篩選
 const minPrice = ref("");
+const appliedMinPrice = ref("");
 
 // 最高價格篩選
 const maxPrice = ref("");
+const appliedMaxPrice = ref("");
 
 // 前端目前時間，用來更新競標剩餘時間
 const currentTime = ref(Date.now());
 
 let countdownTimer = null;
+let latestAuctionRequestId = 0;
 
 /**
  * 從後端取得競標列表。
  */
 async function loadAuctions() {
+  const requestId = ++latestAuctionRequestId;
+
   loading.value = true;
   errorMessage.value = "";
 
   try {
     const response = await getAuctions({
-      keyword: keyword.value.trim() || undefined,
+      keyword: appliedKeyword.value || undefined,
 
-      brandId: brandId.value || undefined,
+      brandIds: selectedBrandIds.value.length
+        ? [...selectedBrandIds.value]
+        : undefined,
 
-      categoryId: categoryId.value || undefined,
+      categoryIds: selectedCategoryIds.value.length
+        ? [...selectedCategoryIds.value]
+        : undefined,
 
-      status: status.value || undefined,
+      statuses: selectedStatuses.value.length
+        ? [...selectedStatuses.value]
+        : undefined,
 
-      condition: condition.value || undefined,
+      conditions: selectedConditions.value.length
+        ? [...selectedConditions.value]
+        : undefined,
 
-      shoeSize: shoeSize.value || undefined,
+      shoeSizes: selectedShoeSizes.value.length
+        ? [...selectedShoeSizes.value]
+        : undefined,
 
-      minPrice: minPrice.value !== "" ? Number(minPrice.value) : undefined,
+      minPrice:
+        appliedMinPrice.value !== ""
+          ? Number(appliedMinPrice.value)
+          : undefined,
 
-      maxPrice: maxPrice.value !== "" ? Number(maxPrice.value) : undefined,
+      maxPrice:
+        appliedMaxPrice.value !== ""
+          ? Number(appliedMaxPrice.value)
+          : undefined,
 
       page: currentPage.value,
 
@@ -518,6 +760,10 @@ async function loadAuctions() {
 
       sort: sort.value,
     });
+
+    if (requestId !== latestAuctionRequestId) {
+      return;
+    }
 
     const pageData = response.data.data;
 
@@ -531,11 +777,17 @@ async function loadAuctions() {
 
     totalPages.value = pageData.totalPages;
   } catch (error) {
+    if (requestId !== latestAuctionRequestId) {
+      return;
+    }
+
     console.error("取得競標列表失敗：", error);
 
     errorMessage.value = "無法取得競標列表";
   } finally {
-    loading.value = false;
+    if (requestId === latestAuctionRequestId) {
+      loading.value = false;
+    }
   }
 }
 
@@ -647,13 +899,59 @@ function formatRemainingTime(auction) {
 }
 
 /**
- * 執行關鍵字搜尋／篩選。
+ * 由第一頁重新查詢目前已套用的條件。
  */
-async function searchAuctions() {
-  // 搜尋條件改變時回到第一頁
+async function refreshAuctionsFromFirstPage() {
   currentPage.value = 0;
 
   await loadAuctions();
+}
+
+/**
+ * 套用關鍵字搜尋；尚未送出的價格草稿不會在此被套用。
+ */
+async function searchAuctions() {
+  appliedKeyword.value = keyword.value.trim();
+
+  await refreshAuctionsFromFirstPage();
+}
+
+/**
+ * 切換可複選的篩選條件，並立即重新查詢。
+ */
+async function toggleFacetSelection(selectedValues, value) {
+  const selectedIndex = selectedValues.indexOf(value);
+
+  if (selectedIndex >= 0) {
+    selectedValues.splice(selectedIndex, 1);
+  } else {
+    selectedValues.push(value);
+  }
+
+  await refreshAuctionsFromFirstPage();
+}
+
+/**
+ * 清空單一複選群組；目前只有「全部分類」會使用。
+ */
+async function clearFacetSelection(selectedValues) {
+  if (selectedValues.length === 0) {
+    return;
+  }
+
+  selectedValues.splice(0, selectedValues.length);
+
+  await refreshAuctionsFromFirstPage();
+}
+
+/**
+ * 價格是唯一需要明確按鈕才套用的左側篩選。
+ */
+async function applyPriceFilters() {
+  appliedMinPrice.value = minPrice.value;
+  appliedMaxPrice.value = maxPrice.value;
+
+  await refreshAuctionsFromFirstPage();
 }
 
 /**
@@ -661,25 +959,23 @@ async function searchAuctions() {
  */
 async function clearFilters() {
   keyword.value = "";
+  appliedKeyword.value = "";
 
-  brandId.value = "";
-  categoryId.value = "";
-
-  status.value = "";
-  condition.value = "";
-
-  shoeSize.value = "";
+  selectedBrandIds.value = [];
+  selectedCategoryIds.value = [];
+  selectedStatuses.value = [];
+  selectedConditions.value = [];
+  selectedShoeSizes.value = [];
 
   minPrice.value = "";
   maxPrice.value = "";
+  appliedMinPrice.value = "";
+  appliedMaxPrice.value = "";
 
   // 恢復預設排序
   sort.value = "endAt,asc";
 
-  // 清除條件後回到第一頁
-  currentPage.value = 0;
-
-  await loadAuctions();
+  await refreshAuctionsFromFirstPage();
 }
 
 /**
@@ -732,15 +1028,12 @@ onUnmounted(() => {
 .auction-hero {
   position: relative;
   overflow: hidden;
-  background: #111;
+  background: linear-gradient(135deg, #0a0a0a 0%, #232323 100%);
   color: #fff;
 }
 
 .auction-hero .container {
   position: relative;
-  min-height: 330px;
-  display: flex;
-  align-items: center;
 }
 
 .hero-content {
@@ -748,44 +1041,23 @@ onUnmounted(() => {
   z-index: 1;
 }
 
-.hero-brand,
-.catalog-eyebrow {
-  margin: 0 0 0.55rem;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
 .hero-brand {
-  color: rgba(255, 255, 255, 0.58);
-}
-
-.auction-hero h1 {
-  margin: 0;
-  font-size: clamp(2.35rem, 5vw, 4.15rem);
-  line-height: 1.05;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  letter-spacing: 0.15em;
 }
 
 .hero-copy {
-  margin: 1rem 0 1.75rem;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: clamp(1rem, 2vw, 1.15rem);
-  line-height: 1.7;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .hero-icon {
   position: absolute;
-  right: 1rem;
+  right: -1rem;
   top: 50%;
-  transform: translateY(-50%) rotate(-14deg);
-
-  font-size: clamp(8rem, 20vw, 15rem);
-
+  transform: translateY(-50%) rotate(-15deg);
+  font-size: 14rem;
   line-height: 1;
-  opacity: 0.08;
+  opacity: 0.1;
   pointer-events: none;
 
   font-family:
@@ -793,158 +1065,196 @@ onUnmounted(() => {
 }
 
 .hero-search {
-  display: flex;
-  width: min(100%, 470px);
-  gap: 0.65rem;
+  width: 100%;
+  max-width: 380px;
 }
 
-.hero-search .form-control,
-.hero-search .btn {
-  min-height: 48px;
-  border-radius: 0.35rem;
+.hero-search input {
+  min-width: 0;
+  font-size: 0.95rem;
 }
 
-.hero-search .form-control {
-  border-color: #fff;
-}
-
-.hero-search .btn {
-  min-width: 96px;
-  padding-inline: 1.35rem;
-  color: #111;
-  font-weight: 700;
-}
-
-.auction-catalog {
-  padding-top: 2rem !important;
+.hero-search-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .catalog-header {
+  position: sticky;
+  top: 56px;
+  z-index: 20;
+
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-
-  border-bottom: 1px solid #dee2e6;
-}
-
-.catalog-eyebrow {
-  color: #6c757d;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  background: #fff;
 }
 
 .catalog-header h2 {
-  margin: 0;
-
-  font-size: clamp(1.55rem, 3vw, 2rem);
-
-  font-weight: 800;
-  letter-spacing: -0.025em;
+  font-size: 1.5rem;
 }
 
 .catalog-count {
-  margin: 0.35rem 0 0;
-  color: #6c757d;
-  font-size: 0.875rem;
+  color: inherit;
 }
 
 .catalog-tools {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-}
-
-.filter-visibility-button,
-.filter-heading button {
-  border: 0;
-  background: transparent;
-  color: #212529;
-  font-weight: 600;
+  gap: 1rem;
 }
 
 .filter-visibility-button {
-  font-size: 0.875rem;
   white-space: nowrap;
 }
 
-.filter-visibility-button:hover,
-.filter-heading button:hover {
+.filter-toggle-btn {
+  font-weight: 500;
+}
+
+.filter-visibility-button:hover {
   text-decoration: underline;
 }
 
 .sort-select {
-  width: auto;
-  min-width: 180px;
-  border-color: #ced4da;
-  font-size: 0.875rem;
+  border: 0;
+  background-color: transparent;
+  box-shadow: none;
+  font-weight: 500;
+}
+
+.sort-select:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .catalog-layout {
-  display: grid;
-  grid-template-columns:
-    220px
-    minmax(0, 1fr);
-
-  gap: 2rem;
-  align-items: start;
-}
-
-.catalog-layout.filters-hidden {
-  grid-template-columns: minmax(0, 1fr);
+  align-items: flex-start;
 }
 
 .filter-sidebar {
   position: sticky;
-  top: 1rem;
+  top: 103px;
+  font-size: 0.82rem;
 }
 
-.filter-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  margin-bottom: 0.35rem;
+.filter-block {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #dee2e6;
 }
 
-.filter-heading h3 {
+.category-list {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 800;
+  padding: 0;
+  list-style: none;
 }
 
-.filter-heading button {
-  padding: 0;
-  color: #6c757d;
-  font-size: 0.78rem;
+.category-item {
+  display: block;
+  width: 100%;
+  padding: 0.18rem 0;
+  border: 0;
+  background: none;
+  color: #212529;
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1.7;
+  text-align: left;
+}
+
+.category-item.active {
+  font-weight: 700;
+  text-decoration: underline;
 }
 
 .filter-group {
   margin: 0;
-  padding: 1rem 0;
-
-  border: 0;
+  padding: 0 0 0.5rem;
   border-bottom: 1px solid #dee2e6;
+  margin-bottom: 0.5rem;
 }
 
-.filter-group > label,
-.filter-group legend {
-  display: block;
-  width: auto;
-
-  margin: 0 0 0.5rem;
-
-  float: none;
-
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
   color: #212529;
-  font-size: 0.82rem;
-  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  list-style: none;
 }
 
-.filter-group .form-select,
+.filter-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.filter-toggle::marker {
+  content: "";
+}
+
+.filter-icon {
+  color: #6c757d;
+}
+
+.filter-icon::before {
+  content: "+";
+}
+
+.filter-group[open] .filter-icon::before {
+  content: "−";
+}
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.25rem;
+  margin-left: 0.35rem;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+.filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.filter-option input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 0.85rem;
+  height: 0.85rem;
+  accent-color: #111;
+}
+
 .filter-group .form-control {
-  min-height: 40px;
+  min-height: 31px;
   border-color: #dee2e6;
   border-radius: 0.25rem;
   font-size: 0.82rem;
@@ -970,20 +1280,19 @@ onUnmounted(() => {
   color: #adb5bd;
 }
 
+.filter-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .apply-filter-button {
-  width: 100%;
-  min-height: 42px;
-
-  margin-top: 1rem;
-
+  min-height: 31px;
   border: 1px solid #111;
-
-  border-radius: 2rem;
-
+  border-radius: 0.25rem;
   background: #111;
   color: #fff;
-
-  font-size: 0.875rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -994,6 +1303,11 @@ onUnmounted(() => {
 .apply-filter-button:disabled {
   border-color: #adb5bd;
   background: #adb5bd;
+}
+
+.clear-filter-button {
+  border-radius: 0.25rem;
+  font-size: 0.82rem;
 }
 
 .auction-results {
@@ -1030,7 +1344,7 @@ onUnmounted(() => {
 
   grid-template-columns: repeat(3, minmax(0, 1fr));
 
-  gap: 1.75rem 1.25rem;
+  gap: 1.5rem;
 }
 
 .auction-product-link {
@@ -1062,7 +1376,7 @@ onUnmounted(() => {
 }
 
 .auction-product-link:hover .product-image {
-  transform: scale(1.045);
+  transform: scale(1.06);
 }
 
 .product-image-empty {
@@ -1120,7 +1434,7 @@ onUnmounted(() => {
 }
 
 .product-card-body {
-  padding: 0.9rem 0.15rem 0;
+  padding: 1rem 0.25rem 0;
 }
 
 .product-brand {
@@ -1128,11 +1442,8 @@ onUnmounted(() => {
 
   color: #6c757d;
 
-  font-size: 0.75rem;
-  font-weight: 700;
-
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 0.875rem;
+  font-weight: 400;
 }
 
 .product-card-body h3 {
@@ -1144,7 +1455,7 @@ onUnmounted(() => {
   color: #111;
 
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.35;
 
   display: -webkit-box;
@@ -1186,8 +1497,8 @@ onUnmounted(() => {
 
 .price-block strong {
   color: #111;
-  font-size: 1.22rem;
-  font-weight: 800;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .auction-card-stats {
@@ -1287,59 +1598,24 @@ onUnmounted(() => {
 }
 
 @media (max-width: 1199.98px) {
-  .catalog-layout {
-    grid-template-columns:
-      200px
-      minmax(0, 1fr);
-
-    gap: 1.5rem;
-  }
-
   .auction-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 767.98px) {
-  .auction-hero .container {
-    min-height: 300px;
-  }
-
-  .hero-icon {
-    right: -2rem;
-  }
-
-  .catalog-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .catalog-tools {
-    width: 100%;
-
-    justify-content: space-between;
-  }
-
-  .sort-select {
-    min-width: 0;
-
-    width: min(100%, 205px);
-  }
-
-  .catalog-layout {
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .price-inputs {
     grid-template-columns: minmax(0, 1fr);
-
-    gap: 1.5rem;
   }
 
+  .price-inputs > span {
+    display: none;
+  }
+}
+
+@media (max-width: 767.98px) {
   .filter-sidebar {
     position: static;
-
-    padding: 1rem;
-
-    border: 1px solid #dee2e6;
-
-    background: #f8f9fa;
   }
 
   .auction-grid {
@@ -1359,16 +1635,6 @@ onUnmounted(() => {
 
   .pagination-actions button {
     flex: 1;
-  }
-}
-
-@media (max-width: 479.98px) {
-  .hero-search {
-    flex-direction: column;
-  }
-
-  .hero-search .btn {
-    width: 100%;
   }
 }
 </style>

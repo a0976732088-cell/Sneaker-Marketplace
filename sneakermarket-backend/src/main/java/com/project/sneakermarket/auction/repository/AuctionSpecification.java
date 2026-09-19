@@ -1,7 +1,9 @@
 package com.project.sneakermarket.auction.repository;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
@@ -36,6 +38,16 @@ public final class AuctionSpecification {
         return (root, query, criteriaBuilder) -> {
 
             List<Predicate> predicates = new ArrayList<>();
+            List<com.project.sneakermarket.auction.entity.AuctionStatus> statuses =
+                    mergeCriteriaValues(criteria.getStatus(), criteria.getStatuses());
+            List<Long> brandIds =
+                    mergeCriteriaValues(criteria.getBrandId(), criteria.getBrandIds());
+            List<Long> categoryIds =
+                    mergeCriteriaValues(criteria.getCategoryId(), criteria.getCategoryIds());
+            List<String> shoeSizes =
+                    mergeTextCriteriaValues(criteria.getShoeSize(), criteria.getShoeSizes());
+            List<com.project.sneakermarket.auction.entity.AuctionCondition> conditions =
+                    mergeCriteriaValues(criteria.getCondition(), criteria.getConditions());
 
             // 公開商城一律排除未啟用、已下架、已 Soft Delete 與舊版僅有 REMOVED status 的資料。
             predicates.add(criteriaBuilder.isNull(root.get("removedAt")));
@@ -48,12 +60,9 @@ public final class AuctionSpecification {
                     com.project.sneakermarket.auction.entity.AuctionStatus.DRAFT));
 
             // 競標狀態
-            if (criteria.getStatus() != null) {
+            if (!statuses.isEmpty()) {
                 predicates.add(
-                        criteriaBuilder.equal(
-                                root.get("status"),
-                                criteria.getStatus()
-                        )
+                        root.get("status").in(statuses)
                 );
             }
 
@@ -80,10 +89,10 @@ public final class AuctionSpecification {
             // 判斷是否有競標商品相關的搜尋條件
             boolean hasProductCriteria =
                     StringUtils.hasText(criteria.getKeyword())
-                            || criteria.getBrandId() != null
-                            || criteria.getCategoryId() != null
-                            || StringUtils.hasText(criteria.getShoeSize())
-                            || criteria.getCondition() != null;
+                            || !brandIds.isEmpty()
+                            || !categoryIds.isEmpty()
+                            || !shoeSizes.isEmpty()
+                            || !conditions.isEmpty();
 
             if (hasProductCriteria) {
 
@@ -127,46 +136,32 @@ public final class AuctionSpecification {
                 }
 
                 // 品牌
-                if (criteria.getBrandId() != null) {
+                if (!brandIds.isEmpty()) {
                     productPredicates.add(
-                            criteriaBuilder.equal(
-                                    productRoot.get("brandId"),
-                                    criteria.getBrandId()
-                            )
+                            productRoot.get("brandId").in(brandIds)
                     );
                 }
 
                 // 分類
-                if (criteria.getCategoryId() != null) {
+                if (!categoryIds.isEmpty()) {
                     productPredicates.add(
-                            criteriaBuilder.equal(
-                                    productRoot.get("categoryId"),
-                                    criteria.getCategoryId()
-                            )
+                            productRoot.get("categoryId").in(categoryIds)
                     );
                 }
 
                 // 球鞋尺寸
-                if (StringUtils.hasText(criteria.getShoeSize())) {
+                if (!shoeSizes.isEmpty()) {
                     productPredicates.add(
-                            criteriaBuilder.equal(
-                                    criteriaBuilder.lower(
-                                            productRoot.get("size")
-                                    ),
-                                    criteria.getShoeSize()
-                                            .trim()
-                                            .toLowerCase()
-                            )
+                            criteriaBuilder.lower(
+                                    productRoot.get("size")
+                            ).in(shoeSizes)
                     );
                 }
 
                 // 商品狀況
-                if (criteria.getCondition() != null) {
+                if (!conditions.isEmpty()) {
                     productPredicates.add(
-                            criteriaBuilder.equal(
-                                    productRoot.get("condition"),
-                                    criteria.getCondition()
-                            )
+                            productRoot.get("condition").in(conditions)
                     );
                 }
 
@@ -184,5 +179,53 @@ public final class AuctionSpecification {
                     predicates.toArray(Predicate[]::new)
             );
         };
+    }
+
+    /**
+     * 合併舊版單值條件與新版多值條件，忽略 null 並維持首次出現順序。
+     */
+    private static <T> List<T> mergeCriteriaValues(
+            T legacyValue,
+            List<T> values) {
+
+        LinkedHashSet<T> mergedValues = new LinkedHashSet<>();
+
+        if (legacyValue != null) {
+            mergedValues.add(legacyValue);
+        }
+
+        if (values != null) {
+            values.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .forEach(mergedValues::add);
+        }
+
+        return List.copyOf(mergedValues);
+    }
+
+    /**
+     * 文字條件在進入 SQL 前統一 trim/lower，避免空白與大小寫造成重複條件。
+     */
+    private static List<String> mergeTextCriteriaValues(
+            String legacyValue,
+            List<String> values) {
+
+        LinkedHashSet<String> mergedValues = new LinkedHashSet<>();
+        addNormalizedText(mergedValues, legacyValue);
+
+        if (values != null) {
+            values.forEach(value -> addNormalizedText(mergedValues, value));
+        }
+
+        return List.copyOf(mergedValues);
+    }
+
+    private static void addNormalizedText(
+            LinkedHashSet<String> values,
+            String value) {
+
+        if (StringUtils.hasText(value)) {
+            values.add(value.trim().toLowerCase(Locale.ROOT));
+        }
     }
 }

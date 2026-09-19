@@ -246,8 +246,15 @@
 
           <dl class="information-list">
             <div>
-              <dt>運送方式</dt>
-              <dd>{{ auction.shippingMethod }}</dd>
+              <dt>交付方式</dt>
+              <dd>
+                {{
+                  formatDeliveryMethod(
+                    auction.shippingMethod,
+                    auction.allowMeetup,
+                  )
+                }}
+              </dd>
             </div>
             <div>
               <dt>運費</dt>
@@ -256,10 +263,6 @@
             <div>
               <dt>付款方式</dt>
               <dd>{{ auction.paymentMethod }}</dd>
-            </div>
-            <div>
-              <dt>允許面交</dt>
-              <dd>{{ formatBoolean(auction.allowMeetup) }}</dd>
             </div>
             <div>
               <dt>允許退貨</dt>
@@ -1040,6 +1043,18 @@ const formatDateTime = formatAuctionTime;
  */
 function formatBoolean(value) {
   return value ? "是" : "否";
+}
+
+/**
+ * 將既有運送方式與面交 Boolean 組合成清楚的公開交付說明。
+ */
+function formatDeliveryMethod(shippingMethod, allowMeetup) {
+  const method =
+    typeof shippingMethod === "string" && shippingMethod.trim()
+      ? shippingMethod.trim()
+      : "-";
+
+  return allowMeetup ? `${method}／可協調面交` : method;
 }
 
 // 頁面載入後先取得完整詳細資料，再開始同步最新狀態。

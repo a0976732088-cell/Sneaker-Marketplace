@@ -293,6 +293,33 @@ class AuctionAccessTests {
                 .andExpect(jsonPath("$.data[0].role").doesNotExist());
     }
 
+    @Test
+    void publicListBindsRepeatedPluralFiltersAndLegacyScalarFilters() throws Exception {
+        when(queries.searchAuctions(any(), any())).thenReturn(new PageData<>(
+                List.of(), 0, 12, 0, 0));
+
+        mvc.perform(get("/api/auctions")
+                        .param("brandId", "9")
+                        .param("brandIds", "11", "12")
+                        .param("categoryIds", "21", "22")
+                        .param("shoeSizes", "US 8", "US 9")
+                        .param("conditions", "NEW", "USED")
+                        .param("statuses", "ACTIVE", "SCHEDULED"))
+                .andExpect(status().isOk());
+
+        verify(queries).searchAuctions(
+                argThat(criteria ->
+                        Long.valueOf(9L).equals(criteria.getBrandId())
+                                && List.of(11L, 12L).equals(criteria.getBrandIds())
+                                && List.of(21L, 22L).equals(criteria.getCategoryIds())
+                                && List.of("US 8", "US 9").equals(criteria.getShoeSizes())
+                                && List.of(AuctionCondition.NEW, AuctionCondition.USED)
+                                        .equals(criteria.getConditions())
+                                && List.of(AuctionStatus.ACTIVE, AuctionStatus.SCHEDULED)
+                                        .equals(criteria.getStatuses())),
+                any());
+    }
+
     private AuctionSummaryResponse publicSummary() {
         return new AuctionSummaryResponse(
                 12L, 3L, "Air Jordan 1", "王小明", "AJ1", "US 9",

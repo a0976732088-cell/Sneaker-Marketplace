@@ -39,6 +39,10 @@ export function payAuctionOrder(orderNumber) {
 export function getAuctions(params = {}) {
   return httpClient.get("/auctions", {
     params,
+    // Spring 以重複 query parameter 綁定多選條件，例如 brandIds=1&brandIds=2。
+    paramsSerializer: {
+      indexes: null,
+    },
   });
 }
 
