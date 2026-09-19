@@ -3,12 +3,11 @@ import { useRouter } from "vue-router";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   getPublicActiveAdvertisements,
-  recordAdvertisementClick,
-  recordAdvertisementView,
   resolveAdvertisementImageUrl,
 } from "@/service/advertisementService";
 import { getCurrentMember } from "@/service/authService";
 import { claimMemberPopup } from "./advertisementPopupMemory";
+import { useAdvertisementTracking } from "@/composables/advertisement/useAdvertisementTracking";
 
 const props = defineProps({
   placements: {
@@ -38,8 +37,10 @@ function hasPlacement(placement) {
 }
 
 const ads = ref([]);
-// set去重viewed
-const viewedAdIds = new Set();
+
+const { trackAdvertisementClick, vViewableAd, disposeAdvertisementTracking } =
+  useAdvertisementTracking();
+
 const router = useRouter();
 // 是否已有會員登入
 const isLoggedIn = ref(false);
@@ -71,33 +72,6 @@ async function loadLoginStatus() {
     // 不論有沒有登入，都表示檢查已完成
     sessionChecked.value = true;
   }
-}
-// 上報view
-function trackAdvertisementView(ad) {
-  const adId = Number(ad?.adId);
-
-  if (!Number.isInteger(adId) || adId <= 0 || viewedAdIds.has(adId)) {
-    return;
-  }
-
-  viewedAdIds.add(adId);
-
-  recordAdvertisementView(adId).catch((error) => {
-    viewedAdIds.delete(adId);
-    console.error("廣告曝光紀錄失敗：", error);
-  });
-}
-// 上報click，點擊不需要使用set
-function trackAdvertisementClick(ad) {
-  const adId = Number(ad?.adId);
-
-  if (!Number.isInteger(adId) || adId <= 0) {
-    return;
-  }
-
-  recordAdvertisementClick(adId).catch((error) => {
-    console.error("廣告點擊紀錄失敗：", error);
-  });
 }
 
 function goToAdvertisementTarget(ad) {
@@ -281,40 +255,6 @@ const currentSmallBlock = computed(() => {
   );
 });
 
-watch(
-  currentBanner,
-  (ad) => {
-    trackAdvertisementView(ad);
-  },
-  { immediate: true },
-);
-
-watch(
-  currentPopup,
-  (ad) => {
-    trackAdvertisementView(ad);
-  },
-  { immediate: true },
-);
-
-watch(
-  currentSmallBlock,
-  (ad) => {
-    trackAdvertisementView(ad);
-  },
-  { immediate: true },
-);
-
-watch(
-  categoryCardAds,
-  (categoryAds) => {
-    categoryAds.forEach((ad) => {
-      trackAdvertisementView(ad);
-    });
-  },
-  { immediate: true },
-);
-
 function nextBanner() {
   if (displayedBannerAds.value.length === 0) return;
 
@@ -391,6 +331,7 @@ onUnmounted(() => {
   if (advertisementRefreshTimer !== null) {
     window.clearInterval(advertisementRefreshTimer);
   }
+  disposeAdvertisementTracking();
 });
 </script>
 
@@ -402,7 +343,11 @@ onUnmounted(() => {
       {{ errorMessage }}
     </div>
     <template v-else>
-      <section v-if="hasPlacement('BANNER') && currentBanner" class="banner-ad">
+      <section
+        v-if="hasPlacement('BANNER') && currentBanner"
+        v-viewable-ad="currentBanner"
+        class="banner-ad"
+      >
         <img
           :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
           :alt="currentBanner.adName"
@@ -458,6 +403,7 @@ onUnmounted(() => {
           <article
             v-for="ad in categoryCardAds"
             :key="ad.adId"
+            v-viewable-ad="ad"
             class="category-card"
           >
             <button
@@ -503,6 +449,7 @@ onUnmounted(() => {
         v-if="
           hasPlacement('SMALL_BLOCK') && showSmallBlock && currentSmallBlock
         "
+        v-viewable-ad="currentSmallBlock"
         class="small-block-ad"
       >
         <button
@@ -524,7 +471,7 @@ onUnmounted(() => {
         v-if="hasPlacement('POPUP') && showPopup && currentPopup"
         class="popup-background"
       >
-        <article class="popup-ad">
+        <article v-viewable-ad="currentPopup" class="popup-ad">
           <button type="button" class="popup-close" @click="showPopup = false">
             ×
           </button>
