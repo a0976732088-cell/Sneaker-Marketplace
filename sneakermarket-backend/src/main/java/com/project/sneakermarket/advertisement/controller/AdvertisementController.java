@@ -7,9 +7,11 @@ import com.project.sneakermarket.advertisement.dto.AdvertisementResponse;
 import com.project.sneakermarket.advertisement.dto.CreateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementRequest;
 import com.project.sneakermarket.advertisement.dto.UpdateAdvertisementStatusRequest;
+import com.project.sneakermarket.advertisement.dto.AdvertisementStatsResponse;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import com.project.sneakermarket.advertisement.service.AdvertisementService;
+import com.project.sneakermarket.advertisement.service.AdvertisementStatsService;
 import com.project.sneakermarket.common.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,8 +30,8 @@ import java.util.List;
 public class AdvertisementController {
 
     private final AdvertisementService adService;
-
     private final AdvertisementImageStorageService adImageService;
+    private final AdvertisementStatsService adStatsService;
 
     @PostMapping("/add")
     public ResponseEntity<ApiResponse<Long>> insertAdvertisement(@Valid @RequestBody CreateAdvertisementRequest request) {
@@ -110,6 +112,19 @@ public class AdvertisementController {
 
         return ResponseEntity.ok(
                 ApiResponse.ok("公開廣告查詢成功", advertisements)
+        );
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<ApiResponse<List<AdvertisementStatsResponse>>>
+    getAdvertisementStats(
+            @RequestParam("adIds") List<Long> adIds
+    ) {
+        List<AdvertisementStatsResponse> stats =
+                adStatsService.getTotalsByAdvertisementIds(adIds);
+
+        return ResponseEntity.ok(
+                ApiResponse.ok("廣告成效查詢成功", stats)
         );
     }
 }

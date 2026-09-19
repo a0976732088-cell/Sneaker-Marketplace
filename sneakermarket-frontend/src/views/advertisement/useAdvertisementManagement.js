@@ -3,6 +3,7 @@ import {
   createAdvertisement,
   deleteAdvertisement,
   getAdvertisementsByPage,
+  getAdvertisementStats,
   updateAdvertisement,
   updateAdvertisementStatus,
   uploadAdvertisementImage,
@@ -397,10 +398,10 @@ export function useAdvertisementManagement() {
           ? `${formatDateTime(ad.startAt)} — ${formatDateTime(ad.endAt)}`
           : "尚未設定",
 
-      // 後端目前沒有成效統計欄位
-      views: "—",
-      clicks: "—",
-      ctr: "—",
+      // 預設為0
+      views: 0,
+      clicks: 0,
+      ctr: "0.00%",
     };
   }
 
@@ -518,6 +519,21 @@ export function useAdvertisementManagement() {
         toAdvertisementViewModel,
       );
 
+      let advertisementStats = [];
+
+      if (refreshedAds.length > 0) {
+        const statsResult = await getAdvertisementStats(
+          // 目前廣告轉為ID陣列，查詢統計後轉Map
+          refreshedAds.map((ad) => ad.id),
+        );
+
+        advertisementStats = statsResult.data || [];
+      }
+
+      const statsByAdId = new Map(
+        advertisementStats.map((stats) => [Number(stats.adId), stats]),
+      );
+
       ads.value = refreshedAds.map((ad) => {
         const previousAd = previousAds.get(ad.id);
 
@@ -525,8 +541,14 @@ export function useAdvertisementManagement() {
         const shouldKeepImageState =
           previousAd && previousAd.imageUrl === ad.imageUrl;
 
+        const stats = statsByAdId.get(Number(ad.id));
+
+        // 統計合併進廣告資料
         return {
           ...ad,
+          views: stats?.views ?? 0,
+          clicks: stats?.clicks ?? 0,
+          ctr: `${Number(stats?.ctr ?? 0).toFixed(2)}%`,
           imageLoadFailed: shouldKeepImageState
             ? previousAd.imageLoadFailed
             : false,

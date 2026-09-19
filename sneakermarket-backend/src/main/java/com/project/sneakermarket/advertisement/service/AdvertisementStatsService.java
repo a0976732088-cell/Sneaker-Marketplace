@@ -1,0 +1,142 @@
+package com.project.sneakermarket.advertisement.service;
+
+import com.project.sneakermarket.advertisement.dto.AdvertisementStatsResponse;
+import com.project.sneakermarket.advertisement.entity.Advertisement;
+import com.project.sneakermarket.advertisement.entity.AdvertisementStats;
+import com.project.sneakermarket.advertisement.repository.AdvertisementRepository;
+import com.project.sneakermarket.advertisement.repository.AdvertisementStatsRepository;
+import com.project.sneakermarket.advertisement.repository.AdvertisementStatsRepository.AdvertisementStatsTotalProjection;
+import com.project.sneakermarket.common.exception.BusinessException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class AdvertisementStatsService {
+
+    // 保證統計日期依台灣時間計算
+    private static final ZoneId TAIPEI_ZONE =
+            ZoneId.of("Asia/Taipei");
+
+    private final AdvertisementRepository advertisementRepository;
+    private final AdvertisementStatsRepository advertisementStatsRepository;
+
+    @Transactional
+    public void recordView(Long adId) {
+        AdvertisementStats stats = getOrCreateTodayStats(adId);
+
+        stats.setViewCount(stats.getViewCount() + 1);
+
+        advertisementStatsRepository.save(stats);
+    }
+
+    @Transactional
+    public void recordClick(Long adId) {
+        AdvertisementStats stats = getOrCreateTodayStats(adId);
+
+        stats.setClickCount(stats.getClickCount() + 1);
+
+        advertisementStatsRepository.save(stats);
+    }
+
+    // 批次查詢方法
+    @Transactional(readOnly = true)
+    public List<AdvertisementStatsResponse> getTotalsByAdvertisementIds(
+            Collection<Long> adIds
+    ) {
+        List<Long> uniqueAdIds = adIds == null
+                ? List.of()
+                : adIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (uniqueAdIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, AdvertisementStatsTotalProjection> totalsByAdId =
+                advertisementStatsRepository
+                        .findTotalsByAdvertisementIds(uniqueAdIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                AdvertisementStatsTotalProjection::getAdId,
+                                Function.identity()
+                        ));
+
+        return uniqueAdIds.stream()
+                .map(adId -> {
+                    AdvertisementStatsTotalProjection totals =
+                            totalsByAdId.get(adId);
+
+                    long views = totals == null
+                            ? 0L
+                            : totals.getViews();
+
+                    long clicks = totals == null
+                            ? 0L
+                            : totals.getClicks();
+
+                    return new AdvertisementStatsResponse(
+                            adId,
+                            views,
+                            clicks,
+                            calculateCtr(views, clicks)
+                    );
+                })
+                .toList();
+    }
+
+    // 共用邏輯，觀看點擊相同流程
+    private AdvertisementStats getOrCreateTodayStats(Long adId) {
+        // 執行悲觀鎖定
+        Advertisement advertisement =
+                advertisementRepository.findByIdForUpdate(adId)
+                        // 需要時才建立例外
+                        .orElseThrow(() ->
+                                new BusinessException("找不到指定的廣告"));
+
+        LocalDate today = LocalDate.now(TAIPEI_ZONE);
+
+        return advertisementStatsRepository
+                .findByAdvertisementAdIdAndStatDate(adId, today)
+                // 資料不存在時才執行，有資料回傳，沒資料建立新stats
+                .orElseGet(() -> {
+                    AdvertisementStats stats = new AdvertisementStats();
+
+                    stats.setAdvertisement(advertisement);
+                    stats.setStatDate(today);
+                    stats.setViewCount(0L);
+                    stats.setClickCount(0L);
+
+                    return stats;
+                });
+    }
+
+    // 計算CTR = (點擊/曝光) x 100%
+    private BigDecimal calculateCtr(long views, long clicks) {
+        if (views <= 0){
+            return BigDecimal.ZERO.setScale(2);
+        }
+        // 方法鏈式呼叫
+        return BigDecimal.valueOf(clicks)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(
+                        BigDecimal.valueOf(views),
+                        2,
+                        RoundingMode.HALF_UP
+                );
+    }
+}

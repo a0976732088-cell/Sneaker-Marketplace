@@ -67,3 +67,25 @@ export async function uploadAdvertisementImage(file, adPlacement) {
 
   return response.data;
 }
+
+export async function recordAdvertisementView(adId) {
+  const response = await httpClient.post(`/ads/${adId}/views`);
+
+  return response.data;
+}
+
+export async function recordAdvertisementClick(adId) {
+  const response = await httpClient.post(`/ads/${adId}/clicks`);
+
+  return response.data;
+}
+
+export async function getAdvertisementStats(adIds) {
+  const response = await httpClient.get("/admin/ads/stats", {
+    params: {
+      adIds: adIds.join(","),
+    },
+  });
+
+  return response.data;
+}

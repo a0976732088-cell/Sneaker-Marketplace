@@ -3,6 +3,8 @@ import { useRouter } from "vue-router";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   getPublicActiveAdvertisements,
+  recordAdvertisementClick,
+  recordAdvertisementView,
   resolveAdvertisementImageUrl,
 } from "@/service/advertisementService";
 import { getCurrentMember } from "@/service/authService";
@@ -36,6 +38,8 @@ function hasPlacement(placement) {
 }
 
 const ads = ref([]);
+// set去重viewed
+const viewedAdIds = new Set();
 const router = useRouter();
 // 是否已有會員登入
 const isLoggedIn = ref(false);
@@ -68,9 +72,39 @@ async function loadLoginStatus() {
     sessionChecked.value = true;
   }
 }
+// 上報view
+function trackAdvertisementView(ad) {
+  const adId = Number(ad?.adId);
+
+  if (!Number.isInteger(adId) || adId <= 0 || viewedAdIds.has(adId)) {
+    return;
+  }
+
+  viewedAdIds.add(adId);
+
+  recordAdvertisementView(adId).catch((error) => {
+    viewedAdIds.delete(adId);
+    console.error("廣告曝光紀錄失敗：", error);
+  });
+}
+// 上報click，點擊不需要使用set
+function trackAdvertisementClick(ad) {
+  const adId = Number(ad?.adId);
+
+  if (!Number.isInteger(adId) || adId <= 0) {
+    return;
+  }
+
+  recordAdvertisementClick(adId).catch((error) => {
+    console.error("廣告點擊紀錄失敗：", error);
+  });
+}
 
 function goToAdvertisementTarget(ad) {
   if (!ad) return;
+
+  // 放!ad後面避免空值上報
+  trackAdvertisementClick(ad);
 
   if (ad.targetType === "CATEGORY") {
     if (ad.targetId) {
@@ -224,6 +258,7 @@ function handlePopupClick() {
 
   // 未登入者固定前往註冊頁
   if (!isLoggedIn.value) {
+    trackAdvertisementClick(currentPopup.value);
     router.push({ name: "register" });
     return;
   }
@@ -245,6 +280,40 @@ const currentSmallBlock = computed(() => {
     ) || null
   );
 });
+
+watch(
+  currentBanner,
+  (ad) => {
+    trackAdvertisementView(ad);
+  },
+  { immediate: true },
+);
+
+watch(
+  currentPopup,
+  (ad) => {
+    trackAdvertisementView(ad);
+  },
+  { immediate: true },
+);
+
+watch(
+  currentSmallBlock,
+  (ad) => {
+    trackAdvertisementView(ad);
+  },
+  { immediate: true },
+);
+
+watch(
+  categoryCardAds,
+  (categoryAds) => {
+    categoryAds.forEach((ad) => {
+      trackAdvertisementView(ad);
+    });
+  },
+  { immediate: true },
+);
 
 function nextBanner() {
   if (displayedBannerAds.value.length === 0) return;
@@ -300,7 +369,9 @@ async function loadAdvertisements(silent = false) {
     }
   }
 }
+
 let advertisementRefreshTimer = null;
+
 onMounted(async () => {
   // 廣告與 Session 狀態可以同時讀取
   await Promise.all([loadAdvertisements(), loadLoginStatus()]);
@@ -311,6 +382,7 @@ onMounted(async () => {
     restartBannerTimer();
   }, 60000);
 });
+
 onUnmounted(() => {
   if (bannerTimer !== null) {
     window.clearTimeout(bannerTimer);
@@ -408,6 +480,7 @@ onUnmounted(() => {
                 <strong>{{ ad.adName }}</strong>
               </button>
 
+              <!-- 廣告被元件實際選中顯示，而且同一次元件掛載只計一次 -->
               <RouterLink
                 v-if="ad.targetType === 'CATEGORY' && ad.targetId"
                 class="category-view-link"
@@ -417,6 +490,7 @@ onUnmounted(() => {
                     categoryId: ad.targetId,
                   },
                 }"
+                @click="trackAdvertisementClick(ad)"
               >
                 查看相關
               </RouterLink>
