@@ -29,6 +29,8 @@ const {
   isUploadingImage,
   minimumStartAt,
   isStartAtLocked,
+  dashboardSummary,
+  loadDashboardSummary,
   handlePlacementChange,
   handleImageUpload,
   toggle,
@@ -45,8 +47,11 @@ const {
 let refreshTimer;
 onMounted(() => {
   loadAdvertisements();
+  loadDashboardSummary();
+
   refreshTimer = window.setInterval(() => {
     loadAdvertisements(currentPage.value, true);
+    loadDashboardSummary();
   }, 60_000);
 });
 onUnmounted(() => {
@@ -80,30 +85,51 @@ onUnmounted(() => {
         </div>
       </header>
 
-      <!-- <div class="metric-grid">
+      <div class="metric-grid">
         <article>
           <i class="coral">↗</i>
           <div>
-            <span>目前投放中</span><strong>2 <small>則</small></strong>
+            <span>目前投放中</span>
+            <strong>
+              {{
+                dashboardSummary.activeAdvertisements.toLocaleString("zh-TW")
+              }}
+              <small>則</small>
+            </strong>
           </div>
-          <em>較上週 +1</em>
         </article>
+
         <article>
           <i class="blue">◫</i>
-          <div><span>本月曝光次數</span><strong>418.2K</strong></div>
-          <em>↑ 12.8%</em>
+          <div>
+            <span>本月曝光次數</span>
+            <strong>
+              <!--顯示完整類似會計數字-->
+              {{ dashboardSummary.views.toLocaleString("zh-TW") }}
+            </strong>
+          </div>
         </article>
+
         <article>
           <i class="violet">⌁</i>
-          <div><span>本月點擊次數</span><strong>18,742</strong></div>
-          <em>↑ 8.3%</em>
+          <div>
+            <span>本月點擊次數</span>
+            <strong>
+              <!--顯示完整類似會計數字-->
+              {{ dashboardSummary.clicks.toLocaleString("zh-TW") }}
+            </strong>
+          </div>
         </article>
+
         <article>
           <i class="mint">◎</i>
-          <div><span>平均點擊率</span><strong>4.48%</strong></div>
-          <em>↑ 0.6%</em>
+          <div>
+            <span>本月點擊率</span>
+            <!--顯示小數-->
+            <strong> {{ Number(dashboardSummary.ctr).toFixed(2) }}% </strong>
+          </div>
         </article>
-      </div> -->
+      </div>
 
       <div class="ad-panel">
         <AdvertisementFilterBar

@@ -142,11 +142,10 @@ onMounted(() => {
 
 <template>
   <section>
-    <!-- 一般商城顯示專用的靜態 BANNER 與 SMALL_BLOCK -->
+    <!-- 一般商城顯示專用的靜態、 BANNER 與 SMALL_BLOCK -->
+    <!-- 移除了:banner-order="1" :static-banner="true" -->
     <AdvertisementDisplay
-      :placements="['BANNER', 'SMALL_BLOCK']"
-      :banner-order="1"
-      :static-banner="true"
+      :placements="['SMALL_BLOCK']"
       :small-block-order="1"
     />
     <div class="shop-hero">

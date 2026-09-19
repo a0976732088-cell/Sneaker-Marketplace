@@ -4,6 +4,7 @@ import {
   deleteAdvertisement,
   getAdvertisementsByPage,
   getAdvertisementStats,
+  getAdvertisementDashboardSummary,
   updateAdvertisement,
   updateAdvertisementStatus,
   uploadAdvertisementImage,
@@ -27,6 +28,14 @@ export function useAdvertisementManagement() {
   const ads = ref([]);
   const loadingAds = ref(false);
   const loadError = ref("");
+
+  // 四個值屬同一份摘要資料
+  const dashboardSummary = reactive({
+    activeAdvertisements: 0,
+    views: 0,
+    clicks: 0,
+    ctr: 0,
+  });
 
   // 後端頁碼從 0 開始
   const currentPage = ref(0);
@@ -573,6 +582,20 @@ export function useAdvertisementManagement() {
     }
   }
 
+  async function loadDashboardSummary() {
+    try {
+      const result = await getAdvertisementDashboardSummary();
+      const summary = result.data || {};
+
+      dashboardSummary.activeAdvertisements = summary.activeAdvertisements ?? 0;
+      dashboardSummary.views = summary.views ?? 0;
+      dashboardSummary.clicks = summary.clicks ?? 0;
+      dashboardSummary.ctr = summary.ctr ?? 0;
+    } catch (error) {
+      console.error("廣告摘要載入失敗", error);
+    }
+  }
+
   // 切換頁籤時回到第一頁，並交由後端依狀態篩選後再分頁。
   watch(activeTab, () => {
     loadAdvertisements(0);
@@ -681,6 +704,8 @@ export function useAdvertisementManagement() {
     isUploadingImage,
     minimumStartAt,
     isStartAtLocked,
+    dashboardSummary,
+    loadDashboardSummary,
     handlePlacementChange,
     handleImageUpload,
     toggle,

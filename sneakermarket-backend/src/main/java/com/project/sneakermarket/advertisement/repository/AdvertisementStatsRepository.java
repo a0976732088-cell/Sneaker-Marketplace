@@ -27,10 +27,30 @@ public interface AdvertisementStatsRepository extends JpaRepository<Advertisemen
             @Param("adIds") Collection<Long> adIds
     );
 
+    // 日期區間總計查詢
+    @Query("""
+    SELECT COALESCE(SUM(stats.viewCount), 0) AS views,
+           COALESCE(SUM(stats.clickCount), 0) AS clicks
+    FROM AdvertisementStats stats
+    WHERE stats.statDate >= :startDate
+      AND stats.statDate < :endDate
+    """)
+    AdvertisementStatsSummaryProjection findSummaryByDateRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
     // Repository內部查詢結果形狀，與JPQL別名對應
     interface AdvertisementStatsTotalProjection {
 
         Long getAdId();
+
+        Long getViews();
+
+        Long getClicks();
+    }
+
+    interface AdvertisementStatsSummaryProjection {
 
         Long getViews();
 

@@ -13,6 +13,7 @@ import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
 import com.project.sneakermarket.advertisement.service.AdvertisementService;
 import com.project.sneakermarket.advertisement.service.AdvertisementStatsService;
 import com.project.sneakermarket.common.response.ApiResponse;
+import com.project.sneakermarket.advertisement.dto.AdvertisementDashboardSummaryResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.multipart.MultipartFile;
@@ -125,6 +126,17 @@ public class AdvertisementController {
 
         return ResponseEntity.ok(
                 ApiResponse.ok("廣告成效查詢成功", stats)
+        );
+    }
+
+    @GetMapping("/dashboard-summary")
+    public ResponseEntity<ApiResponse<AdvertisementDashboardSummaryResponse>>
+    getAdvertisementDashboardSummary() {
+        AdvertisementDashboardSummaryResponse summary =
+                adStatsService.getDashboardSummary();
+
+        return ResponseEntity.ok(
+                ApiResponse.ok("廣告儀表板摘要查詢成功", summary)
         );
     }
 }

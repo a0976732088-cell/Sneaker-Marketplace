@@ -51,6 +51,16 @@
       </div>
     </div>
 
+<<<<<<< HEAD
+=======
+    <!-- 競標商城廣告 -->
+    <!-- 拿掉了:banner-order="2" :static-banner="true" -->
+    <AdvertisementDisplay
+      :placements="['SMALL_BLOCK']"
+      :small-block-order="2"
+    />
+
+>>>>>>> 0c03091 (feat(advertisement): 完成儀錶板展示統計)
     <!-- 競標商品區 -->
     <div class="container py-4 auction-catalog">
       <header class="catalog-header">

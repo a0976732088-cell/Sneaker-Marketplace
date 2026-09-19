@@ -75,4 +75,11 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
     Optional<Advertisement> findByIdForUpdate(
             @Param("adId") Long adId
     );
+
+    // jpa衍生寫法
+    long countByAdStatusAndStartAtLessThanEqualAndEndAtAfter(
+            AdvertisementStatus adStatus,
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    );
 }

@@ -6,6 +6,9 @@ import com.project.sneakermarket.advertisement.entity.AdvertisementStats;
 import com.project.sneakermarket.advertisement.repository.AdvertisementRepository;
 import com.project.sneakermarket.advertisement.repository.AdvertisementStatsRepository;
 import com.project.sneakermarket.advertisement.repository.AdvertisementStatsRepository.AdvertisementStatsTotalProjection;
+import com.project.sneakermarket.advertisement.dto.AdvertisementDashboardSummaryResponse;
+import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
+import com.project.sneakermarket.advertisement.repository.AdvertisementStatsRepository.AdvertisementStatsSummaryProjection;
 import com.project.sneakermarket.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,7 @@ import java.math.RoundingMode;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -97,6 +101,41 @@ public class AdvertisementStatsService {
                     );
                 })
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AdvertisementDashboardSummaryResponse getDashboardSummary() {
+        LocalDate today = LocalDate.now(TAIPEI_ZONE);
+
+        // 例如9月1號到10月1號
+        LocalDate startDate = today.withDayOfMonth(1);
+        LocalDate endDate = startDate.plusMonths(1);
+
+        LocalDateTime now = LocalDateTime.now(TAIPEI_ZONE);
+
+        long activeAdvertisements =
+                advertisementRepository
+                        .countByAdStatusAndStartAtLessThanEqualAndEndAtAfter(
+                                AdvertisementStatus.ACTIVE,
+                                now,
+                                now
+                        );
+
+        AdvertisementStatsSummaryProjection summary =
+                advertisementStatsRepository.findSummaryByDateRange(
+                        startDate,
+                        endDate
+                );
+
+        long views = summary.getViews();
+        long clicks = summary.getClicks();
+
+        return new AdvertisementDashboardSummaryResponse(
+                activeAdvertisements,
+                views,
+                clicks,
+                calculateCtr(views, clicks)
+        );
     }
 
     // 共用邏輯，觀看點擊相同流程

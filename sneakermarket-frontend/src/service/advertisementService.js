@@ -89,3 +89,9 @@ export async function getAdvertisementStats(adIds) {
 
   return response.data;
 }
+
+export async function getAdvertisementDashboardSummary() {
+  const response = await httpClient.get("/admin/ads/dashboard-summary");
+
+  return response.data;
+}
