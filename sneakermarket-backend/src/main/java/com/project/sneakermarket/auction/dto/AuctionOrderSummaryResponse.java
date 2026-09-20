@@ -10,5 +10,7 @@ public record AuctionOrderSummaryResponse(
         String orderNumber, Long auctionId, String productName,
         BigDecimal finalPrice, String paymentMethod,
         AuctionPaymentStatus paymentStatus, AuctionShippingStatus shippingStatus,
-        AuctionOrderStatus orderStatus, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        AuctionOrderStatus orderStatus, LocalDateTime createdAt, LocalDateTime updatedAt,
+        String model, String size, String imageUrl, LocalDateTime paymentDueAt,
+        AuctionAdminManagementState managementState) {
 }

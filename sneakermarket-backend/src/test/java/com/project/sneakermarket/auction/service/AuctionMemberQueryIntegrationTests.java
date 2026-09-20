@@ -1,6 +1,7 @@
 package com.project.sneakermarket.auction.service;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -13,12 +14,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 
 import com.project.sneakermarket.auction.dto.AuctionAdminManagementState;
+import com.project.sneakermarket.auction.dto.AuctionOrderSummaryResponse;
 import com.project.sneakermarket.auction.entity.*;
 import com.project.sneakermarket.auction.repository.*;
 import com.project.sneakermarket.common.exception.BusinessException;
@@ -40,6 +43,7 @@ class AuctionMemberQueryIntegrationTests {
     @Autowired AuctionBidRepository bids;
     @Autowired AuctionResultRepository results;
     @Autowired AuctionOrderRepository orders;
+    @MockitoSpyBean AuctionProductImageRepository images;
     @Autowired MemberRepository members;
     @Autowired EntityManager em;
     @Autowired EntityManagerFactory emf;
@@ -169,6 +173,40 @@ class AuctionMemberQueryIntegrationTests {
     }
 
     @Test
+    void memberBidAndListingImagesPreferPrimaryThenSortedFallbackAndAllowNull() {
+        var primary = auction(seller, AuctionStatus.ACTIVE, NOW.plusSeconds(2));
+        var fallback = auction(seller, AuctionStatus.ACTIVE, NOW.plusSeconds(1));
+        var withoutImage = auction(seller, AuctionStatus.ACTIVE, NOW);
+        bid(primary, a, "6500", NOW.plusSeconds(2));
+        bid(fallback, a, "6500", NOW.plusSeconds(1));
+        bid(withoutImage, a, "6500", NOW);
+        image(primary, "/images/sorted-first.jpg", 1, false);
+        image(primary, "/images/primary.jpg", 99, true);
+        image(fallback, "/images/fallback-second.jpg", 2, false);
+        image(fallback, "/images/fallback-first.jpg", 1, false);
+        flush();
+        clearInvocations(images);
+
+        var bidRows = service.getMyBids(a, 0, 10).items();
+        var listingRows = service.getMyListings(seller, 0, 10).items();
+
+        assertEquals("/images/primary.jpg", bidRows.stream()
+                .filter(row -> row.auctionId().equals(primary.getAuctionId())).findFirst().orElseThrow().imageUrl());
+        assertEquals("/images/fallback-first.jpg", bidRows.stream()
+                .filter(row -> row.auctionId().equals(fallback.getAuctionId())).findFirst().orElseThrow().imageUrl());
+        assertNull(bidRows.stream().filter(row -> row.auctionId().equals(withoutImage.getAuctionId()))
+                .findFirst().orElseThrow().imageUrl());
+        assertEquals("/images/primary.jpg", listingRows.stream()
+                .filter(row -> row.auctionId().equals(primary.getAuctionId())).findFirst().orElseThrow().imageUrl());
+        assertEquals("/images/fallback-first.jpg", listingRows.stream()
+                .filter(row -> row.auctionId().equals(fallback.getAuctionId())).findFirst().orElseThrow().imageUrl());
+        assertNull(listingRows.stream().filter(row -> row.auctionId().equals(withoutImage.getAuctionId()))
+                .findFirst().orElseThrow().imageUrl());
+        verify(images, times(2)).findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(anyList());
+        verify(images, never()).findByAuctionProductIdOrderBySortOrderAsc(anyLong());
+    }
+
+    @Test
     void removedAndDeletedActiveAuctionsRemainInMemberHistoryWithManagementState() {
         var removed = auction(a, AuctionStatus.ACTIVE, NOW.minusMinutes(2));
         removed.setHighestBidderId(a);
@@ -223,8 +261,12 @@ class AuctionMemberQueryIntegrationTests {
 
     @Test
     void ordersAreBuyerScopedEvenWhenMemberSellsOtherOrders() {
-        var old = order(auction(seller, AuctionStatus.SOLD, NOW), a, seller, NOW.minusDays(1));
-        var recent = order(auction(seller, AuctionStatus.SOLD, NOW), a, seller, NOW);
+        var oldAuction = auction(seller, AuctionStatus.SOLD, NOW);
+        var recentAuction = auction(seller, AuctionStatus.SOLD, NOW);
+        var old = order(oldAuction, a, seller, NOW.minusDays(1));
+        var recent = order(recentAuction, a, seller, NOW);
+        recent.setPaymentDueAt(NOW.plusDays(1));
+        image(recentAuction, "/images/order-primary.jpg", 7, true);
         order(auction(a, AuctionStatus.SOLD, NOW), b, a, NOW.plusDays(1));
         flush();
         var page = service.getMyAuctionOrders(a, 0, 1);
@@ -234,6 +276,9 @@ class AuctionMemberQueryIntegrationTests {
         assertEquals(recent.getOrderNumber(), row.orderNumber());
         assertEquals(recent.getAuctionId(), row.auctionId());
         assertEquals("Member query fixture", row.productName());
+        assertEquals("Model 9", row.model());
+        assertEquals("US 9", row.size());
+        assertEquals("/images/order-primary.jpg", row.imageUrl());
         assertMoney("6500", row.finalPrice());
         assertEquals("Transfer", row.paymentMethod());
         assertEquals(AuctionPaymentStatus.PENDING, row.paymentStatus());
@@ -241,15 +286,25 @@ class AuctionMemberQueryIntegrationTests {
         assertEquals(AuctionOrderStatus.PENDING_PAYMENT, row.orderStatus());
         assertEquals(NOW, row.createdAt());
         assertEquals(NOW, row.updatedAt());
-        assertEquals(old.getOrderNumber(), service.getMyAuctionOrders(a, 1, 1).items().get(0).orderNumber());
+        assertEquals(NOW.plusDays(1), row.paymentDueAt());
+        assertEquals(AuctionAdminManagementState.VISIBLE, row.managementState());
+        var oldRow = service.getMyAuctionOrders(a, 1, 1).items().get(0);
+        assertEquals(old.getOrderNumber(), oldRow.orderNumber());
+        assertNull(oldRow.imageUrl());
+        assertNull(oldRow.paymentDueAt());
         assertEquals(1, service.getMyAuctionOrders(b, 0, 10).totalElements());
         assertTrue(service.getMyAuctionOrders(seller, 0, 10).items().isEmpty());
     }
 
     @Test
     void salesAreSellerScopedPaginatedAndReuseOrderSummary() {
-        var old = order(auction(seller, AuctionStatus.SOLD, NOW), a, seller, NOW.minusDays(1));
-        var recent = order(auction(seller, AuctionStatus.SOLD, NOW), b, seller, NOW);
+        var oldAuction = auction(seller, AuctionStatus.SOLD, NOW);
+        var recentAuction = auction(seller, AuctionStatus.SOLD, NOW);
+        var old = order(oldAuction, a, seller, NOW.minusDays(1));
+        var recent = order(recentAuction, b, seller, NOW);
+        recent.setPaymentDueAt(NOW.plusHours(12));
+        image(recentAuction, "/images/sale-second.jpg", 2, false);
+        image(recentAuction, "/images/sale-first.jpg", 1, false);
         var otherSellerOrder = order(auction(a, AuctionStatus.SOLD, NOW), b, a, NOW.plusDays(1));
         flush();
 
@@ -262,6 +317,9 @@ class AuctionMemberQueryIntegrationTests {
         assertEquals(recent.getOrderNumber(), row.orderNumber());
         assertEquals(recent.getAuctionId(), row.auctionId());
         assertEquals("Member query fixture", row.productName());
+        assertEquals("Model 9", row.model());
+        assertEquals("US 9", row.size());
+        assertEquals("/images/sale-first.jpg", row.imageUrl());
         assertMoney("6500", row.finalPrice());
         assertEquals("Transfer", row.paymentMethod());
         assertEquals(AuctionPaymentStatus.PENDING, row.paymentStatus());
@@ -269,13 +327,52 @@ class AuctionMemberQueryIntegrationTests {
         assertEquals(AuctionOrderStatus.PENDING_PAYMENT, row.orderStatus());
         assertEquals(NOW, row.createdAt());
         assertEquals(NOW, row.updatedAt());
-        assertEquals(old.getOrderNumber(), service.getMyAuctionSales(seller, 1, 1).items().get(0).orderNumber());
+        assertEquals(NOW.plusHours(12), row.paymentDueAt());
+        assertEquals(AuctionAdminManagementState.VISIBLE, row.managementState());
+        var oldRow = service.getMyAuctionSales(seller, 1, 1).items().get(0);
+        assertEquals(old.getOrderNumber(), oldRow.orderNumber());
+        assertNull(oldRow.imageUrl());
+        assertNull(oldRow.paymentDueAt());
 
         var buyerSales = service.getMyAuctionSales(a, 0, 10);
         assertEquals(1, buyerSales.totalElements());
         assertEquals(otherSellerOrder.getOrderNumber(), buyerSales.items().get(0).orderNumber());
         assertTrue(buyerSales.items().stream().noneMatch(item -> item.orderNumber().equals(old.getOrderNumber())));
         assertTrue(service.getMyAuctionSales(b, 0, 10).items().isEmpty());
+    }
+
+    @Test
+    void buyerAndSellerOrderSummariesExposeVisibleRemovedAndDeletedManagementStates() {
+        var visible = auction(seller, AuctionStatus.SOLD, NOW.minusMinutes(3));
+        var removed = auction(seller, AuctionStatus.SOLD, NOW.minusMinutes(2));
+        removed.setRemovedAt(NOW.minusMinutes(1));
+        removed.setRemovedByMemberId(seller);
+        removed.setRemoveReason("訂單摘要下架測試");
+        removed.setRemovedFromStatus(AuctionStatus.SOLD);
+        removed.setStatus(AuctionStatus.REMOVED);
+
+        var deleted = auction(seller, AuctionStatus.SOLD, NOW.minusMinutes(1));
+        deleted.setRemovedAt(NOW.minusSeconds(30));
+        deleted.setRemovedByMemberId(seller);
+        deleted.setRemoveReason("訂單摘要刪除前下架");
+        deleted.setRemovedFromStatus(AuctionStatus.SOLD);
+        deleted.setStatus(AuctionStatus.REMOVED);
+        deleted.setDeletedAt(NOW);
+        deleted.setDeletedByMemberId(seller);
+        deleted.setDeleteReason("訂單摘要刪除測試");
+
+        order(visible, a, seller, NOW.minusMinutes(3));
+        order(removed, a, seller, NOW.minusMinutes(2));
+        order(deleted, a, seller, NOW.minusMinutes(1));
+        flush();
+
+        var buyerRows = service.getMyAuctionOrders(a, 0, 10).items();
+        var sellerRows = service.getMyAuctionSales(seller, 0, 10).items();
+        for (var rows : List.of(buyerRows, sellerRows)) {
+            assertOrderManagementState(rows, visible.getAuctionId(), AuctionAdminManagementState.VISIBLE);
+            assertOrderManagementState(rows, removed.getAuctionId(), AuctionAdminManagementState.REMOVED);
+            assertOrderManagementState(rows, deleted.getAuctionId(), AuctionAdminManagementState.DELETED);
+        }
     }
 
     @Test
@@ -299,6 +396,7 @@ class AuctionMemberQueryIntegrationTests {
 
     @Test
     void emptyPagesAndBoundedSizesUseExistingPageContract() {
+        clearInvocations(images);
         for (var page : List.of(service.getMyBids(a, 0, 1000),
                 service.getMyListings(a, 0, 1000), service.getMyAuctionOrders(a, 0, 1000),
                 service.getMyAuctionSales(a, 0, 1000))) {
@@ -308,6 +406,8 @@ class AuctionMemberQueryIntegrationTests {
             assertEquals(0, page.totalPages());
             assertTrue(page.items().isEmpty());
         }
+        verify(images, never()).findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(anyList());
+        verify(images, never()).findByAuctionProductIdOrderBySortOrderAsc(anyLong());
         assertThrows(BusinessException.class, () -> service.getMyBids(a, -1, 10));
         assertThrows(BusinessException.class, () -> service.getMyBids(a, 0, 0));
         assertThrows(BusinessException.class, () -> service.getMyListings(a, -1, 10));
@@ -328,19 +428,35 @@ class AuctionMemberQueryIntegrationTests {
         }
         flush();
         var stats = emf.unwrap(SessionFactory.class).getStatistics();
+        clearInvocations(images);
         stats.clear();
         var bidPage = service.getMyBids(a, 0, 5);
         assertEquals(6, bidPage.totalElements());
         assertEquals(5, bidPage.items().size());
-        assertEquals(5, stats.getPrepareStatementCount()); // 聚合 + count + Auction + Product + Result
+        assertEquals(6, stats.getPrepareStatementCount()); // 聚合 + count + Auction + Product + Result + Image batch
+        verify(images).findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(anyList());
+        verify(images, never()).findByAuctionProductIdOrderBySortOrderAsc(anyLong());
         em.clear();
+        clearInvocations(images);
         stats.clear();
         service.getMyListings(seller, 0, 5);
-        assertEquals(4, stats.getPrepareStatementCount()); // Auction + count + Product + Result
+        assertEquals(5, stats.getPrepareStatementCount()); // Auction + count + Product + Result + Image batch
+        verify(images).findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(anyList());
+        verify(images, never()).findByAuctionProductIdOrderBySortOrderAsc(anyLong());
         em.clear();
+        clearInvocations(images);
         stats.clear();
         service.getMyAuctionOrders(a, 0, 5);
-        assertEquals(4, stats.getPrepareStatementCount()); // Order + count + Auction + Product
+        assertEquals(5, stats.getPrepareStatementCount()); // Order + count + Auction + Product + Image batch
+        verify(images).findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(anyList());
+        verify(images, never()).findByAuctionProductIdOrderBySortOrderAsc(anyLong());
+        em.clear();
+        clearInvocations(images);
+        stats.clear();
+        service.getMyAuctionSales(seller, 0, 5);
+        assertEquals(5, stats.getPrepareStatementCount()); // Order + count + Auction + Product + Image batch
+        verify(images).findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(anyList());
+        verify(images, never()).findByAuctionProductIdOrderBySortOrderAsc(anyLong());
         em.flush();
         assertEquals(0, stats.getEntityInsertCount());
         assertEquals(0, stats.getEntityUpdateCount());
@@ -350,6 +466,12 @@ class AuctionMemberQueryIntegrationTests {
     private void flush() { em.flush(); em.clear(); }
     private void assertMoney(String expected, BigDecimal actual) {
         assertEquals(0, new BigDecimal(expected).compareTo(actual));
+    }
+    private void assertOrderManagementState(List<AuctionOrderSummaryResponse> rows, Long auctionId,
+            AuctionAdminManagementState expected) {
+        assertEquals(expected, rows.stream()
+                .filter(row -> row.auctionId().equals(auctionId))
+                .findFirst().orElseThrow().managementState());
     }
     private Long member() {
         String token = UUID.randomUUID().toString();
@@ -410,6 +532,15 @@ class AuctionMemberQueryIntegrationTests {
         result.setEndedAt(NOW);
         result.setCreatedAt(NOW);
         results.saveAndFlush(result);
+    }
+    private void image(Auction auction, String url, int sortOrder, boolean primary) {
+        var image = new AuctionProductImage();
+        image.setAuctionProductId(auction.getAuctionProductId());
+        image.setImageUrl(url);
+        image.setSortOrder(sortOrder);
+        image.setIsPrimary(primary);
+        image.setCreatedAt(NOW);
+        images.saveAndFlush(image);
     }
     private AuctionOrder order(Auction auction, Long buyer, Long owner, LocalDateTime at) {
         var order = new AuctionOrder();

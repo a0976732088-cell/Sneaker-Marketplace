@@ -1,15 +1,19 @@
 package com.project.sneakermarket.auction.controller;
 
 import org.springframework.web.bind.annotation.*;
+import com.project.sneakermarket.auction.dto.AuctionOrderCheckoutUpdateRequest;
+import com.project.sneakermarket.auction.dto.AuctionOrderCheckoutUpdateResponse;
 import com.project.sneakermarket.auction.dto.AuctionOrderSummaryResponse;
 import com.project.sneakermarket.auction.dto.AuctionOrderDetailResponse;
 import com.project.sneakermarket.auction.dto.AuctionOrderPaymentResponse;
 import com.project.sneakermarket.auction.dto.PageData;
 import com.project.sneakermarket.auction.service.AuctionMemberQueryService;
+import com.project.sneakermarket.auction.service.AuctionOrderCheckoutService;
 import com.project.sneakermarket.auction.service.AuctionOrderPaymentService;
 import com.project.sneakermarket.auction.service.AuctionSessionMemberResolver;
 import com.project.sneakermarket.common.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -17,8 +21,19 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuctionOrderController {
     private final AuctionMemberQueryService queries;
+    private final AuctionOrderCheckoutService checkouts;
     private final AuctionOrderPaymentService payments;
     private final AuctionSessionMemberResolver sessionMemberResolver;
+
+    @PatchMapping("/{orderNumber}/checkout")
+    public ApiResponse<AuctionOrderCheckoutUpdateResponse> updateAuctionOrderCheckout(
+            @PathVariable String orderNumber,
+            @Valid @RequestBody AuctionOrderCheckoutUpdateRequest body,
+            HttpServletRequest request) {
+        Long memberId = sessionMemberResolver.resolveMemberId(request.getSession(false));
+        return ApiResponse.ok("競標訂單收件資料已更新",
+                checkouts.update(orderNumber, memberId, body));
+    }
 
     @PostMapping("/{orderNumber}/pay")
     public ApiResponse<AuctionOrderPaymentResponse> payAuctionOrder(

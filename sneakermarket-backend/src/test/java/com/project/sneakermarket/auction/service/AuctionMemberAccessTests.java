@@ -37,7 +37,8 @@ class AuctionMemberAccessTests {
         // 同時註冊既有 Controller，確認 /me/bids 不會被 /{auctionId}/bids 攔截。
         mvc = MockMvcBuilders.standaloneSetup(
                 new AuctionMemberController(queries, resolver),
-                new AuctionOrderController(queries, mock(AuctionOrderPaymentService.class), resolver),
+                new AuctionOrderController(queries, mock(AuctionOrderCheckoutService.class),
+                        mock(AuctionOrderPaymentService.class), resolver),
                 new AuctionController(mock(AuctionQueryService.class), mock(AuctionCommandService.class),
                         mock(AuctionBidService.class), resolver, references))
                 .setControllerAdvice(new AuctionExceptionHandler(), new GlobalExceptionHandler()).build();
@@ -102,21 +103,28 @@ class AuctionMemberAccessTests {
     @Test
     void defaultPaginationAndAllResponsesExposeOnlySummaryFields() throws Exception {
         var at = LocalDateTime.of(2026, 9, 11, 12, 0);
+        var dueAt = at.plusDays(1);
         var money = new BigDecimal("6500");
         when(queries.getMyBids(77L, 0, 10)).thenReturn(new PageData<>(List.of(
                 new AuctionMyBidResponse(1L, "Shoe", "Model", "US 9", money, money, 3,
-                        AuctionStatus.SOLD, AuctionAdminManagementState.VISIBLE, false, true, AuctionResultStatus.SOLD, money, at, at)), 0, 10, 1, 1));
+                        AuctionStatus.SOLD, AuctionAdminManagementState.VISIBLE, false, true,
+                        AuctionResultStatus.SOLD, money, at, at, "/images/bid.jpg")), 0, 10, 1, 1));
         when(queries.getMyListings(77L, 0, 10)).thenReturn(new PageData<>(List.of(
                 new AuctionMyListingResponse(1L, "Shoe", "Model", "US 9", money, 3,
-                        AuctionStatus.SOLD, AuctionAdminManagementState.VISIBLE, AuctionResultStatus.SOLD, money, at, at, at)), 0, 10, 1, 1));
+                        AuctionStatus.SOLD, AuctionAdminManagementState.VISIBLE, AuctionResultStatus.SOLD,
+                        money, at, at, at, "/images/listing.jpg")), 0, 10, 1, 1));
         when(queries.getMyAuctionOrders(77L, 0, 10)).thenReturn(new PageData<>(List.of(
                 new AuctionOrderSummaryResponse("AO-test", 1L, "Shoe", money, "Transfer",
                         AuctionPaymentStatus.PENDING, AuctionShippingStatus.NOT_SHIPPED,
-                        AuctionOrderStatus.PENDING_PAYMENT, at, at)), 0, 10, 1, 1));
+                        AuctionOrderStatus.PENDING_PAYMENT, at, at,
+                        "Order Model", "US 10", "/images/order.jpg", dueAt,
+                        AuctionAdminManagementState.VISIBLE)), 0, 10, 1, 1));
         when(queries.getMyAuctionSales(77L, 0, 10)).thenReturn(new PageData<>(List.of(
                 new AuctionOrderSummaryResponse("AO-sale", 1L, "Shoe", money, "Transfer",
                         AuctionPaymentStatus.PAID, AuctionShippingStatus.NOT_SHIPPED,
-                        AuctionOrderStatus.PAID, at, at)), 0, 10, 1, 1));
+                        AuctionOrderStatus.PAID, at, at,
+                        "Sale Model", "US 11", "/images/sale.jpg", dueAt,
+                        AuctionAdminManagementState.REMOVED)), 0, 10, 1, 1));
         for (String path : List.of("/api/auctions/me/bids", "/api/auctions/me/listings", "/api/auction-orders/me",
                 "/api/auction-orders/me/sales")) {
             var request = mvc.perform(get(path).session(activeSession()))
@@ -132,7 +140,22 @@ class AuctionMemberAccessTests {
         mvc.perform(get("/api/auctions/me/bids").session(activeSession()))
                 .andExpect(jsonPath("$.data.items[0].won").value(true))
                 .andExpect(jsonPath("$.data.items[0].leading").value(false))
+                .andExpect(jsonPath("$.data.items[0].managementState").value("VISIBLE"))
+                .andExpect(jsonPath("$.data.items[0].imageUrl").value("/images/bid.jpg"));
+        mvc.perform(get("/api/auctions/me/listings").session(activeSession()))
+                .andExpect(jsonPath("$.data.items[0].imageUrl").value("/images/listing.jpg"));
+        mvc.perform(get("/api/auction-orders/me").session(activeSession()))
+                .andExpect(jsonPath("$.data.items[0].model").value("Order Model"))
+                .andExpect(jsonPath("$.data.items[0].size").value("US 10"))
+                .andExpect(jsonPath("$.data.items[0].imageUrl").value("/images/order.jpg"))
+                .andExpect(jsonPath("$.data.items[0].paymentDueAt").value("2026-09-12T12:00:00"))
                 .andExpect(jsonPath("$.data.items[0].managementState").value("VISIBLE"));
+        mvc.perform(get("/api/auction-orders/me/sales").session(activeSession()))
+                .andExpect(jsonPath("$.data.items[0].model").value("Sale Model"))
+                .andExpect(jsonPath("$.data.items[0].size").value("US 11"))
+                .andExpect(jsonPath("$.data.items[0].imageUrl").value("/images/sale.jpg"))
+                .andExpect(jsonPath("$.data.items[0].paymentDueAt").value("2026-09-12T12:00:00"))
+                .andExpect(jsonPath("$.data.items[0].managementState").value("REMOVED"));
     }
 
     @ParameterizedTest

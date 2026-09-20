@@ -17,9 +17,21 @@ export function getMyAuctionSales({ page = 0, size = 10 } = {}) {
   return httpClient.get("/auction-orders/me/sales", { params: { page, size } });
 }
 
-/** 單筆競標訂單由後端 Session 驗證 buyer 身分。 */
+/** 單筆競標訂單由後端 Session 驗證 buyer / seller 身分及回傳欄位可見性。 */
 export function getAuctionOrderDetail(orderNumber) {
   return httpClient.get("/auction-orders/" + encodeURIComponent(orderNumber));
+}
+
+/** 付款前只允許更新訂單既有的收件 Snapshot。 */
+export function updateAuctionOrderCheckout(orderNumber, payload) {
+  return httpClient.patch(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/checkout",
+    {
+      receiverName: payload.receiverName,
+      receiverPhone: payload.receiverPhone,
+      shippingAddress: payload.shippingAddress,
+    },
+  );
 }
 
 /** 付款內容完全由後端既有訂單決定，不傳 Request Body。 */

@@ -30,6 +30,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.project.sneakermarket.auction.dto.AuctionOrderPaymentResponse;
+import com.project.sneakermarket.auction.dto.AuctionOrderCheckoutUpdateRequest;
+import com.project.sneakermarket.auction.dto.AuctionOrderViewerRole;
 import com.project.sneakermarket.auction.email.AuctionEmailService;
 import com.project.sneakermarket.auction.entity.Auction;
 import com.project.sneakermarket.auction.entity.AuctionCondition;
@@ -63,6 +65,8 @@ class AuctionOrderPaymentIntegrationTests {
     private static final LocalDateTime PAYMENT_DUE_AT = PAYMENT_AT.plusHours(1);
 
     @Autowired private AuctionOrderPaymentService payments;
+    @Autowired private AuctionOrderCheckoutService checkouts;
+    @Autowired private AuctionMemberQueryService memberQueries;
     @Autowired private AuctionOrderPaymentDeadlineService deadlines;
     @Autowired private AuctionOrderRepository orders;
     @Autowired private AuctionRepository auctions;
@@ -148,6 +152,30 @@ class AuctionOrderPaymentIntegrationTests {
         assertEquals(1, orderNotifications("AUCTION_ORDER_PAID").size());
         verify(messaging, never()).convertAndSendToUser(
                 anyString(), eq(PRIVATE_DESTINATION), any());
+    }
+
+    @Test
+    void checkoutUpdateThenPaymentKeepsTheNewReceiverSnapshotInBuyerDetail() {
+        when(time.now()).thenReturn(PAYMENT_AT);
+
+        checkouts.update(orderNumber, buyerId, new AuctionOrderCheckoutUpdateRequest(
+                "  新收件人  ", "  0987654321  ", "  台中市新地址  "));
+        payments.pay(orderNumber, buyerId);
+
+        AuctionOrder persisted = orders.findByOrderNumber(orderNumber).orElseThrow();
+        assertEquals(AuctionPaymentStatus.PAID, persisted.getPaymentStatus());
+        assertEquals(AuctionOrderStatus.PAID, persisted.getOrderStatus());
+        assertEquals("新收件人", persisted.getReceiverName());
+        assertEquals("0987654321", persisted.getReceiverPhone());
+        assertEquals("台中市新地址", persisted.getShippingAddress());
+
+        var detail = memberQueries.getAuctionOrderDetail(buyerId, orderNumber);
+        assertEquals(AuctionOrderViewerRole.BUYER, detail.viewerRole());
+        assertTrue(detail.receiverInfoVisible());
+        assertEquals("新收件人", detail.receiverName());
+        assertEquals("0987654321", detail.receiverPhone());
+        assertEquals("台中市新地址", detail.shippingAddress());
+        assertEquals(PAYMENT_AT, detail.paidAt());
     }
 
     @Test

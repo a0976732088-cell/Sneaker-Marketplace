@@ -3,7 +3,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { ref } from "vue";
-import { formatMyBidOutcome, formatMemberAuctionStatus, formatMemberManagementState, formatMemberPublicDetailNotice, formatAuctionOrderStatus } from "../src/utils/auctionMemberStatus.js";
+import {
+  formatMemberAuctionStatus,
+  formatMemberManagementState,
+  formatMemberPublicDetailNotice,
+  formatMyBidOutcome,
+  formatMyListingStatus,
+  getMyBidStatusTone,
+  getMyListingStatusTone,
+} from "../src/utils/auctionMemberStatus.js";
 
 const source = await readFile(new URL("../src/components/auction/AuctionMemberPage.vue", import.meta.url), "utf8");
 const script = source.match(/<script setup>([\s\S]*?)<\/script>/)[1]
@@ -124,15 +132,22 @@ test("new member page loads only the current session response without a shared c
   assert.deepEqual(memberB.items.value.map((row) => row.auctionId), [2]);
 });
 
-test("bid outcomes distinguish leading, outbid, won and lost without depending on order", () => {
-  assert.equal(formatMyBidOutcome({ status: "ACTIVE", managementState: "VISIBLE", leading: true }), "目前領先");
-  assert.equal(formatMyBidOutcome({ status: "ACTIVE", managementState: "VISIBLE", leading: false }), "已被超價");
-  assert.equal(formatMyBidOutcome({ status: "SOLD", resultStatus: "SOLD", won: true }), "已得標");
-  assert.equal(formatMyBidOutcome({ status: "SOLD", resultStatus: "SOLD", won: false }), "未得標");
-  for (const [status, label] of [["UNSOLD", "流標"], ["CANCELLED", "已取消"], ["REMOVED", "廢標"]]) {
-    assert.equal(formatMyBidOutcome({ status }), label);
-    assert.equal(formatMemberAuctionStatus(status), label);
+test("bid outcomes expose one customer-facing status and matching tone", () => {
+  const cases = [
+    [{ status: "ACTIVE", managementState: "VISIBLE", leading: true }, "目前領先", "positive"],
+    [{ status: "ACTIVE", managementState: "VISIBLE", leading: false }, "已被超價", "warning"],
+    [{ status: "SOLD", resultStatus: "SOLD", won: true }, "已得標", "positive"],
+    [{ status: "SOLD", resultStatus: "SOLD", won: false }, "未得標", "neutral"],
+    [{ status: "UNSOLD" }, "流標", "neutral"],
+    [{ status: "CANCELLED" }, "已取消", "danger"],
+    [{ status: "REMOVED" }, "廢標", "danger"],
+  ];
+
+  for (const [bid, label, tone] of cases) {
+    assert.equal(formatMyBidOutcome(bid), label);
+    assert.equal(getMyBidStatusTone(bid), tone);
   }
+
   assert.equal(formatMyBidOutcome({ status: "ACTIVE", managementState: "REMOVED", leading: true }), "已由平台下架");
   assert.equal(formatMyBidOutcome({ status: "REMOVED", resultStatus: "REMOVED", managementState: "REMOVED", leading: true, won: false }), "廢標");
   assert.equal(formatMyBidOutcome({ status: "ACTIVE", resultStatus: "REMOVED", managementState: "REMOVED", leading: true, won: true }), "廢標");
@@ -142,10 +157,29 @@ test("bid outcomes distinguish leading, outbid, won and lost without depending o
   assert.equal(formatMemberManagementState("DELETED"), "已由平台刪除");
   assert.equal(formatMemberPublicDetailNotice("REMOVED"), "已由平台下架，公開詳細頁不可查看");
   assert.equal(formatMemberPublicDetailNotice("DELETED"), "已由平台刪除，公開詳細頁不可查看");
+});
+
+test("listing statuses cover every lifecycle and moderation outcome", () => {
+  const cases = [
+    [{ status: "SCHEDULED", managementState: "VISIBLE" }, "未開始", "warning"],
+    [{ status: "ACTIVE", managementState: "VISIBLE" }, "競標中", "positive"],
+    [{ status: "SOLD", resultStatus: "SOLD", managementState: "VISIBLE" }, "已結標", "positive"],
+    [{ status: "UNSOLD", resultStatus: "UNSOLD", managementState: "VISIBLE" }, "流標", "neutral"],
+    [{ status: "CANCELLED", resultStatus: "CANCELLED", managementState: "VISIBLE" }, "已取消", "danger"],
+    [{ status: "ACTIVE", resultStatus: null, managementState: "REMOVED" }, "已下架", "danger"],
+    [{ status: "REMOVED", resultStatus: "REMOVED", managementState: "REMOVED" }, "廢標", "danger"],
+    [{ status: "REMOVED", resultStatus: "REMOVED", managementState: "DELETED" }, "已刪除", "danger"],
+  ];
+
+  for (const [listing, label, tone] of cases) {
+    assert.equal(formatMyListingStatus(listing), label);
+    assert.equal(getMyListingStatusTone(listing), tone);
+  }
+
+  assert.equal(formatMemberAuctionStatus("SCHEDULED"), "尚未開始");
+  assert.equal(formatMemberAuctionStatus("ACTIVE"), "競標中");
+  assert.equal(formatMemberAuctionStatus("SOLD"), "已結標");
   assert.equal(formatMemberAuctionStatus(null), "尚未結標");
-  assert.equal(formatAuctionOrderStatus("PENDING_PAYMENT"), "等待付款");
-  assert.equal(formatAuctionOrderStatus("NOT_SHIPPED"), "未出貨");
-  assert.equal(formatAuctionOrderStatus("ABANDONED"), "已棄標");
 });
 
 test("member views wire the shared page and use existing money/time formatters", async () => {
@@ -156,6 +190,8 @@ test("member views wire the shared page and use existing money/time formatters",
     assert.ok(view.includes("formatTwd("));
     assert.ok(view.includes("formatAuctionTime("));
     assert.ok(view.includes("查看競標"));
+    assert.ok(view.includes("AuctionRecordItem"));
+    assert.ok(view.includes(`:image-url="${file === "AuctionMyBidsView" ? "bid" : "listing"}.imageUrl"`));
   }
 
   const orderView = await readFile(new URL("../src/views/auction/AuctionOrderListView.vue", import.meta.url), "utf8");
@@ -166,12 +202,29 @@ test("member views wire the shared page and use existing money/time formatters",
   assert.ok(orderView.includes("formatTwd("));
   assert.ok(orderView.includes("formatAuctionTime("));
   assert.ok(orderView.includes("查看競標"));
+  assert.ok(orderView.includes("AuctionRecordItem"));
+  assert.ok(orderView.includes(':image-url="order.imageUrl"'));
 });
+
+test("bid and listing views provide the requested commerce empty states", async () => {
+  const bidView = await readFile(new URL("../src/views/auction/AuctionMyBidsView.vue", import.meta.url), "utf8");
+  assert.match(bidView, /empty-title="尚無出價紀錄"/);
+  assert.match(bidView, /empty-message="去競標商城看看目前正在競標的商品"/);
+  assert.match(bidView, /name: 'auction'[\s\S]*?>前往競標商城</);
+
+  const listingView = await readFile(new URL("../src/views/auction/AuctionMyListingsView.vue", import.meta.url), "utf8");
+  assert.match(listingView, /empty-title="尚無刊登紀錄"/);
+  assert.match(listingView, /empty-message="建立你的第一筆競標商品"/);
+  assert.match(listingView, /name: 'auction-create'[\s\S]*?>建立競標商品</);
+});
+
 test("member bid and listing views link public detail only for visible auctions", async () => {
   for (const file of ["AuctionMyBidsView", "AuctionMyListingsView"]) {
     const view = await readFile(new URL("../src/views/auction/" + file + ".vue", import.meta.url), "utf8");
     const item = file === "AuctionMyBidsView" ? "bid" : "listing";
     assert.ok(view.includes("managementState === 'VISIBLE'"));
     assert.ok(view.includes("formatMemberPublicDetailNotice(" + item + ".managementState)"));
+    assert.match(view, new RegExp(`v-if="${item}\\.managementState === 'VISIBLE'"[\\s\\S]*?name: 'auction-detail'`));
+    assert.match(view, new RegExp(`v-else[\\s\\S]*?formatMemberPublicDetailNotice\\(${item}\\.managementState\\)`));
   }
 });

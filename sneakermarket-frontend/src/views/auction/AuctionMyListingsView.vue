@@ -1,33 +1,70 @@
 <template>
-  <AuctionMemberPage title="我的刊登" empty-message="目前沒有刊登紀錄" :fetch-page="getMyListings">
+  <AuctionMemberPage
+    title="刊登紀錄"
+    empty-title="尚無刊登紀錄"
+    empty-message="建立你的第一筆競標商品"
+    :fetch-page="getMyListings"
+  >
+    <template #empty-action>
+      <RouterLink class="empty-action" :to="{ name: 'auction-create' }">建立競標商品</RouterLink>
+    </template>
+
     <template #default="{ items }">
-      <div class="row g-3">
-        <div v-for="listing in items" :key="listing.auctionId" class="col-12 col-lg-6">
-          <article class="card h-100">
-            <div class="card-body">
-              <h2 class="h5">{{ listing.productName }}</h2>
-              <p class="text-muted">{{ listing.model }} · {{ listing.size }}</p>
-              <dl class="row mb-0">
-                <dt class="col-5">目前價格</dt><dd class="col-7">{{ formatTwd(listing.currentPrice) }}</dd>
-                <dt v-if="listing.finalPrice != null" class="col-5">成交價格</dt><dd v-if="listing.finalPrice != null" class="col-7">{{ formatTwd(listing.finalPrice) }}</dd>
-                <dt class="col-5">出價次數</dt><dd class="col-7">{{ listing.bidCount }}</dd>
-                <dt class="col-5">競標狀態</dt><dd class="col-7">{{ formatMemberAuctionStatus(listing.status) }}</dd>
-                <dt class="col-5">管理狀態</dt><dd class="col-7">{{ formatMemberManagementState(listing.managementState) }}</dd>
-                <dt class="col-5">結標結果</dt><dd class="col-7">{{ formatMemberAuctionStatus(listing.resultStatus) }}</dd>
-                <dt class="col-5">開始時間</dt><dd class="col-7">{{ formatAuctionTime(listing.startAt) }}</dd>
-                <dt class="col-5">結束時間</dt><dd class="col-7">{{ formatAuctionTime(listing.endAt) }}</dd>
-              </dl>
-              <RouterLink
-                v-if="listing.managementState === 'VISIBLE'"
-                class="btn btn-outline-primary"
-                :to="{ name: 'auction-detail', params: { id: listing.auctionId } }"
-              >查看競標</RouterLink>
-              <p v-else class="alert alert-secondary py-2 mb-0 small">
-                {{ formatMemberPublicDetailNotice(listing.managementState) }}
-              </p>
+      <div class="auction-record-list">
+        <AuctionRecordItem
+          v-for="listing in items"
+          :key="listing.auctionId"
+          :image-url="listing.imageUrl"
+          :image-alt="listing.productName"
+          :status="formatMyListingStatus(listing)"
+          :status-tone="getMyListingStatusTone(listing)"
+        >
+          <template #header>
+            <p class="record-reference">
+              競標 #{{ listing.auctionId }} · 刊登於 {{ formatAuctionTime(listing.createdAt) }}
+            </p>
+          </template>
+
+          <template #product>
+            <h2 class="record-product-title">{{ listing.productName }}</h2>
+            <p class="record-product-meta">{{ formatProductMeta(listing) }}</p>
+          </template>
+
+          <div class="record-metrics">
+            <div class="record-metric">
+              <span class="record-metric__label">
+                {{ listing.finalPrice != null ? "結標價格" : "目前價格" }}
+              </span>
+              <strong class="record-metric__value">
+                {{ formatTwd(listing.finalPrice ?? listing.currentPrice) }}
+              </strong>
             </div>
-          </article>
-        </div>
+            <div class="record-metric">
+              <span class="record-metric__label">出價</span>
+              <strong class="record-metric__value">{{ listing.bidCount ?? 0 }} 次</strong>
+            </div>
+          </div>
+
+          <p class="record-supporting-text">
+            <template v-if="listing.status === 'SCHEDULED'">
+              {{ formatAuctionTime(listing.startAt) }} 開始
+            </template>
+            <template v-else>{{ formatAuctionTime(listing.endAt) }} 結束</template>
+          </p>
+
+          <template #actions>
+            <RouterLink
+              v-if="listing.managementState === 'VISIBLE'"
+              class="record-action"
+              :to="{ name: 'auction-detail', params: { id: listing.auctionId } }"
+            >
+              查看競標 →
+            </RouterLink>
+            <p v-else class="record-action-notice">
+              {{ formatMemberPublicDetailNotice(listing.managementState) }}
+            </p>
+          </template>
+        </AuctionRecordItem>
       </div>
     </template>
   </AuctionMemberPage>
@@ -35,8 +72,17 @@
 
 <script setup>
 import AuctionMemberPage from "@/components/auction/AuctionMemberPage.vue";
+import AuctionRecordItem from "@/components/auction/AuctionRecordItem.vue";
 import { getMyListings } from "@/service/auctionService";
+import {
+  formatMemberPublicDetailNotice,
+  formatMyListingStatus,
+  getMyListingStatusTone,
+} from "@/utils/auctionMemberStatus";
 import { formatTwd } from "@/utils/auctionMoney";
 import { formatAuctionTime } from "@/utils/auctionTime";
-import { formatMemberAuctionStatus, formatMemberManagementState, formatMemberPublicDetailNotice } from "@/utils/auctionMemberStatus";
+
+function formatProductMeta(item) {
+  return [item.model, item.size].filter(Boolean).join(" · ") || "商品規格未提供";
+}
 </script>
