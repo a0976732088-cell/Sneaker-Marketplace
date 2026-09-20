@@ -39,14 +39,30 @@ function formatDate(dateString) {
   return `${year}/${month}/${day}`
 }
 
+function formatDateTime(dateString) {
+  if (!dateString) return '—'
+  const date = new Date(dateString)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${year}/${month}/${day} ${hour}:${minute}`
+}
+
 function paymentMethodLabel(method) {
-  const labels = { MOCK_CREDIT_CARD: '信用卡' }
+  const labels = { MOCK_CREDIT_CARD: '信用卡', ECPAY_CREDIT_CARD: '信用卡' }
   return labels[method] || method
 }
 
 function statusLabel(status) {
   const labels = { PAID: '已付款', PENDING: '等待確認' }
   return labels[status] || status
+}
+
+function shippingMethodLabel(method) {
+  const labels = { HOME_DELIVERY: '宅配', CVS: '7-11 超商取貨' }
+  return labels[method] || '宅配'
 }
 
 onMounted(() => {
@@ -68,7 +84,7 @@ onMounted(() => {
     <div class="p-4">
       <div class="d-flex justify-content-between mb-3">
         <span>訂單編號：{{ order.orderNumber }}</span>
-        <span class="text-secondary">訂購日：{{ formatDate(order.createdAt) }}</span>
+        <span class="text-secondary">訂購日：{{ formatDateTime(order.createdAt) }}</span>
       </div>
 
       <table class="table">
@@ -140,10 +156,11 @@ onMounted(() => {
         <div class="col-md-6 mb-3">
           <h6 class="fw-bold mb-2">付款狀態</h6>
           <span class="badge bg-secondary">{{ statusLabel(order.status) }}</span>
+          <p v-if="order.paidAt" class="mb-0 mt-1 text-secondary small">付款完成時間：{{ formatDateTime(order.paidAt) }}</p>
         </div>
         <div class="col-md-6 mb-3">
           <h6 class="fw-bold mb-2">運送狀態</h6>
-          <span class="badge bg-secondary">已出貨</span>
+          <span class="badge bg-secondary">待出貨</span>
         </div>
         <div class="col-md-6">
           <h6 class="fw-bold mb-2">付款方式</h6>
@@ -151,7 +168,10 @@ onMounted(() => {
         </div>
         <div class="col-md-6">
           <h6 class="fw-bold mb-2">運送方式</h6>
-          <span class="badge bg-secondary">宅配</span>
+          <span class="badge bg-secondary">{{ shippingMethodLabel(order.shippingMethod) }}</span>
+          <p v-if="order.shippingMethod === 'CVS' && order.cvsStoreName" class="mb-0 mt-1 text-secondary small">
+            取貨門市：{{ order.cvsStoreName }}
+          </p>
         </div>
       </div>
     </div>
