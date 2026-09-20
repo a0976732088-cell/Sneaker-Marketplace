@@ -20,13 +20,13 @@ public class OrderEmailListener {
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onOrderCreated(OrderCreatedEvent event) {
+    public void onPaymentSuccess(PaymentSuccessEvent event) {
 
         Order order = orderRepository.findById(event.getOrderId())
                 .orElseThrow(() -> new RuntimeException("找不到這張訂單"));
 
         MemberResponse member = memberService.getMember(event.getMemberId());
 
-        commerceEmailService.sendOrderCreatedEmail(member, order);
+        commerceEmailService.sendPaymentSuccessEmail(member, order);
     }
 }

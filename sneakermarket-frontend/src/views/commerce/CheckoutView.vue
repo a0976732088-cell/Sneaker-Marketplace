@@ -4,39 +4,54 @@ import httpClient from '@/service/httpClient'
 import { getCurrentMember } from '@/service/authService'
 import { useRouter } from 'vue-router'
 import CheckoutSteps from '@/components/commerce/CheckoutSteps.vue'
+import StoreMap from '@/views/commerce/StoreMap.vue'
 
 const router = useRouter()
 
 // ===== 會員資料 =====
 const memberEmail = ref('')
-const memberInfo = ref({ name: '', phone: '', address: '' }) // 存起來給「帶入會員資料」用，不直接綁定表單
+const memberInfo = ref({ name: '', phone: '', address: '' })
 const useMemberInfo = ref(false)
 
-// ===== 購物車資料（只用來顯示訂單摘要，不會送出） =====
+// ===== 購物車資料 =====
 const cartItems = ref([])
 const cartLoading = ref(true)
 
-// ===== 寄送資訊表單（預設空白，由使用者自己填或勾選帶入會員資料） =====
+// ===== 寄送資訊表單 =====
 const receiverName = ref('')
 const receiverPhone = ref('')
 const shippingAddress = ref('')
+
+// ===== 取貨方式 =====
+const shippingMethod = ref('HOME_DELIVERY') // HOME_DELIVERY 或 CVS
+const cvsStoreId = ref('')
+const cvsStoreName = ref('')
+const cvsStoreAddress = ref('')
+
+// 地圖選好門市後，把資料寫回同一組變數
+function handleStoreSelected(store) {
+  cvsStoreId.value = store.storeId
+  cvsStoreName.value = store.storeName
+  cvsStoreAddress.value = store.address
+}
+
+// 按「更換門市」：清空目前選擇，畫面會自動切回顯示地圖
+function resetStoreSelection() {
+  cvsStoreId.value = ''
+  cvsStoreName.value = ''
+  cvsStoreAddress.value = ''
+}
 
 // ===== 優惠券 =====
 const coupons = ref([])
 const couponId = ref('')
 
-// ===== 信用卡表單（純前端視覺 + 格式驗證，不會送到後端） =====
-const cardHolderName = ref('')
-const cardNumber = ref('')
-const cardExpiry = ref('')
-const cardCvv = ref('')
 
 const submitting = ref(false)
 const paymentSuccess = ref(false)
 const formError = ref('')
 const completedOrderId = ref(null)
 
-// ===== 訂單摘要計算（跟 CartView.vue 同一套邏輯，只算勾選的商品） =====
 const selectedItems = computed(() => cartItems.value.filter(item => item.selected))
 
 const subtotal = computed(() => {
@@ -69,7 +84,6 @@ async function loadMember() {
   }
 }
 
-// ===== 「帶入會員資料」核取方塊：勾選就填入、取消就清空 =====
 function toggleUseMemberInfo() {
   if (useMemberInfo.value) {
     receiverName.value = memberInfo.value.name
@@ -85,10 +99,10 @@ function toggleUseMemberInfo() {
 async function loadCart() {
   try {
     cartLoading.value = true
-    const response = await httpClient.get('/cart', { params: { memberId: 1 } }) // 之後改成真正登入的會員 ID，跟 CartView.vue 一樣的既有 TODO
+    const response = await httpClient.get('/cart', { params: { memberId: 1 } })
     cartItems.value = response.data
   } catch (error) {
-    // 訂單摘要載入失敗不擋結帳，安靜失敗
+    // 安靜失敗
   } finally {
     cartLoading.value = false
   }
@@ -99,7 +113,7 @@ async function loadCoupons() {
     const response = await httpClient.get('/coupons/me/available')
     coupons.value = response.data
   } catch (error) {
-    // 優惠券查詢失敗不影響結帳本身，安靜失敗就好
+    // 安靜失敗
   }
 }
 
@@ -109,78 +123,30 @@ onMounted(() => {
   loadCoupons()
 })
 
-// ===== 信用卡欄位格式化 =====
-function formatCardNumber(event) {
-  const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 16)
-  const groups = digitsOnly.match(/.{1,4}/g) || []
-  cardNumber.value = groups.join(' ')
-}
-
-function formatExpiry(event) {
-  const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 4)
-  if (digitsOnly.length <= 2) {
-    cardExpiry.value = digitsOnly
-  } else {
-    cardExpiry.value = digitsOnly.slice(0, 2) + '/' + digitsOnly.slice(2)
-  }
-}
-
-function formatCvv(event) {
-  cardCvv.value = event.target.value.replace(/\D/g, '').slice(0, 4)
-}
-
-// ===== 信用卡格式驗證（純前端，只是為了看起來逼真，不會真的刷卡） =====
-function validateCard() {
-  if (!cardHolderName.value.trim()) {
-    return '請輸入持卡人姓名'
-  }
-
-  const rawCardNumber = cardNumber.value.replace(/\s/g, '')
-  if (rawCardNumber.length < 13 || rawCardNumber.length > 16) {
-    return '卡號格式不正確'
-  }
-
-  const expiryMatch = cardExpiry.value.match(/^(\d{2})\/(\d{2})$/)
-  if (!expiryMatch) {
-    return '到期日格式不正確，請輸入 MM/YY'
-  }
-  const month = Number(expiryMatch[1])
-  const year = Number(expiryMatch[2]) + 2000
-  if (month < 1 || month > 12) {
-    return '到期月份不正確'
-  }
-  const now = new Date()
-  const expiryDate = new Date(year, month) // 該月份結束後才算過期
-  if (expiryDate < now) {
-    return '這張卡已經過期了'
-  }
-
-  if (cardCvv.value.length < 3) {
-    return '安全碼格式不正確'
-  }
-
-  return ''
-}
 
 async function checkout() {
   formError.value = ''
 
-  const cardError = validateCard()
-  if (cardError) {
-    formError.value = cardError
+  // 選超商取貨卻還沒選門市，先擋下來
+  if (shippingMethod.value === 'CVS' && !cvsStoreId.value) {
+    formError.value = '請先選擇取貨門市'
     return
   }
+
 
   submitting.value = true
   try {
     const response = await httpClient.post('/orders', {
       receiverName: receiverName.value,
       receiverPhone: receiverPhone.value,
-      shippingAddress: shippingAddress.value,
+      shippingAddress: shippingMethod.value === 'HOME_DELIVERY' ? shippingAddress.value : cvsStoreAddress.value,
+      shippingMethod: shippingMethod.value,
+      cvsStoreId: cvsStoreId.value || null,
+      cvsStoreName: cvsStoreName.value || null,
+      cvsAddress: cvsStoreAddress.value || null,
       couponId: couponId.value || null
     })
-    completedOrderId.value = response.data.orderId
-    paymentSuccess.value = true
+    window.location.href = `http://localhost:8080/api/payment/checkout/${response.data.orderId}`
   } catch (error) {
     alert(error.response?.data?.message || '結帳失敗，請稍後再試')
     submitting.value = false
@@ -210,10 +176,9 @@ async function checkout() {
   <div v-else>
     <CheckoutSteps :current-step="2" />
     <div class="row">
-      <!-- 左側：寄送資訊 + 付款 -->
       <div class="col-lg-7">
         <h5 class="mb-4">寄送資訊</h5>
-          
+
         <div class="mb-1">
           <label class="form-label">電子郵件</label>
           <input type="email" :value="memberEmail" class="form-control" disabled>
@@ -221,8 +186,8 @@ async function checkout() {
         <p class="text-secondary small mb-3">結帳後會寄發確認電子郵件。</p>
 
         <div class="d-flex justify-content-between align-items-center mb-2">
-        <p class="fw-semibold mb-2">輸入你的姓名和地址：</p>
-        <div class="form-check mb-0">
+          <p class="fw-semibold mb-2">輸入你的姓名和地址：</p>
+          <div class="form-check mb-0">
             <input type="checkbox" class="form-check-input" id="useMemberInfo" v-model="useMemberInfo" @change="toggleUseMemberInfo">
             <label class="form-check-label" for="useMemberInfo">帶入會員資料</label>
           </div>
@@ -236,8 +201,33 @@ async function checkout() {
           <input type="text" v-model="receiverPhone" placeholder="收件人電話" class="form-control">
         </div>
 
-        <div class="mb-4">
+        <div class="mb-3">
+          <label class="form-label d-block">取貨方式</label>
+          <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" id="methodHome" value="HOME_DELIVERY" v-model="shippingMethod" autocomplete="off">
+            <label class="btn btn-outline-dark" for="methodHome">宅配到府</label>
+
+            <input type="radio" class="btn-check" id="methodCvs" value="CVS" v-model="shippingMethod" autocomplete="off">
+            <label class="btn btn-outline-dark" for="methodCvs">7-11 超商取貨</label>
+          </div>
+        </div>
+
+        <div v-if="shippingMethod === 'HOME_DELIVERY'" class="mb-4">
           <input type="text" v-model="shippingAddress" placeholder="收件人地址" class="form-control">
+        </div>
+
+        <!-- ========================================================
+             選了 7-11 超商取貨才會進到這裡：
+             還沒選門市 -> 顯示地圖讓使用者點
+             已經選好門市 -> 收起地圖，顯示卡片
+             ======================================================== -->
+        <div v-else class="mb-4">
+          <div v-if="cvsStoreName" class="border rounded p-3">
+            <p class="mb-1 fw-semibold">取貨門市：{{ cvsStoreName }}</p>
+            <p class="mb-2 text-secondary small">{{ cvsStoreAddress }}</p>
+            <button type="button" class="btn btn-outline-dark btn-sm" @click="resetStoreSelection">更換門市</button>
+          </div>
+          <StoreMap v-else @store-selected="handleStoreSelected" />
         </div>
 
         <hr class="my-4">
@@ -255,15 +245,8 @@ async function checkout() {
           <div v-else class="text-secondary small">目前沒有可使用的優惠券</div>
         </div>
 
-        <div class="border rounded p-3 mb-3 bg-light">
-          💳 信用卡或金融簽帳卡
-        </div>
-
-        <input type="text" v-model="cardHolderName" placeholder="持卡人姓名" class="form-control mb-2">
-        <input type="text" :value="cardNumber" @input="formatCardNumber" placeholder="卡號" maxlength="19" class="form-control mb-2">
-        <div class="d-flex gap-2 mb-2">
-          <input type="text" :value="cardExpiry" @input="formatExpiry" placeholder="MM/YY" maxlength="5" class="form-control">
-          <input type="text" :value="cardCvv" @input="formatCvv" placeholder="安全碼" maxlength="4" class="form-control">
+        <div class="border rounded p-3 mb-3 bg-light text-secondary small">
+          點選「下訂單」後，將跳轉至綠界金流輸入信用卡資訊
         </div>
 
         <div v-if="formError" class="alert alert-danger py-2">
@@ -273,7 +256,6 @@ async function checkout() {
         <button class="btn btn-dark w-100 mt-3 rounded-pill" @click="checkout">下訂單</button>
       </div>
 
-      <!-- 右側：訂單摘要 -->
       <div class="col-lg-5">
         <div class="border rounded p-3" style="position: sticky; top: 76px;">
           <h5 class="mb-3">訂單摘要</h5>

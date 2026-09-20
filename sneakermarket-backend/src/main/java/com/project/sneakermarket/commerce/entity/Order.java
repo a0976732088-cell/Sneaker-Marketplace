@@ -63,6 +63,18 @@ public class Order {
     @Column(name = "shipping_address", nullable = false, length = 300)
     private String shippingAddress;
 
+    @Column(name = "shipping_method", length = 30)
+    private String shippingMethod;
+
+    @Column(name = "cvs_store_id", length = 20)
+    private String cvsStoreId;
+
+    @Column(name = "cvs_store_name", length = 100)
+    private String cvsStoreName;
+
+    @Column(name = "cvs_address", length = 200)
+    private String cvsAddress;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

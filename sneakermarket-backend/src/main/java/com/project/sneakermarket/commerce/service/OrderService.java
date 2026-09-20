@@ -3,6 +3,8 @@ import com.project.sneakermarket.commerce.email.OrderCreatedEvent;
 import com.project.sneakermarket.commerce.dto.OrderDetailResponse;
 import com.project.sneakermarket.commerce.dto.OrderItemResponse;
 import com.project.sneakermarket.commerce.dto.OrderListItemResponse;
+
+import com.project.sneakermarket.commerce.email.PaymentSuccessEvent;
 import com.project.sneakermarket.commerce.entity.Cart;
 import com.project.sneakermarket.commerce.entity.CartItem;
 import com.project.sneakermarket.commerce.entity.Order;
@@ -93,6 +95,10 @@ public class OrderService {
                 order.getReceiverName(),
                 order.getReceiverPhone(),
                 order.getShippingAddress(),
+                order.getShippingMethod(),
+                order.getCvsStoreId(),
+                order.getCvsStoreName(),
+                order.getCvsAddress(),
                 order.getCreatedAt(),
                 order.getPaidAt(),
                 order.getCompletedAt(),
@@ -106,7 +112,11 @@ public class OrderService {
                                            String receiverName,
                                            String receiverPhone,
                                            String shippingAddress,
-                                           Long couponId) {
+                                           Long couponId,
+                                           String shippingMethod,
+                                           String cvsStoreId,
+                                           String cvsStoreName,
+                                           String cvsAddress) {
 
         Cart cart = cartRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new RuntimeException("找不到這個購物車"));
@@ -148,12 +158,15 @@ public class OrderService {
         order.setDiscountAmount(discount);
         order.setShippingFee(BigDecimal.valueOf(100));
         order.setTotalAmount(subtotal.add(BigDecimal.valueOf(100)).subtract(discount));
-        order.setPaymentMethod("MOCK_CREDIT_CARD");
-        order.setStatus("PAID");
+        order.setPaymentMethod("ECPAY_CREDIT_CARD");
+        order.setStatus("PENDING");
         order.setReceiverName(receiverName);
         order.setReceiverPhone(receiverPhone);
         order.setShippingAddress(shippingAddress);
-        order.setPaidAt(LocalDateTime.now());
+        order.setShippingMethod(shippingMethod);
+        order.setCvsStoreId(cvsStoreId);
+        order.setCvsStoreName(cvsStoreName);
+        order.setCvsAddress(cvsAddress);
         orderRepository.save(order);
 
         // 每個勾選品項各自建立一筆訂單明細，並扣掉對應庫存
@@ -188,5 +201,25 @@ public class OrderService {
 
         // 全部存完才組回傳值（借用 getOrderDetail 邏輯）
         return getOrderDetail(memberId,order.getOrderId());
+
+    }
+    // 綠界確認付款成功後呼叫，把訂單狀態改成已付款
+    @Transactional
+    public void confirmPayment(Long orderId) {
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("找不到這張訂單"));
+
+        order.setStatus("PAID");
+        order.setPaidAt(LocalDateTime.now());
+
+        orderRepository.save(order);
+
+        eventPublisher.publishEvent(
+                new PaymentSuccessEvent(
+                        order.getOrderId(),
+                        order.getMemberId()
+                )
+        );
     }
 }
