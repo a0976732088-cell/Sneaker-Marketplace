@@ -8,6 +8,7 @@ import {
 import { getCurrentMember } from "@/service/authService";
 import { claimMemberPopup } from "./advertisementPopupMemory";
 import { useAdvertisementTracking } from "@/composables/advertisement/useAdvertisementTracking";
+import { getAuctions } from "@/service/auctionService";
 
 const props = defineProps({
   placements: {
@@ -37,6 +38,7 @@ function hasPlacement(placement) {
 }
 
 const ads = ref([]);
+const hotAuction = ref(null);
 
 const { trackAdvertisementClick, vViewableAd, disposeAdvertisementTracking } =
   useAdvertisementTracking();
@@ -77,6 +79,10 @@ async function loadLoginStatus() {
 function goToAdvertisementTarget(ad) {
   if (!ad) return;
 
+  if (ad.targetType === "HOT_AUCTION" && !hotAuction.value) {
+    return;
+  }
+
   // 放!ad後面避免空值上報
   trackAdvertisementClick(ad);
 
@@ -115,6 +121,14 @@ function goToAdvertisementTarget(ad) {
     }
   }
 
+  if (ad.targetType === "HOT_AUCTION") {
+    router.push({
+      name: "auction-detail",
+      params: { id: hotAuction.value.auctionId },
+    });
+    return;
+  }
+
   if (ad.targetType === "EVENT") {
     router.push({
       name: "calendar",
@@ -126,6 +140,22 @@ function goToAdvertisementTarget(ad) {
 
 const loading = ref(false);
 const errorMessage = ref("");
+
+async function loadHotAuction() {
+  try {
+    const response = await getAuctions({
+      status: "ACTIVE",
+      sort: "bidCount,desc",
+      page: 0,
+      size: 1,
+    });
+
+    hotAuction.value = response.data?.data?.items?.[0] ?? null;
+  } catch (error) {
+    console.error("熱門競標讀取失敗：", error);
+    hotAuction.value = null;
+  }
+}
 
 const bannerAds = computed(() =>
   ads.value.filter(
@@ -294,6 +324,15 @@ async function loadAdvertisements(silent = false) {
   try {
     const result = await getPublicActiveAdvertisements();
     ads.value = result.data || [];
+    const hasHotAuctionAd = ads.value.some(
+      (ad) => ad.targetType === "HOT_AUCTION" && hasPlacement(ad.adPlacement),
+    );
+
+    if (hasHotAuctionAd) {
+      await loadHotAuction();
+    } else {
+      hotAuction.value = null;
+    }
     errorMessage.value = "";
     if (bannerIndex.value >= displayedBannerAds.value.length) {
       bannerIndex.value = 0;
@@ -447,7 +486,10 @@ onUnmounted(() => {
 
       <aside
         v-if="
-          hasPlacement('SMALL_BLOCK') && showSmallBlock && currentSmallBlock
+          hasPlacement('SMALL_BLOCK') &&
+          showSmallBlock &&
+          currentSmallBlock &&
+          (currentSmallBlock.targetType !== 'HOT_AUCTION' || hotAuction)
         "
         v-viewable-ad="currentSmallBlock"
         class="small-block-ad"

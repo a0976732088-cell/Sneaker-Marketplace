@@ -58,6 +58,24 @@ function clearTarget() {
   showTargetSelector.value = false;
 }
 
+function enableHotAuction() {
+  emit("update:targetType", "HOT_AUCTION");
+  emit("update:targetId", null);
+  emit("update:targetUrl", "");
+
+  selectedTarget.value = null;
+  showTargetSelector.value = false;
+}
+
+function disableHotAuction() {
+  emit("update:targetType", "AUCTION");
+  emit("update:targetId", null);
+  emit("update:targetUrl", "");
+
+  selectedTarget.value = null;
+  showTargetSelector.value = false;
+}
+
 function handleTargetTypeChange(event) {
   emit("update:targetType", event.target.value);
   clearTarget();
@@ -83,7 +101,7 @@ function getTargetLabel(targetType) {
 
         <select
           class="target-type-select"
-          :value="targetType"
+          :value="targetType === 'HOT_AUCTION' ? 'AUCTION' : targetType"
           required
           @change="handleTargetTypeChange"
         >
@@ -98,12 +116,20 @@ function getTargetLabel(targetType) {
     <section class="target-picker">
       <div class="target-picker-header">
         <div>
-          <span>
+          <span v-if="targetType === 'HOT_AUCTION'">
+            熱門競標商品（自動）
+          </span>
+
+          <span v-else>
             指定{{ getTargetLabel(targetType) }}
             {{ targetType === "CATEGORY" ? "（必填）" : "（選填）" }}
           </span>
 
-          <small v-if="selectedTarget">
+          <small v-if="targetType === 'HOT_AUCTION'">
+            已啟用：系統會自動顯示出價次數最多的進行中競標。
+          </small>
+
+          <small v-else-if="selectedTarget">
             已選擇：{{ selectedTarget.name }}
           </small>
 
@@ -115,36 +141,74 @@ function getTargetLabel(targetType) {
             點擊廣告後，將前往活動行事曆。
           </small>
 
-          <small v-else>
-            未指定時，廣告會前往{{
-              targetType === "PRODUCT" ? "一般商城列表" : "競標商城列表"
-            }}。
+          <!-- <small v-else-if="targetType === 'AUCTION' && targetId">
+            目前仍指定競標編號 {{ targetId }}，可以清除或改為自動熱門競標。
+          </small> -->
+
+          <small v-else-if="targetType === 'AUCTION'">
+            未啟用時，廣告會前往競標商城列表。
           </small>
+
+          <small v-else> 未指定時，廣告會前往一般商城列表。 </small>
         </div>
 
         <div v-if="targetType !== 'EVENT'" class="target-picker-actions">
           <button
-            v-if="targetId"
+            v-if="targetType === 'HOT_AUCTION'"
             type="button"
             class="clear-target-button"
-            @click="clearTarget"
+            @click="disableHotAuction"
           >
-            清除
+            移除
           </button>
 
-          <button
-            type="button"
-            class="select-target-button"
-            @click="showTargetSelector = true"
-          >
-            選擇{{ getTargetLabel(targetType) }}
-          </button>
+          <template v-else-if="targetType === 'AUCTION'">
+            <!-- <button
+              v-if="targetId"
+              type="button"
+              class="clear-target-button"
+              @click="clearTarget"
+            >
+              清除舊設定
+            </button> -->
+
+            <button
+              type="button"
+              class="select-target-button"
+              @click="enableHotAuction"
+            >
+              自動熱門競標
+            </button>
+          </template>
+
+          <template v-else>
+            <button
+              v-if="targetId"
+              type="button"
+              class="clear-target-button"
+              @click="clearTarget"
+            >
+              清除
+            </button>
+
+            <button
+              type="button"
+              class="select-target-button"
+              @click="showTargetSelector = true"
+            >
+              選擇{{ getTargetLabel(targetType) }}
+            </button>
+          </template>
         </div>
       </div>
     </section>
 
     <AdvertisementTargetSelector
-      v-if="showTargetSelector"
+      v-if="
+        showTargetSelector &&
+        targetType !== 'AUCTION' &&
+        targetType !== 'HOT_AUCTION'
+        "
       :target-type="targetType"
       @select="handleTargetSelect"
       @close="showTargetSelector = false"
