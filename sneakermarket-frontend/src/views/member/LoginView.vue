@@ -39,9 +39,6 @@ async function handleLogin() {
   password: password.value,
 });
 
-console.log("登入成功");
-console.log("登入角色：", member.role);
-
 // ADMIN → 管理後台
 if (member.role === "ROLE_ADMIN") {
 
@@ -54,7 +51,7 @@ if (member.role === "ROLE_ADMIN") {
   await router.push("/ads/storefront");
 }
   } catch (error) {
-    console.error("登入失敗：", error);
+    console.error("登入失敗：");
 
     // fetch 版本使用 error.status
     if (error.status === 400 || error.status === 401) {

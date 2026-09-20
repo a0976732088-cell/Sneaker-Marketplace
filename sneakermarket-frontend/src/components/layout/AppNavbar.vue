@@ -172,16 +172,10 @@ async function loadCurrentMember() {
 
     currentMember.value = member;
 
-    console.log("Navbar 目前登入會員：", currentMember.value);
-
-    console.log("Navbar 目前角色：", currentMember.value?.role);
-
-    console.log("是否為 Admin：", isAdmin.value);
   } catch (error) {
     // 沒登入時
     currentMember.value = null;
 
-    console.log("Navbar：目前沒有登入會員");
   }
 }
 
@@ -200,12 +194,10 @@ async function handleLogout() {
     // 清掉 Navbar 的會員狀態
     currentMember.value = null;
 
-    console.log("會員登出成功");
-
     // 登出後回首頁
     await router.push("/");
   } catch (error) {
-    console.error("會員登出失敗：", error);
+    console.error("會員登出失敗：");
   }
 }
 
@@ -274,7 +266,7 @@ const fetchNotifications = async () => {
       return;
     }
 
-    console.error("取得通知失敗", err);
+    console.error("取得通知失敗");
   }
 };
 
@@ -288,7 +280,7 @@ function ensureAuctionPrivateSocketConnected() {
       // WebSocket 只表示通知資料有更新；正式資料仍由既有通知 API 取得
       onMessage: fetchNotifications,
       onError: (error) => {
-        console.error("競標私人通知連線失敗", error);
+        console.error("競標私人通知連線失敗");
       },
     });
   }
@@ -307,7 +299,7 @@ async function disconnectAuctionPrivateSocket() {
   try {
     await socket.disconnect();
   } catch (error) {
-    console.error("停止競標私人通知連線失敗", error);
+    console.error("停止競標私人通知連線失敗");
   }
 }
 
@@ -334,7 +326,7 @@ const handleMarkAsRead = async (id) => {
       target.isRead = true;
     }
   } catch (err) {
-    console.error("更新已讀狀態失敗", err);
+    console.error("更新已讀狀態失敗");
   }
 };
 
@@ -353,7 +345,7 @@ const handleMarkAllAsRead = async () => {
     }));
   } catch (error) {
     notificationError.value = "標為全部已讀失敗，請再試一次。";
-    console.error("標為全部已讀失敗", error);
+    console.error("標為全部已讀失敗");
   } finally {
     markAllLoading.value = false;
   }

@@ -33,23 +33,61 @@ function getBackendMessage(error, fallback) {
   return fallback;
 }
 
+/*
+ * 判斷字串是否包含中文。
+ *
+ * 目前需求：
+ * - 帳號不可包含中文
+ * - 密碼不可包含中文
+ */
+function containsChinese(value) {
+  return /[\u4E00-\u9FFF]/.test(value);
+}
+
 async function handleRegister() {
   errorMessage.value = "";
   successMessage.value = "";
 
+  /*
+   * 先清理文字欄位前後空白。
+   */
   const cleanAccount = account.value.trim();
   const cleanName = name.value.trim();
   const cleanEmail = email.value.trim();
   const cleanPhone = phone.value.trim();
   const cleanAddress = address.value.trim();
 
+  // =====================================================
+  // 帳號驗證
+  // =====================================================
+
   if (!cleanAccount) {
     errorMessage.value = "請輸入帳號";
     return;
   }
 
+  /*
+   * 帳號不可包含中文字元。
+   */
+  if (containsChinese(cleanAccount)) {
+    errorMessage.value = "帳號不可輸入中文";
+    return;
+  }
+
+  // =====================================================
+  // 密碼驗證
+  // =====================================================
+
   if (!password.value) {
     errorMessage.value = "請輸入密碼";
+    return;
+  }
+
+  /*
+   * 密碼不可包含中文字元。
+   */
+  if (containsChinese(password.value)) {
+    errorMessage.value = "密碼不可輸入中文";
     return;
   }
 
@@ -63,10 +101,18 @@ async function handleRegister() {
     return;
   }
 
+  // =====================================================
+  // 姓名驗證
+  // =====================================================
+
   if (!cleanName) {
     errorMessage.value = "請輸入姓名";
     return;
   }
+
+  // =====================================================
+  // Email 驗證
+  // =====================================================
 
   if (!cleanEmail) {
     errorMessage.value = "請輸入 Email";
@@ -80,16 +126,29 @@ async function handleRegister() {
     return;
   }
 
+  // =====================================================
+  // 手機驗證
+  // =====================================================
+
   if (!cleanPhone) {
     errorMessage.value = "請輸入手機號碼";
     return;
   }
 
-  // 09 開頭 + 後面 8 個數字，總共 10 碼
+  /*
+   * 09 開頭 + 後面 8 個數字
+   * 總共 10 碼。
+   */
   const phonePattern = /^09\d{8}$/;
 
   if (!phonePattern.test(cleanPhone)) {
-    errorMessage.value = "手機格式錯誤，需為 09 開頭後接 8 個數字";
+    errorMessage.value =
+      "手機格式錯誤，需為 09 開頭後接 8 個數字";
+    return;
+  }
+
+  if (!cleanAddress) {
+    errorMessage.value = "請輸入地址";
     return;
   }
 
@@ -105,15 +164,14 @@ async function handleRegister() {
       address: cleanAddress,
     });
 
-    console.log("註冊成功：", result);
-
-    successMessage.value = "註冊成功，即將前往登入頁面";
+    successMessage.value =
+      "註冊成功，即將前往登入頁面";
 
     setTimeout(() => {
       router.push("/login");
     }, 1000);
   } catch (error) {
-    console.error("註冊失敗：", error);
+    console.error("註冊失敗：");
 
     errorMessage.value = getBackendMessage(
       error,
@@ -128,19 +186,40 @@ async function handleRegister() {
 <template>
   <div class="register-page">
     <div class="register-card">
-      <h1 class="register-title">建立會員帳號</h1>
+      <h1 class="register-title">
+        建立會員帳號
+      </h1>
 
-      <div v-if="errorMessage" class="alert alert-danger">
+      <!-- 錯誤訊息 -->
+      <div
+        v-if="errorMessage"
+        class="alert alert-danger"
+      >
         {{ errorMessage }}
       </div>
 
-      <div v-if="successMessage" class="alert alert-success">
+      <!-- 註冊成功訊息 -->
+      <div
+        v-if="successMessage"
+        class="alert alert-success"
+      >
         {{ successMessage }}
       </div>
 
       <form @submit.prevent="handleRegister">
+
+        <!-- ========================================= -->
+        <!-- 帳號 -->
+        <!-- ========================================= -->
+
         <div class="mb-3">
-          <label for="account" class="form-label">帳號</label>
+          <label
+            for="account"
+            class="form-label"
+          >
+            帳號
+          </label>
+
           <input
             id="account"
             v-model="account"
@@ -149,12 +228,26 @@ async function handleRegister() {
             placeholder="請輸入帳號"
             autocomplete="username"
             :disabled="loading"
+            required
           />
-          <div class="form-text">帳號不可與既有會員重複。</div>
+
+          <div class="form-text">
+            帳號不可輸入中文，且不可與既有會員重複。
+          </div>
         </div>
 
+        <!-- ========================================= -->
+        <!-- 姓名 -->
+        <!-- ========================================= -->
+
         <div class="mb-3">
-          <label for="name" class="form-label">姓名</label>
+          <label
+            for="name"
+            class="form-label"
+          >
+            姓名
+          </label>
+
           <input
             id="name"
             v-model="name"
@@ -163,11 +256,22 @@ async function handleRegister() {
             placeholder="請輸入姓名"
             autocomplete="name"
             :disabled="loading"
+            required
           />
         </div>
 
+        <!-- ========================================= -->
+        <!-- Email -->
+        <!-- ========================================= -->
+
         <div class="mb-3">
-          <label for="email" class="form-label">Email</label>
+          <label
+            for="email"
+            class="form-label"
+          >
+            Email
+          </label>
+
           <input
             id="email"
             v-model="email"
@@ -176,12 +280,26 @@ async function handleRegister() {
             placeholder="example@email.com"
             autocomplete="email"
             :disabled="loading"
+            required
           />
-          <div class="form-text">Email 不可與既有會員重複。</div>
+
+          <div class="form-text">
+            Email 不可與既有會員重複。
+          </div>
         </div>
 
+        <!-- ========================================= -->
+        <!-- 手機 -->
+        <!-- ========================================= -->
+
         <div class="mb-3">
-          <label for="phone" class="form-label">手機</label>
+          <label
+            for="phone"
+            class="form-label"
+          >
+            手機
+          </label>
+
           <input
             id="phone"
             v-model="phone"
@@ -191,25 +309,59 @@ async function handleRegister() {
             autocomplete="tel"
             maxlength="10"
             :disabled="loading"
+            required
           />
-          <div class="form-text">格式：09 開頭後接 8 個數字，例如 0912345678。</div>
+
+          <div class="form-text">
+            格式：09 開頭後接 8 個數字，例如 0912345678。
+          </div>
         </div>
 
+        <!-- ========================================= -->
+        <!-- 地址 -->
+        <!--
+          ★ 這次修改：
+          原本地址可以不填，
+          現在改成必填。
+        -->
+        <!-- ========================================= -->
+
         <div class="mb-3">
-          <label for="address" class="form-label">地址</label>
+          <label
+            for="address"
+            class="form-label"
+          >
+            地址
+          </label>
+
           <input
             id="address"
             v-model="address"
             type="text"
             class="form-control"
-            placeholder="請輸入地址（可不填）"
+            placeholder="請輸入地址"
             autocomplete="street-address"
             :disabled="loading"
+            required
           />
+
+          <div class="form-text">
+            地址為必填欄位。
+          </div>
         </div>
 
+        <!-- ========================================= -->
+        <!-- 密碼 -->
+        <!-- ========================================= -->
+
         <div class="mb-3">
-          <label for="password" class="form-label">密碼</label>
+          <label
+            for="password"
+            class="form-label"
+          >
+            密碼
+          </label>
+
           <input
             id="password"
             v-model="password"
@@ -218,11 +370,26 @@ async function handleRegister() {
             placeholder="至少 8 碼"
             autocomplete="new-password"
             :disabled="loading"
+            required
           />
+
+          <div class="form-text">
+            密碼至少 8 碼，且不可輸入中文。
+          </div>
         </div>
 
+        <!-- ========================================= -->
+        <!-- 確認密碼 -->
+        <!-- ========================================= -->
+
         <div class="mb-4">
-          <label for="confirmPassword" class="form-label">確認密碼</label>
+          <label
+            for="confirmPassword"
+            class="form-label"
+          >
+            確認密碼
+          </label>
+
           <input
             id="confirmPassword"
             v-model="confirmPassword"
@@ -231,17 +398,35 @@ async function handleRegister() {
             placeholder="請再次輸入密碼"
             autocomplete="new-password"
             :disabled="loading"
+            required
           />
         </div>
 
-        <button type="submit" class="btn btn-dark w-100" :disabled="loading">
+        <!-- ========================================= -->
+        <!-- 建立帳號 -->
+        <!-- ========================================= -->
+
+        <button
+          type="submit"
+          class="btn btn-dark w-100"
+          :disabled="loading"
+        >
           {{ loading ? "註冊中..." : "建立帳號" }}
         </button>
 
         <div class="text-center mt-4">
-          <span class="text-secondary">已經有帳號？</span>
-          <RouterLink to="/login" class="login-link">登入</RouterLink>
+          <span class="text-secondary">
+            已經有帳號？
+          </span>
+
+          <RouterLink
+            to="/login"
+            class="login-link"
+          >
+            登入
+          </RouterLink>
         </div>
+
       </form>
     </div>
   </div>

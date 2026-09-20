@@ -98,9 +98,9 @@ async function loadCurrentMember() {
      */
     member.value = await getCurrentMember();
 
-    console.log("目前登入會員：", member.value);
+    
   } catch (error) {
-    console.error("取得會員資料失敗：", error);
+    console.error("取得會員資料失敗：");
 
     /*
      * 沒登入
@@ -218,7 +218,7 @@ async function saveMember() {
 
     isEditing.value = false;
   } catch (error) {
-    console.error("修改會員失敗：", error);
+    console.error("修改會員失敗：");
 
     errorMessage.value = getApiErrorMessage(error, "會員資料修改失敗");
   } finally {
@@ -282,7 +282,7 @@ async function handleChangePassword() {
 
     resetPasswordForm();
   } catch (error) {
-    console.error("修改密碼失敗：", error);
+    console.error("修改密碼失敗：");
 
     errorMessage.value = getApiErrorMessage(error, "密碼修改失敗");
   } finally {
@@ -329,13 +329,9 @@ async function handleDeleteAccount() {
 
     alert("帳號已刪除");
 
-    /*
-     * 後端 Session
-     * 已經 invalidate。
-     */
     await router.replace("/login");
   } catch (error) {
-    console.error("刪除帳號失敗：", error);
+    console.error("刪除帳號失敗：");
 
     errorMessage.value = getApiErrorMessage(error, "刪除帳號失敗");
   }

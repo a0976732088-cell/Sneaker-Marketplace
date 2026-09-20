@@ -68,7 +68,7 @@ async function loadLoginStatus() {
 
     // 不是正常的 401 才輸出錯誤
     if (error.status !== 401) {
-      console.error("會員登入狀態讀取失敗：", error);
+      console.error("會員登入狀態讀取失敗：");
     }
   } finally {
     // 不論有沒有登入，都表示檢查已完成

@@ -405,29 +405,15 @@ router.beforeEach(async (to) => {
   try {
     const member = await getCurrentMember();
 
-    console.log("目前登入會員：", member);
-
-    console.log("目前角色：", member.role);
-
-    // =============================================
-    // 不是 ADMIN
-    // =============================================
     if (member.role !== "ROLE_ADMIN") {
-      console.log("不是 ADMIN，禁止進入管理後台");
 
       return {
         name: "forbidden",
       };
     }
 
-    // =============================================
-    // ADMIN
-    // =============================================
-    console.log("ADMIN 驗證成功");
-
     return true;
   } catch (error) {
-    console.log("尚未登入，導向登入頁");
 
     return {
       name: "login",

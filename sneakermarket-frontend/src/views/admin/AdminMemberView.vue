@@ -424,7 +424,7 @@ async function checkAdminPermission() {
     currentAdmin.value = member;
     return true;
   } catch (error) {
-    console.error("管理員驗證失敗：", error);
+    console.error("管理員驗證失敗：");
 
     await router.replace({
       name: "login",
@@ -447,7 +447,7 @@ async function loadMembers() {
     const response = await getAllMembers();
     members.value = response.data;
   } catch (error) {
-    console.error("取得會員資料失敗：", error);
+    console.error("取得會員資料失敗：");
 
     errorMessage.value = getApiErrorMessage(
       error,
@@ -523,7 +523,7 @@ async function handleCreateMember() {
     closeCreateForm();
     await loadMembers();
   } catch (error) {
-    console.error("新增會員失敗：", error);
+    console.error("新增會員失敗：");
 
     errorMessage.value = getApiErrorMessage(
       error,
@@ -596,7 +596,7 @@ async function handleUpdateMember(memberId) {
     cancelEditMember();
     await loadMembers();
   } catch (error) {
-    console.error("修改會員失敗：", error);
+    console.error("修改會員失敗：");
 
     errorMessage.value = getApiErrorMessage(
       error,
@@ -635,7 +635,7 @@ async function handleDeleteMember(member) {
 
     await loadMembers();
   } catch (error) {
-    console.error("刪除會員失敗：", error);
+    console.error("刪除會員失敗：");
 
     errorMessage.value = getApiErrorMessage(
       error,
