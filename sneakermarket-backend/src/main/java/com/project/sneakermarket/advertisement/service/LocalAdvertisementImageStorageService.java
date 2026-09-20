@@ -56,9 +56,9 @@ public class LocalAdvertisementImageStorageService implements AdvertisementImage
                     new ImageRule(
                             "商品頁側欄",
                             300,
-                            300,
-                            1.0,
-                            "1:1"
+                            600,
+                            1.0 / 2.0,
+                            "1:2"
                     ),
 
                     AdvertisementPlacement.CATEGORY_CARD,

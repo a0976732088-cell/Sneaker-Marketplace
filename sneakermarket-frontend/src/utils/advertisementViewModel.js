@@ -4,6 +4,7 @@ const TYPE_LABELS = {
   NEW_PRODUCT: "新品推薦",
   AUCTION: "競標活動",
   DISCOUNT: "折扣優惠",
+  PLATFORM_EVENT: "行事曆活動",
 };
 
 const PLACEMENT_LABELS = {

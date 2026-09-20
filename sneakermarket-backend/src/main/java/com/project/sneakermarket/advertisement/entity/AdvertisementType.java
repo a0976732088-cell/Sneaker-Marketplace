@@ -4,5 +4,6 @@ public enum AdvertisementType {
     HOT_PRODUCT,
     NEW_PRODUCT,
     AUCTION,
-    DISCOUNT
+    DISCOUNT,
+    PLATFORM_EVENT
 }

@@ -26,11 +26,11 @@ export function useAdvertisementForm(notify) {
     SMALL_BLOCK: {
       label: "商品頁側欄",
       width: 600,
-      height: 600,
+      height: 1200,
       minimumWidth: 300,
-      minimumHeight: 300,
-      ratio: 1,
-      ratioLabel: "1:1",
+      minimumHeight: 600,
+      ratio: 1 / 2,
+      ratioLabel: "1:2",
     },
 
     CATEGORY_CARD: {

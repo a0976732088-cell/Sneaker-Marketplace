@@ -87,7 +87,7 @@ const emit = defineEmits([
           <label
             >廣告類型<select v-model="form.adType" required>
               <option value="NEW_PRODUCT">新品推薦</option>
-              <option value="HOT_PRODUCT">熱門商品</option>
+              <option value="HOT_PRODUCT">行事曆活動</option>
               <option value="AUCTION">競標活動</option>
               <!-- <option value="DISCOUNT">折扣優惠</option> -->
             </select></label
