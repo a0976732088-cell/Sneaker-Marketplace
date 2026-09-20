@@ -26,10 +26,10 @@ export function useAdvertisementList() {
   const pageSize = ref(5);
 
   const placementApiValues = {
-    首頁橫幅: "BANNER",
-    首頁彈窗: "POPUP",
-    商品頁側欄: "SMALL_BLOCK",
-    分類卡片: "CATEGORY_CARD",
+    橫幅: "BANNER",
+    彈窗: "POPUP",
+    側欄: "SMALL_BLOCK",
+    分類: "CATEGORY_CARD",
   };
 
   const tabStatusValues = {

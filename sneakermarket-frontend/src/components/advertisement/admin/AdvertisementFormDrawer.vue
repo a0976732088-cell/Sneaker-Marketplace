@@ -97,10 +97,10 @@ const emit = defineEmits([
               v-model="form.adPlacement"
               @change="emit('placement-change')"
             >
-              <option value="BANNER">首頁橫幅</option>
-              <option value="POPUP">首頁彈窗</option>
-              <option value="SMALL_BLOCK">商品頁側欄</option>
-              <option value="CATEGORY_CARD">分類卡片</option>
+              <option value="BANNER">橫幅</option>
+              <option value="POPUP">彈窗</option>
+              <option value="SMALL_BLOCK">側欄</option>
+              <option value="CATEGORY_CARD">分類</option>
             </select>
           </label>
         </div>

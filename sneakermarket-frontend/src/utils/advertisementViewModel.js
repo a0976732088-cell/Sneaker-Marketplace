@@ -8,10 +8,10 @@ const TYPE_LABELS = {
 };
 
 const PLACEMENT_LABELS = {
-  BANNER: "首頁橫幅",
-  POPUP: "首頁彈窗",
-  SMALL_BLOCK: "商品頁側欄",
-  CATEGORY_CARD: "分類卡片",
+  BANNER: "橫幅",
+  POPUP: "彈窗",
+  SMALL_BLOCK: "側欄",
+  CATEGORY_CARD: "分類",
 };
 
 function resolveDisplayStatus(ad) {

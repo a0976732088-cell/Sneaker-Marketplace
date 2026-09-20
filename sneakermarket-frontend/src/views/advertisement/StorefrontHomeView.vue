@@ -3,8 +3,6 @@ import AdvertisementShowcase from "@/components/advertisement/AdvertisementShowc
 </script>
 
 <template>
-  <h1>SneakerMarket</h1>
-  <p>球鞋商城與競標平台</p>
   <main class="demo-home">
     <AdvertisementShowcase />
 
