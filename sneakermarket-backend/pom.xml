@@ -28,6 +28,14 @@
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
+        <!-- Spring Boot 4 預設改用 Jackson 3 (tools.jackson)，
+     但程式碼中仍使用 com.fasterxml.jackson.databind (Jackson 2 API)，
+     故需明確加入此依賴，版本由 spring-boot-starter-parent 的 BOM 管理 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
         <!-- Bean Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
