@@ -48,18 +48,13 @@ async function handleRegister() {
   errorMessage.value = "";
   successMessage.value = "";
 
-  /*
-   * 先清理文字欄位前後空白。
-   */
   const cleanAccount = account.value.trim();
   const cleanName = name.value.trim();
   const cleanEmail = email.value.trim();
   const cleanPhone = phone.value.trim();
   const cleanAddress = address.value.trim();
 
-  // =====================================================
   // 帳號驗證
-  // =====================================================
 
   if (!cleanAccount) {
     errorMessage.value = "請輸入帳號";
@@ -142,8 +137,7 @@ async function handleRegister() {
   const phonePattern = /^09\d{8}$/;
 
   if (!phonePattern.test(cleanPhone)) {
-    errorMessage.value =
-      "手機格式錯誤，需為 09 開頭後接 8 個數字";
+    errorMessage.value = "手機格式錯誤，需為 09 開頭後接 8 個數字";
     return;
   }
 
@@ -164,8 +158,7 @@ async function handleRegister() {
       address: cleanAddress,
     });
 
-    successMessage.value =
-      "註冊成功，即將前往登入頁面";
+    successMessage.value = "註冊成功，即將前往登入頁面";
 
     setTimeout(() => {
       router.push("/login");
@@ -173,10 +166,7 @@ async function handleRegister() {
   } catch (error) {
     console.error("註冊失敗：");
 
-    errorMessage.value = getBackendMessage(
-      error,
-      "註冊失敗，請確認輸入資料"
-    );
+    errorMessage.value = getBackendMessage(error, "註冊失敗，請確認輸入資料");
   } finally {
     loading.value = false;
   }
@@ -186,39 +176,25 @@ async function handleRegister() {
 <template>
   <div class="register-page">
     <div class="register-card">
-      <h1 class="register-title">
-        建立會員帳號
-      </h1>
+      <h1 class="register-title">建立會員帳號</h1>
 
       <!-- 錯誤訊息 -->
-      <div
-        v-if="errorMessage"
-        class="alert alert-danger"
-      >
+      <div v-if="errorMessage" class="alert alert-danger">
         {{ errorMessage }}
       </div>
 
       <!-- 註冊成功訊息 -->
-      <div
-        v-if="successMessage"
-        class="alert alert-success"
-      >
+      <div v-if="successMessage" class="alert alert-success">
         {{ successMessage }}
       </div>
 
       <form @submit.prevent="handleRegister">
-
         <!-- ========================================= -->
         <!-- 帳號 -->
         <!-- ========================================= -->
 
         <div class="mb-3">
-          <label
-            for="account"
-            class="form-label"
-          >
-            帳號
-          </label>
+          <label for="account" class="form-label"> 帳號 </label>
 
           <input
             id="account"
@@ -231,9 +207,7 @@ async function handleRegister() {
             required
           />
 
-          <div class="form-text">
-            帳號不可輸入中文，且不可與既有會員重複。
-          </div>
+          <div class="form-text">帳號不可輸入中文。</div>
         </div>
 
         <!-- ========================================= -->
@@ -241,12 +215,7 @@ async function handleRegister() {
         <!-- ========================================= -->
 
         <div class="mb-3">
-          <label
-            for="name"
-            class="form-label"
-          >
-            姓名
-          </label>
+          <label for="name" class="form-label"> 姓名 </label>
 
           <input
             id="name"
@@ -265,12 +234,7 @@ async function handleRegister() {
         <!-- ========================================= -->
 
         <div class="mb-3">
-          <label
-            for="email"
-            class="form-label"
-          >
-            Email
-          </label>
+          <label for="email" class="form-label"> Email </label>
 
           <input
             id="email"
@@ -283,9 +247,7 @@ async function handleRegister() {
             required
           />
 
-          <div class="form-text">
-            Email 不可與既有會員重複。
-          </div>
+          <div class="form-text"></div>
         </div>
 
         <!-- ========================================= -->
@@ -293,12 +255,7 @@ async function handleRegister() {
         <!-- ========================================= -->
 
         <div class="mb-3">
-          <label
-            for="phone"
-            class="form-label"
-          >
-            手機
-          </label>
+          <label for="phone" class="form-label"> 手機 </label>
 
           <input
             id="phone"
@@ -312,9 +269,7 @@ async function handleRegister() {
             required
           />
 
-          <div class="form-text">
-            格式：09 開頭後接 8 個數字，例如 0912345678。
-          </div>
+          <div class="form-text"></div>
         </div>
 
         <!-- ========================================= -->
@@ -327,12 +282,7 @@ async function handleRegister() {
         <!-- ========================================= -->
 
         <div class="mb-3">
-          <label
-            for="address"
-            class="form-label"
-          >
-            地址
-          </label>
+          <label for="address" class="form-label"> 地址 </label>
 
           <input
             id="address"
@@ -345,9 +295,7 @@ async function handleRegister() {
             required
           />
 
-          <div class="form-text">
-            地址為必填欄位。
-          </div>
+          <div class="form-text">地址為必填欄位。</div>
         </div>
 
         <!-- ========================================= -->
@@ -355,12 +303,7 @@ async function handleRegister() {
         <!-- ========================================= -->
 
         <div class="mb-3">
-          <label
-            for="password"
-            class="form-label"
-          >
-            密碼
-          </label>
+          <label for="password" class="form-label"> 密碼 </label>
 
           <input
             id="password"
@@ -373,9 +316,7 @@ async function handleRegister() {
             required
           />
 
-          <div class="form-text">
-            密碼至少 8 碼，且不可輸入中文。
-          </div>
+          <div class="form-text">密碼至少 8 碼。</div>
         </div>
 
         <!-- ========================================= -->
@@ -383,12 +324,7 @@ async function handleRegister() {
         <!-- ========================================= -->
 
         <div class="mb-4">
-          <label
-            for="confirmPassword"
-            class="form-label"
-          >
-            確認密碼
-          </label>
+          <label for="confirmPassword" class="form-label"> 確認密碼 </label>
 
           <input
             id="confirmPassword"
@@ -406,27 +342,15 @@ async function handleRegister() {
         <!-- 建立帳號 -->
         <!-- ========================================= -->
 
-        <button
-          type="submit"
-          class="btn btn-dark w-100"
-          :disabled="loading"
-        >
+        <button type="submit" class="btn btn-dark w-100" :disabled="loading">
           {{ loading ? "註冊中..." : "建立帳號" }}
         </button>
 
         <div class="text-center mt-4">
-          <span class="text-secondary">
-            已經有帳號？
-          </span>
+          <span class="text-secondary"> 已經有帳號？ </span>
 
-          <RouterLink
-            to="/login"
-            class="login-link"
-          >
-            登入
-          </RouterLink>
+          <RouterLink to="/login" class="login-link"> 登入 </RouterLink>
         </div>
-
       </form>
     </div>
   </div>
