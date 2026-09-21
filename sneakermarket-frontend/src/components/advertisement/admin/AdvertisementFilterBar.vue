@@ -58,7 +58,7 @@ const emit = defineEmits([
       <option>橫幅</option>
       <option>彈窗</option>
       <option>側欄</option>
-      <option>卡片</option>
+      <option>分類</option>
     </select>
   </div>
 </template>

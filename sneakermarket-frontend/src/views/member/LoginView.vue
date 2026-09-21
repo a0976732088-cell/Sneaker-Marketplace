@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { login } from "@/service/authService";
-import { resetMemberPopup } from "@/components/advertisement/advertisementPopupMemory";
+import { resetMemberPopup } from "@/utils/advertisementPopupMemory";
 
 const router = useRouter();
 

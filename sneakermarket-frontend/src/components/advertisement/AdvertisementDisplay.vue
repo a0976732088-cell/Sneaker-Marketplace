@@ -6,9 +6,10 @@ import {
   resolveAdvertisementImageUrl,
 } from "@/service/advertisementService";
 import { getCurrentMember } from "@/service/authService";
-import { claimMemberPopup } from "./advertisementPopupMemory";
+import { claimMemberPopup } from "@/utils/advertisementPopupMemory";
 import { useAdvertisementTracking } from "@/composables/advertisement/useAdvertisementTracking";
 import { getAuctions } from "@/service/auctionService";
+import AdvertisementCategoryCarousel from "./AdvertisementCategoryCarousel.vue";
 
 const props = defineProps({
   placements: {
@@ -210,7 +211,7 @@ function restartBannerTimer() {
 
   // 重新從三秒開始倒數
   bannerTimer = window.setTimeout(() => {
-    nextBanner(); // 三秒後切換下一張
+    nextBanner(); // 4.5秒後切換下一張
   }, 4500);
 }
 const showPopup = ref(true);
@@ -387,12 +388,16 @@ onUnmounted(() => {
         v-viewable-ad="currentBanner"
         class="banner-ad"
       >
-        <img
-          :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
-          :alt="currentBanner.adName"
-          :class="{ 'static-banner-image': staticBanner }"
-          @click="!staticBanner && goToAdvertisementTarget(currentBanner)"
-        />
+        <Transition name="banner-fade">
+          <img
+            :key="currentBanner.adId"
+            class="banner-image"
+            :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
+            :alt="currentBanner.adName"
+            :class="{ 'static-banner-image': staticBanner }"
+            @click="!staticBanner && goToAdvertisementTarget(currentBanner)"
+          />
+        </Transition>
 
         <button
           v-if="!staticBanner && displayedBannerAds.length > 1"
@@ -430,59 +435,15 @@ onUnmounted(() => {
         目前沒有上架中的 BANNER 廣告
       </p>
 
-      <section
+      <slot name="after-banner"></slot>
+
+      <AdvertisementCategoryCarousel
         v-if="hasPlacement('CATEGORY_CARD') && categoryCardAds.length"
-        class="category-card-section"
+        :advertisements="categoryCardAds"
+        @select-ad="goToAdvertisementTarget"
       >
-        <header class="category-card-header">
-          <h2>推薦分類</h2>
-        </header>
-
-        <div class="category-card-track">
-          <article
-            v-for="ad in categoryCardAds"
-            :key="ad.adId"
-            v-viewable-ad="ad"
-            class="category-card"
-          >
-            <button
-              type="button"
-              class="category-card-image-button"
-              @click="goToAdvertisementTarget(ad)"
-            >
-              <img
-                :src="resolveAdvertisementImageUrl(ad.imageUrl)"
-                :alt="ad.adName"
-              />
-            </button>
-
-            <div class="category-card-footer">
-              <button
-                type="button"
-                class="category-card-title"
-                @click="goToAdvertisementTarget(ad)"
-              >
-                <strong>{{ ad.adName }}</strong>
-              </button>
-
-              <!-- 廣告被元件實際選中顯示，而且同一次元件掛載只計一次 -->
-              <RouterLink
-                v-if="ad.targetType === 'CATEGORY' && ad.targetId"
-                class="category-view-link"
-                :to="{
-                  name: 'commerce',
-                  query: {
-                    categoryId: ad.targetId,
-                  },
-                }"
-                @click="trackAdvertisementClick(ad)"
-              >
-                查看相關
-              </RouterLink>
-            </div>
-          </article>
-        </div>
-      </section>
+        <slot name="category-result"></slot>
+      </AdvertisementCategoryCarousel>
 
       <aside
         v-if="
