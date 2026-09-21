@@ -470,22 +470,33 @@ onUnmounted(() => {
         />
       </aside>
 
-      <div
-        v-if="hasPlacement('POPUP') && showPopup && currentPopup"
-        class="popup-background"
+      <Transition
+        name="popup-ios"
+        appear
+        :duration="{ enter: 520, leave: 260 }"
       >
-        <article v-viewable-ad="currentPopup" class="popup-ad">
-          <button type="button" class="popup-close" @click="showPopup = false">
-            ×
-          </button>
+        <div
+          v-if="hasPlacement('POPUP') && showPopup && currentPopup"
+          class="popup-background"
+        >
+          <article v-viewable-ad="currentPopup" class="popup-ad">
+            <button
+              type="button"
+              class="popup-close"
+              aria-label="關閉廣告"
+              @click="showPopup = false"
+            >
+              ×
+            </button>
 
-          <img
-            :src="resolveAdvertisementImageUrl(currentPopup.imageUrl)"
-            :alt="currentPopup.adName"
-            @click="handlePopupClick"
-          />
-        </article>
-      </div>
+            <img
+              :src="resolveAdvertisementImageUrl(currentPopup.imageUrl)"
+              :alt="currentPopup.adName"
+              @click="handlePopupClick"
+            />
+          </article>
+        </div>
+      </Transition>
     </template>
   </section>
 </template>
