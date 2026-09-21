@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.time.LocalDateTime;
+import java.util.List;
 
 import java.util.Collection;
 
@@ -32,5 +34,10 @@ NotificationLogRepository extends JpaRepository<NotificationLog, Long>,
         """)
     Long sumTotalSentByStatus(
             @Param("status") NotificationJobStatus status
+    );
+
+    List<NotificationLog> findByCreatedAtBetween(
+            LocalDateTime start,
+            LocalDateTime end
     );
 }

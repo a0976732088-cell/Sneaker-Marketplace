@@ -42,9 +42,7 @@
         />
       </div>
     </div>
-
-    <p class="panel-quote">每一個日期，都有一個值得穿上好鞋出門的理由。</p>
-  </aside>
+    </aside>
 </template>
 
 <script setup>
@@ -148,16 +146,6 @@ const selectedDateLabel = computed(() =>
   color: #697079;
   font-size: 13px;
   text-align: center;
-}
-
-.panel-quote {
-  margin: 16px 0 0;
-  padding: 18px 20px;
-  border-radius: 12px;
-  background: #eef0f1;
-  color: #4c5459;
-  font-size: 14px;
-  letter-spacing: 0.06em;
 }
 
 @media (max-width: 1100px) {

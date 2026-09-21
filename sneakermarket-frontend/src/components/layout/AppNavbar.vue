@@ -95,6 +95,16 @@
                   會員中心
                 </RouterLink>
               </li>
+
+              <li>
+                <RouterLink
+                  class="dropdown-item"
+                  to="/notifications/preferences"
+                >
+                  通知偏好
+                </RouterLink>
+              </li>
+
               <li v-if="isAdmin">
                 <RouterLink class="dropdown-item" to="/admin">
                   管理後台

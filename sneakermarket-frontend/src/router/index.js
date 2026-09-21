@@ -143,13 +143,13 @@ const routes = [
     component: () => import("@/views/calendar/CalendarHomeView.vue"),
   },
 
-  // {
-  //   path: "/calendar/eventManage",
+  {
+    path: "/notifications/preferences",
 
-  //   name: "eventManage",
+    name: "notification-preferences",
 
-  //   component: () => import("@/views/calendar/EventManageView.vue"),
-  // },
+    component: () => import("@/views/notification/NotificationHomeView.vue"),
+  },
 
   // =====================================================
   // Auction - Member
@@ -326,22 +326,28 @@ const routes = [
       // ================================================
       {
         path: "events",
-
-        name: "admin-events",
-
-        component: () => import("@/views/admin/AdminCalendarNotificationView.vue"),
+        name: "admin-activity-overview",
+        component: () =>
+          import("@/views/admin/calendarAndNotification/AdminActivityOverviewView.vue"),
       },
-      // ================================================
-      // Notification
-      // ================================================
+      {
+        path: "events/manage",
+        name: "admin-events",
+        component: () =>
+          import("@/views/admin/calendarAndNotification/AdminActivityManagementView.vue"),
+      },
       {
         path: "notifications",
-
         name: "admin-notifications",
-
-        component: () => import("@/views/admin/AdminCalendarNotificationView.vue"),
+        component: () =>
+          import("@/views/admin/calendarAndNotification/AdminNotificationCenterView.vue"),
       },
-
+      {
+        path: "notifications/logs",
+        name: "admin-notification-logs",
+        component: () =>
+          import("@/views/admin/calendarAndNotification/AdminNotificationLogView.vue"),
+      },
       // ================================================
       // Auction
       // ================================================

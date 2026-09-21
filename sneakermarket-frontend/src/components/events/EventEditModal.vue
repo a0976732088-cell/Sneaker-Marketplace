@@ -86,6 +86,43 @@
               ></textarea>
             </div>
 
+            <div class="border rounded-3 p-3 mb-3">
+              <h5 class="fw-bold mb-3">活動地點</h5>
+
+              <div class="mb-3">
+                <label class="form-label">場地名稱</label>
+                <input
+                  v-model.trim="editForm.venueName"
+                  type="text"
+                  class="form-control"
+                  maxlength="150"
+                  placeholder="例如：台北流行音樂中心"
+                />
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">活動地址</label>
+                <input
+                  v-model.trim="editForm.address"
+                  type="text"
+                  class="form-control"
+                  maxlength="300"
+                  placeholder="例如：台北市南港區市民大道八段99號"
+                />
+              </div>
+
+              <LocationPickerMap
+                :venue-name="editForm.venueName"
+                :address="editForm.address"
+                v-model:latitude="editForm.latitude"
+                v-model:longitude="editForm.longitude"
+              />
+
+              <div class="form-text">
+                地址有修改時請重新按「依地址定位」；也可以直接點擊地圖調整位置。
+              </div>
+            </div>
+
             <div class="mb-3">
               <label class="form-label">修改圖片</label>
               <input
@@ -139,6 +176,7 @@
 import { ref, reactive, onMounted, onUnmounted } from "vue";
 import { Modal } from "bootstrap";
 import { updateEvent } from "@/service/eventService";
+import LocationPickerMap from "@/components/events/LocationPickerMap.vue";
 
 const props = defineProps({
   event: { type: Object, required: true },
@@ -162,6 +200,10 @@ const editForm = reactive({
   startAt: "",
   endAt: "",
   description: "",
+  venueName: "",
+  address: "",
+  latitude: null,
+  longitude: null,
   targetUrl: "",
   sourceType: "",
   sourceId: null,
@@ -174,6 +216,16 @@ const formatForDateTimeInput = (dateStr) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
     d.getHours(),
   )}:${pad(d.getMinutes())}`;
+};
+
+const normalizeOptionalNumber = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : null;
 };
 
 const handleHidden = () => {
@@ -228,6 +280,29 @@ const submitUpdate = async () => {
     alert("已取消活動不能重新啟用或修改");
     return;
   }
+
+  const latitude = normalizeOptionalNumber(editForm.latitude);
+
+  const longitude = normalizeOptionalNumber(editForm.longitude);
+
+  if ((latitude === null) !== (longitude === null)) {
+    alert("緯度與經度必須同時填寫。");
+    return;
+  }
+
+  if (latitude !== null && (latitude < -90 || latitude > 90)) {
+    alert("緯度必須介於 -90 到 90。");
+    return;
+  }
+
+  if (longitude !== null && (longitude < -180 || longitude > 180)) {
+    alert("經度必須介於 -180 到 180。");
+    return;
+  }
+
+  editForm.latitude = latitude;
+  editForm.longitude = longitude;
+
   const isChangingToCancelled =
     props.event.status !== "CANCELLED" && editForm.status === "CANCELLED";
 

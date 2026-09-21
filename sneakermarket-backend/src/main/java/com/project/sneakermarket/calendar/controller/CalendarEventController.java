@@ -11,9 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.PublicKey;
 import java.time.LocalDateTime;
 import java.util.Optional;
+
+import jakarta.validation.Valid;
 
 
 @RestController
@@ -25,19 +26,46 @@ public class CalendarEventController {
     @Autowired
     private CalendarEventRepository calendarEventRepo;
 
+
+
+
     @PostMapping("/api/calendar/eventCreate")
-    public ResponseEntity<CalendarEvent> createEvent(@RequestBody CalendarEventDTO request){
-        CalendarEvent created = calendarEventService.createEvent(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<CalendarEvent> createEvent(
+            @Valid
+            @RequestBody
+            CalendarEventDTO request
+    ) {
+        CalendarEvent created =
+                calendarEventService.createEvent(
+                        request
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(created);
     }
+
 
     @PutMapping("/api/calendar/eventUpdate/{id}")
-    public ResponseEntity<?> updateEvent(@PathVariable("id") Long eventId, @RequestBody CalendarEventDTO request){
-        calendarEventService.updateEventById(eventId, request);
+    public ResponseEntity<?> updateEvent(
+            @PathVariable("id")
+            Long eventId,
 
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+            @Valid
+            @RequestBody
+            CalendarEventDTO request
+    ) {
+        calendarEventService.updateEventById(
+                eventId,
+                request
+        );
 
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .build();
     }
+
+
 
     @DeleteMapping("/api/calendar/eventDelete")
     public ResponseEntity<?> deleteEvent(@RequestParam Long eventId){

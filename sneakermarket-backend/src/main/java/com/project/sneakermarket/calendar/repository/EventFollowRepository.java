@@ -1,9 +1,7 @@
 package com.project.sneakermarket.calendar.repository;
 
 import com.project.sneakermarket.calendar.entity.EventFollow;
-
 import jakarta.persistence.LockModeType;
-
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -27,6 +25,11 @@ public interface EventFollowRepository
             Long memberId
     );
 
+    List<EventFollow> findByCreatedAtBetween(
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
     boolean existsByMemberIdAndEventId(
             Long memberId,
             Long eventId
@@ -37,15 +40,6 @@ public interface EventFollowRepository
             Long eventId
     );
 
-    //會員已收到同活動 EVENT_REMINDER
-    //→ 即使取消關注後又重新關注
-    //→ 不會再次產生相同通知
-    /**
-     * 找出已進入提醒時間、尚未產生通知的關注資料。
-     *
-     * 使用 SQL Server DATEADD：
-     * 活動時間 - 提前提醒分鐘 <= 現在時間
-     */
     @Query(
             value = """
                     SELECT TOP (100) f.follow_id
@@ -67,9 +61,6 @@ public interface EventFollowRepository
             @Param("now") LocalDateTime now
     );
 
-    /**
-     * 鎖定單筆關注資料，避免同一筆提醒同時被重複處理。
-     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT f
@@ -79,7 +70,4 @@ public interface EventFollowRepository
     Optional<EventFollow> findByIdForUpdate(
             @Param("followId") Long followId
     );
-
-
-
 }

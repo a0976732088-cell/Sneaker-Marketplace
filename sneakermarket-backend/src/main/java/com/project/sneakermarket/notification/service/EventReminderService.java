@@ -4,13 +4,12 @@ import com.project.sneakermarket.calendar.entity.CalendarEvent;
 import com.project.sneakermarket.calendar.entity.EventFollow;
 import com.project.sneakermarket.calendar.repository.CalendarEventRepository;
 import com.project.sneakermarket.calendar.repository.EventFollowRepository;
-import com.project.sneakermarket.notification.entity.Notification;
-import com.project.sneakermarket.notification.repository.NotificationRepository;
 import com.project.sneakermarket.member.entity.Member;
 import com.project.sneakermarket.member.repository.MemberRepository;
-
+import com.project.sneakermarket.notification.entity.Notification;
+import com.project.sneakermarket.notification.repository.NotificationRepository;
+import com.project.sneakermarket.notification.service.NotificationPreferencePolicyService.DeliveryDecision;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,13 +28,8 @@ public class EventReminderService {
     private final NotificationRepository notificationRepository;
     private final MemberRepository memberRepository;
     private final NotificationEmailJobService emailJobService;
+    private final NotificationPreferencePolicyService preferencePolicyService;
 
-    /**
-     * 每一筆關注各自使用一個 Transaction。
-     *
-     * 通知建立失敗時，reminded 不會被更新；
-     * 下一輪排程還可以重新處理。
-     */
     @Transactional
     public void createReminder(
             Long followId,
@@ -54,26 +48,16 @@ public class EventReminderService {
                 .findById(follow.getEventId())
                 .orElse(null);
 
-        /*
-         * 活動不存在時通常代表資料異常。
-         * 標記完成，避免排程永遠重複查詢。
-         */
         if (event == null) {
             follow.setReminded(true);
             return;
         }
 
-        /*
-         * 活動已開始或已過期，不補發過期提醒。
-         */
         if (!event.getStartAt().isAfter(now)) {
             follow.setReminded(true);
             return;
         }
 
-        /*
-         * 再次確認活動目前可以發送提醒。
-         */
         if ("INACTIVE".equals(event.getStatus())
                 || "DRAFT".equals(event.getStatus())
                 || "CANCELLED".equals(event.getStatus())) {
@@ -89,30 +73,60 @@ public class EventReminderService {
                                 event.getEventId()
                         );
 
-        if (!alreadyExists) {
-            Notification notification = new Notification();
+        if (alreadyExists) {
+            follow.setReminded(true);
+            return;
+        }
 
-            notification.setMemberId(follow.getMemberId());
-            notification.setNotificationType("EVENT_REMINDER");
-            notification.setTitle(
-                    "活動即將開始：" + event.getTitle()
-            );
-            notification.setContent(
-                    "您關注的活動將於 "
-                            + event.getStartAt().format(DATE_TIME_FORMATTER)
-                            + " 開始。"
-            );
-            notification.setTargetType("EVENT");
-            notification.setTargetId(event.getEventId());
-            notification.setTargetUrl(event.getTargetUrl());
+        DeliveryDecision decision =
+                preferencePolicyService.resolve(
+                        follow.getMemberId(),
+                        "EVENT_REMINDER",
+                        "EVENT"
+                );
 
-            notification.setIsRead(false);
-            notification.setIsSent(true);
-            notification.setSentAt(now);
+        /*
+         * 會員兩種管道都關閉時不建立通知，
+         * 但仍標記 reminded，避免排程每次重複處理。
+         */
+        if (!decision.anyEnabled()) {
+            follow.setReminded(true);
+            return;
+        }
 
-            Notification saved =
-                    notificationRepository.save(notification);
+        Notification notification = new Notification();
 
+        notification.setMemberId(follow.getMemberId());
+        notification.setNotificationType("EVENT_REMINDER");
+
+        notification.setTitle(
+                "活動即將開始：" + event.getTitle()
+        );
+
+        notification.setContent(
+                "您關注的活動將於 "
+                        + event.getStartAt().format(
+                        DATE_TIME_FORMATTER
+                )
+                        + " 開始。"
+        );
+
+        notification.setTargetType("EVENT");
+        notification.setTargetId(event.getEventId());
+        notification.setTargetUrl(event.getTargetUrl());
+
+        notification.setIsRead(false);
+        notification.setIsSent(true);
+        notification.setSentAt(now);
+
+        notification.setInAppVisible(
+                decision.inAppEnabled()
+        );
+
+        Notification saved =
+                notificationRepository.save(notification);
+
+        if (decision.emailEnabled()) {
             Member member = memberRepository
                     .findById(follow.getMemberId())
                     .orElse(null);
@@ -126,10 +140,6 @@ public class EventReminderService {
             }
         }
 
-        /*
-         * 不管是剛建立，或通知已經存在，
-         * 都代表這筆關注不需要再次提醒。
-         */
         follow.setReminded(true);
     }
 }

@@ -41,7 +41,15 @@ const isAdvertisementActive = computed(() => {
 // CALENDAR
 // =====================================================
 
+const isActivityOverviewActive = computed(() => {
+  return route.name === "admin-activity-overview";
+});
+
 const isCalendarActive = computed(() => {
+  return route.name === "admin-events";
+});
+
+const isActivityManagementActive = computed(() => {
   return route.name === "admin-events";
 });
 
@@ -51,6 +59,10 @@ const isCalendarActive = computed(() => {
 
 const isNotificationActive = computed(() => {
   return route.name === "admin-notifications";
+});
+
+const isNotificationLogActive = computed(() => {
+  return route.name === "admin-notification-logs";
 });
 
 // =====================================================
@@ -192,40 +204,48 @@ const isAuctionSection = computed(() => {
       <div class="menu-section">
         <p class="menu-section-title">CALENDAR</p>
 
-        <!-- 行事曆管理 -->
+        <RouterLink
+          :to="{ name: 'admin-activity-overview' }"
+          class="menu-item"
+          :class="{ active: isActivityOverviewActive }"
+          active-class=""
+          exact-active-class=""
+        >
+          <span class="menu-icon"> ◫ </span>
+          <span>活動總覽</span>
+        </RouterLink>
 
         <RouterLink
-          :to="{
-            name: 'admin-events',
-          }"
+          :to="{ name: 'admin-events' }"
           class="menu-item"
-          :class="{
-            active: isCalendarActive,
-          }"
+          :class="{ active: isActivityManagementActive }"
           active-class=""
           exact-active-class=""
         >
           <span class="menu-icon"> ▣ </span>
-
-          <span> 行事曆管理 </span>
+          <span>活動管理</span>
         </RouterLink>
 
-        <!-- 通知管理 -->
-
         <RouterLink
-          :to="{
-            name: 'admin-notifications',
-          }"
+          :to="{ name: 'admin-notifications' }"
           class="menu-item"
-          :class="{
-            active: isNotificationActive,
-          }"
+          :class="{ active: isNotificationActive }"
           active-class=""
           exact-active-class=""
         >
           <span class="menu-icon"> ◇ </span>
+          <span>通知中心</span>
+        </RouterLink>
 
-          <span> 通知管理 </span>
+        <RouterLink
+          :to="{ name: 'admin-notification-logs' }"
+          class="menu-item"
+          :class="{ active: isNotificationLogActive }"
+          active-class=""
+          exact-active-class=""
+        >
+          <span class="menu-icon"> ✉ </span>
+          <span>發送紀錄</span>
         </RouterLink>
       </div>
 

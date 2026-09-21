@@ -31,10 +31,7 @@
         </div>
 
         <div class="detail-content">
-          <span
-            class="type-badge"
-            :style="{ backgroundColor: event.color }"
-          >
+          <span class="type-badge" :style="{ backgroundColor: event.color }">
             {{ getEventType(event.eventType).label }}
           </span>
 
@@ -50,6 +47,16 @@
               <dd>{{ formatDateTime(event.endAt) }}</dd>
             </div>
           </dl>
+
+          <div v-if="event.venueName">
+            <dt>活動場地</dt>
+            <dd>{{ event.venueName }}</dd>
+          </div>
+
+          <div v-if="event.address">
+            <dt>活動地址</dt>
+            <dd>{{ event.address }}</dd>
+          </div>
 
           <p class="description">
             {{ event.description || "目前沒有更多活動介紹。" }}

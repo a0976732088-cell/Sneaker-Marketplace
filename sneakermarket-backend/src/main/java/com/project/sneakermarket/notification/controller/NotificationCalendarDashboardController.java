@@ -1,8 +1,8 @@
 package com.project.sneakermarket.notification.controller;
 
 import com.project.sneakermarket.notification.dto.NotificationCalendarDashboardDTO;
-import com.project.sneakermarket.notification.service.NotificationCalendarDashboardService;
 
+import com.project.sneakermarket.notification.service.NotificationCalendarDashboardService;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.ResponseEntity;

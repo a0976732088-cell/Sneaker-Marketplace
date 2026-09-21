@@ -1,7 +1,6 @@
 package com.project.sneakermarket.notification.repository;
 
 import com.project.sneakermarket.notification.entity.Notification;
-
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -12,18 +11,22 @@ public interface NotificationRepository extends
         JpaRepository<Notification, Long>,
         JpaSpecificationExecutor<Notification> {
 
-    // 後台原本使用的查詢
-    List<Notification> findByIsSentTrueOrderByCreatedAtDesc();
-
-    // 前台：只取得目前會員的通知
     List<Notification>
-    findByMemberIdAndIsSentTrueOrderByCreatedAtDesc(
+    findByIsSentTrueOrderByCreatedAtDesc();
+
+    /*
+     * 會員通知抽屜只顯示允許站內通知的資料。
+     */
+    List<Notification>
+    findByMemberIdAndInAppVisibleTrueAndIsSentTrueOrderByCreatedAtDesc(
             Long memberId
     );
 
-    // 已讀操作：通知 ID 和會員 ID 必須同時符合
+    /*
+     * 會員只能讀取自己可見的站內通知。
+     */
     Optional<Notification>
-    findByNotificationIdAndMemberId(
+    findByNotificationIdAndMemberIdAndInAppVisibleTrue(
             Long notificationId,
             Long memberId
     );
@@ -34,4 +37,5 @@ public interface NotificationRepository extends
             String targetType,
             Long targetId
     );
+
 }

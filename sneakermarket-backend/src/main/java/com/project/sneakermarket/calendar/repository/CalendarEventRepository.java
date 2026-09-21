@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 
 public interface CalendarEventRepository extends
         JpaRepository<CalendarEvent, Long>,
@@ -24,5 +25,15 @@ public interface CalendarEventRepository extends
     long countByStartAtAfterAndStatusNotIn(
             LocalDateTime now,
             Collection<String> excludedStatuses
+    );
+
+    List<CalendarEvent> findByCreatedAtBetween(
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
+    List<CalendarEvent> findByStartAtBetweenOrderByStartAtAsc(
+            LocalDateTime start,
+            LocalDateTime end
     );
 }

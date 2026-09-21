@@ -68,6 +68,7 @@ public class NotificationController {
             @RequestParam(required = false) String notificationType,
             @RequestParam(required = false) String targetType,
             @RequestParam(required = false) Boolean isRead,
+            @RequestParam(required = false) Boolean isSent,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startCreatedAt,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endCreatedAt,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startReadAt,
@@ -75,19 +76,20 @@ public class NotificationController {
             @RequestParam(defaultValue = "1") Integer pageNumber,
             @RequestParam(defaultValue = "10") Integer pageSize) {
 
-        Page<Notification> result = notificationService.searchNotifications(
-                // memberId, // ⏳ 待會員系統完成後帶入
-                title,
-                notificationType,
-                targetType,
-                isRead,
-                startCreatedAt,
-                endCreatedAt,
-                startReadAt,
-                endReadAt,
-                pageNumber,
-                pageSize
-        );
+        Page<Notification> result =
+                notificationService.searchNotifications(
+                        title,
+                        notificationType,
+                        targetType,
+                        isRead,
+                        isSent,
+                        startCreatedAt,
+                        endCreatedAt,
+                        startReadAt,
+                        endReadAt,
+                        pageNumber,
+                        pageSize
+                );
         return ResponseEntity.ok(result);
     }
 
@@ -225,6 +227,5 @@ public class NotificationController {
 
         return ResponseEntity.noContent().build();
     }
-
 
 }

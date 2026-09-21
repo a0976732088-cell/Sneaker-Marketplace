@@ -10,6 +10,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "calendar_events")
@@ -35,6 +36,32 @@ public class CalendarEvent {
 
     @Column(name = "description", columnDefinition = "NVARCHAR(MAX)")
     private String description;
+
+    @Column(
+            name = "venue_name",
+            length = 150
+    )
+    private String venueName;
+
+    @Column(
+            name = "address",
+            length = 300
+    )
+    private String address;
+
+    @Column(
+            name = "latitude",
+            precision = 9,
+            scale = 6
+    )
+    private BigDecimal latitude;
+
+    @Column(
+            name = "longitude",
+            precision = 10,
+            scale = 6
+    )
+    private BigDecimal longitude;
 
     @Column(name = "start_at", nullable = false)
     private LocalDateTime startAt;

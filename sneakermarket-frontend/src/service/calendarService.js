@@ -52,13 +52,29 @@ export const mapEventData = (rawData = []) => {
       time: endTime ? `${startTime} - ${endDayPrefix}${endTime}` : startTime,
       title: item.title,
       description: item.description,
+
+      venueName: item.venueName || "",
+
+      address: item.address || "",
+
+      latitude:
+        item.latitude === null || item.latitude === undefined
+          ? null
+          : Number(item.latitude),
+
+      longitude:
+        item.longitude === null || item.longitude === undefined
+          ? null
+          : Number(item.longitude),
+
       startAt: item.startAt,
       endAt: item.endAt,
       eventType: item.eventType || "OTHER",
       color: getEventType(item.eventType).color,
       status: item.status,
       targetUrl: item.targetUrl,
-      photoUrl: item.photoUrl || (item.hasPhoto ? getEventPhotoUrl(item.eventId) : ""),
+      photoUrl:
+        item.photoUrl || (item.hasPhoto ? getEventPhotoUrl(item.eventId) : ""),
     };
   });
 };
@@ -75,4 +91,39 @@ export const followEvent = (eventId, remindBeforeMinutes = 60) => {
 
 export const unfollowEvent = (eventId) => {
   return httpClient.delete(`/calendar/events/${eventId}/follow`);
+};
+
+/**
+ * 取得目前會員的 Google Calendar 連線狀態。
+ */
+export const getGoogleCalendarStatus = () => {
+  return httpClient.get(
+    "/calendar/google/status",
+  );
+};
+
+/**
+ * 取得 Google OAuth 授權入口。
+ *
+ * OAuth 必須讓整個瀏覽器跳轉，
+ * 不能只使用 Axios 發送請求。
+ */
+export const getGoogleCalendarConnectUrl = () => {
+  const baseUrl =
+    httpClient.defaults.baseURL ||
+    "http://localhost:8080/api";
+
+  return (
+    baseUrl.replace(/\/+$/, "") +
+    "/calendar/google/connect"
+  );
+};
+
+/**
+ * 解除目前會員的 Google Calendar 連線。
+ */
+export const disconnectGoogleCalendar = () => {
+  return httpClient.delete(
+    "/calendar/google/connection",
+  );
 };
