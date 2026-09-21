@@ -76,6 +76,7 @@ export const AUCTION_SHIPPING_METHOD_OPTIONS = Object.freeze([
 export const AUCTION_PAYMENT_METHOD_OPTIONS = Object.freeze([
   "轉帳",
   "信用卡",
+  "LINE Pay",
 ]);
 
 export const AUCTION_WARRANTY_NOTE_OPTIONS = Object.freeze([

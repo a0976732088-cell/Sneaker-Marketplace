@@ -48,6 +48,10 @@
               {{ deadlineNotice }}
             </div>
 
+            <div v-if="routeNotice" class="notice notice--warning" role="status">
+              {{ routeNotice }}
+            </div>
+
             <fieldset class="form-grid" :disabled="!canOperateCheckout || isBusy">
               <div class="form-field form-field--full">
                 <label for="auction-checkout-email">Email</label>
@@ -103,7 +107,7 @@
                 </p>
               </div>
 
-              <div class="form-field form-field--full">
+              <div v-if="!isCvsShipping" class="form-field form-field--full">
                 <label for="auction-shipping-address">配送地址</label>
                 <textarea
                   id="auction-shipping-address"
@@ -120,6 +124,182 @@
                   id="auction-shipping-address-error"
                   class="field-error"
                 >
+                  {{ shippingErrors.shippingAddress }}
+                </p>
+              </div>
+
+              <div v-else class="cvs-store-picker form-field--full">
+                <span class="cvs-store-picker__label">取貨超商</span>
+
+                <div class="cvs-selection-card">
+                  <p class="cvs-selection-card__label">目前取貨門市</p>
+                  <template v-if="hasSelectedCvsStore">
+                    <strong>{{ selectedCvsStoreLabel }} {{ cvsSelection.cvsStoreName }}</strong>
+                    <span>門市代碼：{{ displayValue(cvsSelection.cvsStoreId) }}</span>
+                    <span>地址：{{ displayValue(cvsSelection.cvsAddress) }}</span>
+                    <span v-if="cvsSelection.cvsTelephone">
+                      電話：{{ cvsSelection.cvsTelephone }}
+                    </span>
+                  </template>
+                  <p v-else class="cvs-selection-card__empty">未選擇門市</p>
+                  <div class="cvs-selection-card__actions">
+                    <button
+                      v-if="hasSelectedCvsStore"
+                      type="button"
+                      class="secondary-button"
+                      @click="openStoreMap(cvsSelection)"
+                    >
+                      查看地圖
+                    </button>
+                    <button
+                      type="button"
+                      class="secondary-button"
+                      @click="openCvsPicker"
+                    >
+                      {{ hasSelectedCvsStore ? "更換門市" : "選擇門市" }}
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  v-if="isCvsPickerOpen"
+                  class="cvs-picker-modal"
+                  role="presentation"
+                  @click.self="closeCvsPicker()"
+                >
+                  <section
+                    class="cvs-picker-modal__dialog"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="cvs-picker-title"
+                  >
+                    <header class="cvs-picker-modal__header">
+                      <div>
+                        <p class="eyebrow">CVS pickup</p>
+                        <h2 id="cvs-picker-title">選擇取貨門市</h2>
+                      </div>
+                      <button
+                        type="button"
+                        class="cvs-picker-modal__close"
+                        aria-label="關閉門市選擇"
+                        :disabled="isSelectingCvsStore"
+                        @click="closeCvsPicker()"
+                      >
+                        ×
+                      </button>
+                    </header>
+
+                    <div class="cvs-picker-modal__body">
+                <div class="cvs-store-options" role="group" aria-label="選擇超商品牌">
+                  <button
+                    v-for="option in AUCTION_CVS_STORE_OPTIONS"
+                    :key="option.value"
+                    type="button"
+                    class="cvs-store-option"
+                    :class="{ 'cvs-store-option--active': selectedCvsStoreType === option.value }"
+                    :aria-pressed="selectedCvsStoreType === option.value"
+                    :disabled="isLoadingCvsStores || isSelectingCvsStore"
+                    @click="changeCvsStoreType(option.value)"
+                  >
+                    {{ option.label }}
+                  </button>
+                </div>
+
+                <div class="cvs-store-search">
+                  <div class="form-field">
+                    <label for="auction-cvs-city">縣市</label>
+                    <select id="auction-cvs-city" v-model="cvsStoreFilters.city">
+                      <option value="">全部縣市</option>
+                      <option v-for="city in TAIWAN_CITIES" :key="city" :value="city">
+                        {{ city }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label for="auction-cvs-keyword">搜尋門市</label>
+                    <input
+                      id="auction-cvs-keyword"
+                      v-model="cvsStoreFilters.keyword"
+                      type="search"
+                      maxlength="80"
+                      placeholder="門市名稱、店號或地址"
+                      autocomplete="off"
+                    />
+                  </div>
+                </div>
+
+                <p v-if="isLoadingCvsStores" class="cvs-store-state" role="status">
+                  門市資料載入中…
+                </p>
+                <div v-else-if="cvsStoreLoadError" class="notice notice--error" role="alert">
+                  <p>{{ cvsStoreLoadError }}</p>
+                  <button type="button" class="secondary-button" @click="reloadCvsStores">
+                    重新載入門市
+                  </button>
+                </div>
+                <p v-else-if="!hasCvsSearchCriteria" class="cvs-store-state">
+                  請先選擇縣市或輸入門市關鍵字。
+                </p>
+                <p v-else-if="filteredCvsStores.length === 0" class="cvs-store-state">
+                  查無符合條件的門市。
+                </p>
+                <template v-else>
+                  <p v-if="hasTooManyCvsStores" class="notice notice--warning">
+                    符合門市過多，請縮小搜尋範圍。
+                  </p>
+                  <p class="cvs-store-result-count">
+                    顯示 {{ filteredCvsStores.length }} 筆門市（最多 100 筆）
+                  </p>
+                  <ul class="cvs-store-results" aria-label="超商門市搜尋結果">
+                    <li v-for="store in filteredCvsStores" :key="`${store.storeType}-${store.storeId}`">
+                      <div class="cvs-store-result__details">
+                        <strong>{{ store.storeName }}</strong>
+                        <span>門市代碼：{{ store.storeId }}</span>
+                        <span>地址：{{ store.storeAddress }}</span>
+                        <span v-if="store.storePhone">電話：{{ store.storePhone }}</span>
+                      </div>
+                      <div class="cvs-store-result__actions">
+                        <button
+                          type="button"
+                          class="secondary-button"
+                          @click="openStoreMap(store)"
+                        >
+                          查看地圖
+                        </button>
+                        <button
+                          type="button"
+                          class="secondary-button"
+                          :disabled="isSelectingCvsStore || isCurrentCvsStore(store)"
+                          @click="chooseCvsStore(store)"
+                        >
+                          {{ isCurrentCvsStore(store) ? "已選擇" : "選擇此門市" }}
+                        </button>
+                      </div>
+                    </li>
+                  </ul>
+                </template>
+
+                <p v-if="cvsStoreSelectionError" class="field-error" role="alert">
+                  {{ cvsStoreSelectionError }}
+                </p>
+                    </div>
+
+                    <footer class="cvs-picker-modal__footer">
+                      <button
+                        type="button"
+                        class="secondary-button"
+                        :disabled="isSelectingCvsStore"
+                        @click="closeCvsPicker()"
+                      >
+                        取消
+                      </button>
+                    </footer>
+                  </section>
+                </div>
+                <p v-if="!hasSelectedCvsStore" class="field-hint">
+                  請先選擇超商取貨門市
+                </p>
+                <p v-if="shippingErrors.shippingAddress" class="field-error">
                   {{ shippingErrors.shippingAddress }}
                 </p>
               </div>
@@ -279,6 +459,16 @@
               </p>
             </fieldset>
 
+            <div v-else-if="isLinePay" class="line-pay-instructions">
+              <strong>LINE Pay</strong>
+              <p v-if="isWaitingForLinePay">
+                等待 LINE Pay 完成付款…<br />請在 LINE Pay 付款視窗完成操作。
+              </p>
+              <p v-else>
+                將開啟 LINE Pay 付款視窗。<br />付款完成後會自動前往競標訂單。
+              </p>
+            </div>
+
             <div v-else class="notice notice--error" role="alert">
               目前付款方式無法處理，請稍後再試。
             </div>
@@ -359,14 +549,25 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import {
+  AUCTION_CVS_RESULT_LIMIT,
+  AUCTION_CVS_STORE_OPTIONS,
+  AUCTION_CVS_STORE_TYPE,
+} from "@/constants/auctionCvs";
+import { TAIWAN_CITIES } from "@/constants/auctionFormOptions";
+import {
   AUCTION_PAYMENT_METHOD,
   AUCTION_TRANSFER_ACCOUNT,
 } from "@/constants/auctionPayment";
 import { getCurrentMember } from "@/service/authService";
 import {
+  getAuctionCvsSelection,
+  getAuctionCvsStores,
+  getAuctionLinePayStatus,
   getAuctionOrderDetail,
   handleAuctionAccessError,
   payAuctionOrder,
+  requestAuctionLinePay,
+  selectAuctionCvsStore,
   updateAuctionOrderCheckout,
 } from "@/service/auctionService";
 import { resolveAuctionImageUrl } from "@/utils/auctionImageUrl";
@@ -391,8 +592,14 @@ const redirecting = ref(false);
 const errorMessage = ref("");
 const operationError = ref("");
 const saveMessage = ref("");
+const routeNotice = ref("");
 const isSaving = ref(false);
 const isPaying = ref(false);
+const isLoadingCvsStores = ref(false);
+const isSelectingCvsStore = ref(false);
+const isCvsPickerOpen = ref(false);
+const isWaitingForLinePay = ref(false);
+const linePayMerchantOrderId = ref("");
 const imageLoadFailed = ref(false);
 const currentTimeMs = ref(Date.now());
 
@@ -404,16 +611,40 @@ const cardForm = reactive({ cardHolderName: "", cardNumber: "", cardExpiry: "", 
 const cardErrors = reactive({ cardHolderName: "", cardNumber: "", cardExpiry: "", cardCvv: "" });
 const transferForm = reactive({ remitterName: "", accountLastFive: "" });
 const transferErrors = reactive({ remitterName: "", accountLastFive: "" });
+const selectedCvsStoreType = ref(AUCTION_CVS_STORE_TYPE.UNIMART);
+const cvsStores = ref([]);
+const cvsStoreFilters = reactive({ city: "", keyword: "" });
+const cvsStoreLoadError = ref("");
+const cvsStoreSelectionError = ref("");
+const cvsSelection = reactive({
+  selected: false,
+  storeType: null,
+  logisticsSubType: null,
+  cvsStoreId: null,
+  cvsStoreName: null,
+  cvsAddress: null,
+  cvsTelephone: null,
+  cvsOutside: null,
+  selectedAt: null,
+});
 
 let requestVersion = 0;
 let viewVersion = 0;
 let countdownTimer = null;
 let deadlineRefreshOrderNumber = null;
+let cvsStoreRequestVersion = 0;
+let linePayPaymentWindow = null;
+let linePayPollingVersion = 0;
+let linePayPollTimer = null;
+let resolveLinePayPollDelay = null;
+
+const LINE_PAY_POLL_DELAY_MS = 1500;
 
 const isBuyer = computed(() => order.value?.viewerRole === "BUYER");
 const isPendingPayment = computed(
   () => order.value?.paymentStatus === "PENDING" && order.value?.orderStatus === "PENDING_PAYMENT",
 );
+const isCvsShipping = computed(() => order.value?.shippingMethod === "超商寄送");
 const paymentDeadlineMs = computed(() => {
   if (!order.value?.paymentDueAt) return null;
   const timestamp = parseAuctionTime(order.value.paymentDueAt).getTime();
@@ -428,10 +659,24 @@ const canOperateCheckout = computed(
 );
 const isCreditCard = computed(() => order.value?.paymentMethod === AUCTION_PAYMENT_METHOD.CREDIT_CARD);
 const isTransfer = computed(() => order.value?.paymentMethod === AUCTION_PAYMENT_METHOD.TRANSFER);
-const isSupportedPaymentMethod = computed(() => isCreditCard.value || isTransfer.value);
-const isBusy = computed(() => isSaving.value || isPaying.value);
+const isLinePay = computed(() => order.value?.paymentMethod === AUCTION_PAYMENT_METHOD.LINE_PAY);
+const isSupportedPaymentMethod = computed(
+  () => isCreditCard.value || isTransfer.value || isLinePay.value,
+);
+const isBusy = computed(
+  () =>
+    isSaving.value ||
+    isPaying.value ||
+    isSelectingCvsStore.value ||
+    isWaitingForLinePay.value,
+);
+const hasSelectedCvsStore = computed(() => Boolean(cvsSelection.selected));
 const canSubmitPayment = computed(
-  () => canOperateCheckout.value && isSupportedPaymentMethod.value && !isBusy.value,
+  () =>
+    canOperateCheckout.value &&
+    isSupportedPaymentMethod.value &&
+    (!isCvsShipping.value || hasSelectedCvsStore.value) &&
+    !isBusy.value,
 );
 const hasMemberProfile = computed(
   () => Boolean(memberInfo.name || memberInfo.phone || memberInfo.address),
@@ -442,13 +687,45 @@ const productImageUrl = computed(() =>
 const productMeta = computed(
   () => [order.value?.model, order.value?.size].filter(Boolean).join(" · ") || "商品規格未提供",
 );
+const selectedCvsStoreLabel = computed(
+  () =>
+    AUCTION_CVS_STORE_OPTIONS.find((option) => option.value === cvsSelection.storeType)?.label ||
+    "超商",
+);
+const normalizedCvsCity = computed(() => normalizeCvsSearchText(cvsStoreFilters.city));
+const normalizedCvsKeyword = computed(() => normalizeCvsSearchText(cvsStoreFilters.keyword));
+const hasCvsSearchCriteria = computed(
+  () => Boolean(normalizedCvsCity.value || normalizedCvsKeyword.value),
+);
+const matchingCvsStores = computed(() => {
+  if (!hasCvsSearchCriteria.value) return [];
+
+  return cvsStores.value
+    .filter((store) => {
+      const address = normalizeCvsSearchText(store.storeAddress);
+      if (normalizedCvsCity.value && !address.includes(normalizedCvsCity.value)) return false;
+      if (!normalizedCvsKeyword.value) return true;
+
+      return [store.storeId, store.storeName, store.storeAddress, store.storePhone]
+        .some((value) => normalizeCvsSearchText(value).includes(normalizedCvsKeyword.value));
+    });
+});
+const hasTooManyCvsStores = computed(
+  () => matchingCvsStores.value.length > AUCTION_CVS_RESULT_LIMIT,
+);
+const filteredCvsStores = computed(() =>
+  matchingCvsStores.value.slice(0, AUCTION_CVS_RESULT_LIMIT),
+);
 const paymentMethodLabel = computed(() => {
   if (isCreditCard.value) return "信用卡";
   if (isTransfer.value) return "銀行轉帳";
+  if (isLinePay.value) return "LINE Pay";
   return order.value?.paymentMethod || "未知付款方式";
 });
 const paymentButtonText = computed(() => {
+  if (isWaitingForLinePay.value) return "等待 LINE Pay 完成付款…";
   if (isPaying.value) return "付款處理中…";
+  if (isLinePay.value) return "使用 LINE Pay 付款";
   return isTransfer.value ? "確認已完成轉帳" : "確認並付款";
 });
 const remainingPaymentTimeText = computed(() => {
@@ -471,16 +748,59 @@ function displayValue(value) {
   return value === null || value === undefined || value === "" ? "—" : value;
 }
 
+function normalizeCvsSearchText(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .trim()
+    .replaceAll("台", "臺")
+    .toLocaleLowerCase("zh-TW");
+}
+
+function buildStoreMapUrl(store) {
+  const storeName =
+    String(store?.storeName ?? "").trim() || String(store?.cvsStoreName ?? "").trim();
+  const storeAddress =
+    String(store?.storeAddress ?? "").trim() || String(store?.cvsAddress ?? "").trim();
+  if (!storeName && !storeAddress) return "";
+
+  const storeBrand = AUCTION_CVS_STORE_OPTIONS.find(
+    (option) => option.value === store?.storeType,
+  )?.label;
+  const query = [storeBrand, storeName, storeAddress].filter(Boolean).join(" ");
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function openStoreMap(store) {
+  const url = buildStoreMapUrl(store);
+  if (!url) return;
+
+  const mapWindow = window.open(url, "_blank", "noopener,noreferrer");
+  if (mapWindow) {
+    try {
+      mapWindow.opener = null;
+    } catch {
+      // The noopener window feature already prevents access to the originating checkout.
+    }
+  }
+}
+
 function applyErrors(target, keys, errors) {
   for (const key of keys) target[key] = errors[key] ?? "";
   return keys.every((key) => !target[key]);
 }
 
 function validateShippingForm() {
+  if (isCvsShipping.value && hasSelectedCvsStore.value) {
+    shippingForm.shippingAddress = cvsSelection.cvsAddress ?? shippingForm.shippingAddress;
+  }
+  const errors = validateShippingFormValues(shippingForm);
+  if (isCvsShipping.value && !hasSelectedCvsStore.value) {
+    errors.shippingAddress = "請先選擇超商取貨門市";
+  }
   return applyErrors(
     shippingErrors,
     ["receiverName", "receiverPhone", "shippingAddress"],
-    validateShippingFormValues(shippingForm),
+    errors,
   );
 }
 
@@ -527,6 +847,53 @@ function resetCheckoutForms() {
   applyErrors(transferErrors, ["remitterName", "accountLastFive"], {});
 }
 
+function resetCvsSelection() {
+  Object.assign(cvsSelection, {
+    selected: false,
+    storeType: null,
+    logisticsSubType: null,
+    cvsStoreId: null,
+    cvsStoreName: null,
+    cvsAddress: null,
+    cvsTelephone: null,
+    cvsOutside: null,
+    selectedAt: null,
+  });
+  selectedCvsStoreType.value = AUCTION_CVS_STORE_TYPE.UNIMART;
+}
+
+function resetCvsStoreBrowser() {
+  cvsStoreRequestVersion++;
+  cvsStores.value = [];
+  Object.assign(cvsStoreFilters, { city: "", keyword: "" });
+  cvsStoreLoadError.value = "";
+  cvsStoreSelectionError.value = "";
+  isLoadingCvsStores.value = false;
+  isSelectingCvsStore.value = false;
+}
+
+function applyCvsSelection(selection) {
+  Object.assign(cvsSelection, {
+    selected: Boolean(selection?.selected),
+    storeType: selection?.storeType ?? null,
+    logisticsSubType: selection?.logisticsSubType ?? null,
+    cvsStoreId: selection?.cvsStoreId ?? null,
+    cvsStoreName: selection?.cvsStoreName ?? null,
+    cvsAddress: selection?.cvsAddress ?? null,
+    cvsTelephone: selection?.cvsTelephone ?? null,
+    cvsOutside: selection?.cvsOutside ?? null,
+    selectedAt: selection?.selectedAt ?? null,
+  });
+
+  if (AUCTION_CVS_STORE_OPTIONS.some((option) => option.value === cvsSelection.storeType)) {
+    selectedCvsStoreType.value = cvsSelection.storeType;
+  }
+  if (cvsSelection.selected && cvsSelection.cvsAddress) {
+    shippingForm.shippingAddress = cvsSelection.cvsAddress;
+    shippingErrors.shippingAddress = "";
+  }
+}
+
 function initializeShippingForm(detail) {
   Object.assign(shippingForm, {
     receiverName: detail.receiverName ?? "",
@@ -538,11 +905,9 @@ function initializeShippingForm(detail) {
 
 function fillFromMember() {
   if (!canOperateCheckout.value || isBusy.value) return;
-  Object.assign(shippingForm, {
-    receiverName: memberInfo.name ?? "",
-    receiverPhone: memberInfo.phone ?? "",
-    shippingAddress: memberInfo.address ?? "",
-  });
+  shippingForm.receiverName = memberInfo.name ?? "";
+  shippingForm.receiverPhone = memberInfo.phone ?? "";
+  if (!isCvsShipping.value) shippingForm.shippingAddress = memberInfo.address ?? "";
   applyErrors(shippingErrors, ["receiverName", "receiverPhone", "shippingAddress"], {});
 }
 
@@ -550,7 +915,11 @@ function checkoutPayload() {
   return {
     receiverName: shippingForm.receiverName.trim(),
     receiverPhone: shippingForm.receiverPhone.trim(),
-    shippingAddress: shippingForm.shippingAddress.trim(),
+    shippingAddress: String(
+      isCvsShipping.value && hasSelectedCvsStore.value
+        ? cvsSelection.cvsAddress ?? shippingForm.shippingAddress
+        : shippingForm.shippingAddress,
+    ).trim(),
   };
 }
 
@@ -563,8 +932,142 @@ function shouldUseDetailPage(detail) {
 }
 
 async function redirectToDetail(orderNumber) {
+  stopLinePayPolling({ closeWindow: true });
   redirecting.value = true;
   await router.replace({ name: "auction-order-detail", params: { orderNumber } });
+}
+
+function closeLinePayPaymentWindow(paymentWindow = linePayPaymentWindow) {
+  if (!paymentWindow) return;
+  try {
+    if (!paymentWindow.closed) paymentWindow.close();
+  } catch {
+    // 跨來源付款視窗若拒絕存取，仍可安全清除本地參照。
+  }
+  if (linePayPaymentWindow === paymentWindow) linePayPaymentWindow = null;
+}
+
+function stopLinePayPolling({ closeWindow = false } = {}) {
+  linePayPollingVersion++;
+  if (linePayPollTimer !== null) {
+    clearTimeout(linePayPollTimer);
+    linePayPollTimer = null;
+  }
+  if (resolveLinePayPollDelay) {
+    const resolveDelay = resolveLinePayPollDelay;
+    resolveLinePayPollDelay = null;
+    resolveDelay(false);
+  }
+  isWaitingForLinePay.value = false;
+  linePayMerchantOrderId.value = "";
+  if (closeWindow) {
+    closeLinePayPaymentWindow();
+  } else if (linePayPaymentWindow?.closed) {
+    linePayPaymentWindow = null;
+  }
+}
+
+function waitForLinePayPollDelay(pollingVersion) {
+  if (pollingVersion !== linePayPollingVersion) return Promise.resolve(false);
+
+  return new Promise((resolve) => {
+    resolveLinePayPollDelay = resolve;
+    linePayPollTimer = setTimeout(() => {
+      linePayPollTimer = null;
+      resolveLinePayPollDelay = null;
+      resolve(pollingVersion === linePayPollingVersion);
+    }, LINE_PAY_POLL_DELAY_MS);
+  });
+}
+
+function linePayStatusValue(response) {
+  const payload = response?.data?.data ?? response?.data;
+  return String(payload?.status ?? "").trim().toUpperCase();
+}
+
+async function pollLinePayStatus(
+  orderNumber,
+  merchantOrderId,
+  activeViewVersion,
+  pollingVersion,
+) {
+  while (
+    pollingVersion === linePayPollingVersion &&
+    isCurrentCheckout(orderNumber, activeViewVersion)
+  ) {
+    let response;
+    try {
+      response = await getAuctionLinePayStatus(orderNumber, merchantOrderId);
+    } catch (error) {
+      if (
+        pollingVersion !== linePayPollingVersion ||
+        !isCurrentCheckout(orderNumber, activeViewVersion)
+      ) {
+        return;
+      }
+      const status = error.response?.status;
+      if (status === 401 || status === 403) {
+        stopLinePayPolling({ closeWindow: true });
+        await handleAuctionAccessError(error, router);
+        return;
+      }
+      if (status >= 400 && status < 500) {
+        stopLinePayPolling({ closeWindow: true });
+        operationError.value = "LINE Pay 付款狀態查詢失敗，請稍後再試。";
+        return;
+      }
+
+      // Provider timeout / 5xx 的結果不明確；保留同一 attempt，避免重複建立付款。
+      if (!(await waitForLinePayPollDelay(pollingVersion))) return;
+      continue;
+    }
+
+    if (
+      pollingVersion !== linePayPollingVersion ||
+      !isCurrentCheckout(orderNumber, activeViewVersion)
+    ) {
+      return;
+    }
+
+    const status = linePayStatusValue(response);
+    if (status === "PAID") {
+      stopLinePayPolling({ closeWindow: true });
+      await redirectToDetail(orderNumber);
+      return;
+    }
+    if (status === "CANCELLED") {
+      stopLinePayPolling({ closeWindow: true });
+      routeNotice.value = "LINE Pay 已取消，你仍可在付款期限內重新付款。";
+      return;
+    }
+    if (status === "FAILED") {
+      stopLinePayPolling({ closeWindow: true });
+      operationError.value = "LINE Pay 付款失敗，請在付款期限內重新嘗試。";
+      return;
+    }
+    if (status !== "WAITING") {
+      stopLinePayPolling({ closeWindow: true });
+      operationError.value = "LINE Pay 回傳了無法辨識的付款狀態，請稍後再試。";
+      return;
+    }
+
+    if (linePayPaymentWindow?.closed) {
+      stopLinePayPolling();
+      routeNotice.value =
+        "LINE Pay 付款視窗已關閉。若尚未完成付款，可重新發起付款。";
+      return;
+    }
+
+    if (!(await waitForLinePayPollDelay(pollingVersion))) return;
+  }
+}
+
+function startLinePayPolling(orderNumber, merchantOrderId, paymentWindow, activeViewVersion) {
+  linePayPaymentWindow = paymentWindow;
+  linePayMerchantOrderId.value = merchantOrderId;
+  isWaitingForLinePay.value = true;
+  const pollingVersion = ++linePayPollingVersion;
+  void pollLinePayStatus(orderNumber, merchantOrderId, activeViewVersion, pollingVersion);
 }
 
 async function loadMember(orderNumber, activeViewVersion) {
@@ -584,6 +1087,121 @@ async function loadMember(orderNumber, activeViewVersion) {
   }
 }
 
+async function loadCvsSelection(orderNumber, activeViewVersion) {
+  resetCvsSelection();
+  if (!isCvsShipping.value) return;
+
+  const response = await getAuctionCvsSelection(orderNumber);
+  if (!isCurrentCheckout(orderNumber, activeViewVersion)) return;
+  applyCvsSelection(response?.data?.data ?? { selected: false });
+}
+
+async function openCvsPicker() {
+  if (!canOperateCheckout.value || isBusy.value) return;
+
+  resetCvsStoreBrowser();
+  selectedCvsStoreType.value = AUCTION_CVS_STORE_OPTIONS.some(
+    (option) => option.value === cvsSelection.storeType,
+  )
+    ? cvsSelection.storeType
+    : AUCTION_CVS_STORE_TYPE.UNIMART;
+  isCvsPickerOpen.value = true;
+
+  const orderNumber = String(order.value?.orderNumber || route.params.orderNumber || "");
+  if (!orderNumber) return;
+  await loadCvsStores(orderNumber, viewVersion);
+}
+
+function closeCvsPicker(force = false) {
+  if (isSelectingCvsStore.value && !force) return;
+  isCvsPickerOpen.value = false;
+  resetCvsStoreBrowser();
+}
+
+async function loadCvsStores(
+  orderNumber,
+  activeViewVersion,
+  storeType = selectedCvsStoreType.value,
+) {
+  const storeRequestVersion = ++cvsStoreRequestVersion;
+  cvsStores.value = [];
+  cvsStoreLoadError.value = "";
+  cvsStoreSelectionError.value = "";
+  isLoadingCvsStores.value = true;
+
+  try {
+    const response = await getAuctionCvsStores(orderNumber, storeType);
+    if (
+      storeRequestVersion !== cvsStoreRequestVersion ||
+      !isCurrentCheckout(orderNumber, activeViewVersion) ||
+      !isCvsPickerOpen.value ||
+      selectedCvsStoreType.value !== storeType
+    ) {
+      return;
+    }
+
+    const stores = response?.data?.data;
+    if (!Array.isArray(stores)) throw new Error("Invalid CVS store response");
+    cvsStores.value = stores
+      .map((store) => ({
+        storeType: String(store?.storeType ?? ""),
+        storeId: String(store?.storeId ?? ""),
+        storeName: String(store?.storeName ?? ""),
+        storeAddress: String(store?.storeAddress ?? ""),
+        storePhone: String(store?.storePhone ?? ""),
+      }))
+      .filter((store) => store.storeType === storeType && store.storeId !== "");
+  } catch (error) {
+    if (
+      storeRequestVersion !== cvsStoreRequestVersion ||
+      !isCurrentCheckout(orderNumber, activeViewVersion) ||
+      !isCvsPickerOpen.value
+    ) {
+      return;
+    }
+    const status = error.response?.status;
+    if ((status === 401 || status === 403) && (await handleAuctionAccessError(error, router))) {
+      return;
+    }
+    cvsStoreLoadError.value = "門市資料暫時無法取得，請稍後再試。";
+  } finally {
+    if (
+      storeRequestVersion === cvsStoreRequestVersion &&
+      isCurrentCheckout(orderNumber, activeViewVersion) &&
+      isCvsPickerOpen.value
+    ) {
+      isLoadingCvsStores.value = false;
+    }
+  }
+}
+
+async function changeCvsStoreType(storeType) {
+  if (
+    isLoadingCvsStores.value ||
+    !AUCTION_CVS_STORE_OPTIONS.some((option) => option.value === storeType)
+  ) {
+    return;
+  }
+  selectedCvsStoreType.value = storeType;
+  const orderNumber = String(order.value?.orderNumber || route.params.orderNumber || "");
+  if (!orderNumber) return;
+  await loadCvsStores(orderNumber, viewVersion, storeType);
+}
+
+async function reloadCvsStores() {
+  const orderNumber = String(order.value?.orderNumber || route.params.orderNumber || "");
+  if (!orderNumber) return;
+  await loadCvsStores(orderNumber, viewVersion);
+}
+
+function isCurrentCvsStore(store) {
+  return (
+    hasSelectedCvsStore.value &&
+    cvsSelection.storeType === store.storeType &&
+    String(cvsSelection.cvsStoreId) === String(store.storeId)
+  );
+}
+
 function detailErrorMessage(error) {
   if (error.response?.status === 403) return "你沒有權限查看此訂單";
   if (error.response?.status === 404) return "找不到此競標訂單";
@@ -591,6 +1209,7 @@ function detailErrorMessage(error) {
 }
 
 async function loadOrder() {
+  stopLinePayPolling({ closeWindow: true });
   const activeViewVersion = ++viewVersion;
   const version = ++requestVersion;
   const orderNumber = String(route.params.orderNumber || "");
@@ -601,11 +1220,15 @@ async function loadOrder() {
   errorMessage.value = "";
   operationError.value = "";
   saveMessage.value = "";
+  routeNotice.value = "";
   order.value = null;
   memberEmail.value = "";
   Object.assign(memberInfo, { name: "", phone: "", address: "" });
   imageLoadFailed.value = false;
   resetCheckoutForms();
+  resetCvsSelection();
+  resetCvsStoreBrowser();
+  isCvsPickerOpen.value = false;
 
   try {
     const response = await getAuctionOrderDetail(orderNumber);
@@ -620,7 +1243,10 @@ async function loadOrder() {
       return;
     }
 
-    await loadMember(orderNumber, activeViewVersion);
+    await Promise.all([
+      loadMember(orderNumber, activeViewVersion),
+      loadCvsSelection(orderNumber, activeViewVersion),
+    ]);
     await refreshExpiredOrderOnce();
   } catch (error) {
     if (!isCurrentCheckout(orderNumber, activeViewVersion)) return;
@@ -750,15 +1376,79 @@ async function saveCheckout() {
   }
 }
 
+async function chooseCvsStore(store) {
+  currentTimeMs.value = Date.now();
+  operationError.value = "";
+  saveMessage.value = "";
+  cvsStoreSelectionError.value = "";
+  if (isBusy.value || !canOperateCheckout.value) {
+    operationError.value = unavailableMessage();
+    await refreshExpiredOrderOnce();
+    return;
+  }
+
+  if (
+    !store ||
+    !AUCTION_CVS_STORE_OPTIONS.some((option) => option.value === store.storeType) ||
+    !cvsStores.value.some(
+      (candidate) =>
+        candidate.storeType === store.storeType &&
+        String(candidate.storeId) === String(store.storeId),
+    )
+  ) {
+    cvsStoreSelectionError.value = "門市資料無效，請重新查詢後再試。";
+    return;
+  }
+
+  const orderNumber = String(order.value.orderNumber || route.params.orderNumber);
+  const activeViewVersion = viewVersion;
+  isSelectingCvsStore.value = true;
+  try {
+    const response = await selectAuctionCvsStore(orderNumber, {
+      storeType: store.storeType,
+      storeId: store.storeId,
+    });
+    if (!isCurrentCheckout(orderNumber, activeViewVersion)) return;
+    applyCvsSelection(response?.data?.data ?? { selected: false });
+    saveMessage.value = "取貨門市已更新。";
+    closeCvsPicker(true);
+  } catch (error) {
+    if (!isCurrentCheckout(orderNumber, activeViewVersion)) return;
+    const status = error.response?.status;
+    if ((status === 401 || status === 403) && (await handleAuctionAccessError(error, router))) return;
+    if (status === 404) {
+      cvsStoreSelectionError.value = "找不到此門市，請重新查詢。";
+    } else if (status === 409) {
+      cvsStoreSelectionError.value = "訂單目前已不可選店，正在重新取得最新狀態。";
+      try {
+        await refreshOrderDetail(orderNumber);
+      } catch {
+        // 保留選店錯誤；使用者可重新載入。
+      }
+    } else {
+      cvsStoreSelectionError.value = "門市選擇失敗，請稍後再試。";
+    }
+  } finally {
+    if (isCurrentCheckout(orderNumber, activeViewVersion)) {
+      isSelectingCvsStore.value = false;
+    }
+  }
+}
+
 function validatePaymentForm() {
   if (isCreditCard.value) return validateCreditCardForm();
   if (isTransfer.value) return validateTransferForm();
+  if (isLinePay.value) return true;
   operationError.value = "目前付款方式無法處理，請稍後再試。";
   return false;
 }
 
 function paymentRequestErrorMessage(error) {
   const status = error.response?.status;
+  const providerMessage = error.response?.data?.message;
+  if (isLinePay.value && typeof providerMessage === "string" && providerMessage.trim()) {
+    return providerMessage;
+  }
   if (status === 403) return "你沒有權限付款此訂單";
   if (status === 404) return "找不到此競標訂單";
   if (status === 409) return "目前訂單狀態無法付款，正在重新取得最新狀態。";
@@ -788,6 +1478,28 @@ async function confirmAndPay() {
   }
   if (!validateShippingForm() || !validatePaymentForm()) return;
 
+  let paymentWindow = null;
+  let linePayWindowHandedOff = false;
+  if (isLinePay.value) {
+    stopLinePayPolling({ closeWindow: true });
+    routeNotice.value = "";
+    try {
+      paymentWindow = window.open(
+        "about:blank",
+        "sneakermarket-line-pay",
+        "popup,width=520,height=760",
+      );
+    } catch {
+      paymentWindow = null;
+    }
+    if (!paymentWindow) {
+      operationError.value =
+        "瀏覽器阻擋了 LINE Pay 付款視窗，請允許彈出式視窗後再試。";
+      return;
+    }
+    linePayPaymentWindow = paymentWindow;
+  }
+
   const orderNumber = String(order.value.orderNumber || route.params.orderNumber);
   const activeViewVersion = viewVersion;
   const payload = checkoutPayload();
@@ -807,11 +1519,38 @@ async function confirmAndPay() {
     }
 
     phase = "payment";
+    if (isLinePay.value) {
+      const response = await requestAuctionLinePay(orderNumber);
+      if (!isCurrentCheckout(orderNumber, activeViewVersion)) return;
+      const paymentUrl = response?.data?.data?.paymentUrl ?? response?.data?.paymentUrl;
+      const merchantOrderId =
+        response?.data?.data?.merchantOrderId ?? response?.data?.merchantOrderId;
+      if (typeof paymentUrl !== "string" || paymentUrl.trim() === "") {
+        throw new Error("LINE Pay 未回傳付款網址");
+      }
+      if (typeof merchantOrderId !== "string" || merchantOrderId.trim() === "") {
+        throw new Error("LINE Pay 未回傳付款識別碼");
+      }
+      paymentWindow.location.href = paymentUrl.trim();
+      startLinePayPolling(
+        orderNumber,
+        merchantOrderId.trim(),
+        paymentWindow,
+        activeViewVersion,
+      );
+      linePayWindowHandedOff = true;
+      return;
+    }
+
     await payAuctionOrder(orderNumber);
     if (!isCurrentCheckout(orderNumber, activeViewVersion)) return;
     await redirectToDetail(orderNumber);
   } catch (error) {
     if (!isCurrentCheckout(orderNumber, activeViewVersion)) return;
+    if (paymentWindow && !linePayWindowHandedOff) {
+      closeLinePayPaymentWindow(paymentWindow);
+      paymentWindow = null;
+    }
     const status = error.response?.status;
     if ((status === 401 || status === 403) && (await handleAuctionAccessError(error, router))) return;
     if (phase === "checkout") {
@@ -823,6 +1562,9 @@ async function confirmAndPay() {
       await reconcilePaymentState(orderNumber);
     }
   } finally {
+    if (paymentWindow && !linePayWindowHandedOff) {
+      closeLinePayPaymentWindow(paymentWindow);
+    }
     isPaying.value = false;
   }
 }
@@ -830,7 +1572,10 @@ async function confirmAndPay() {
 watch(
   () => route.params.orderNumber,
   (orderNumber, previousOrderNumber) => {
-    if (orderNumber !== previousOrderNumber) loadOrder();
+    if (orderNumber !== previousOrderNumber) {
+      stopLinePayPolling({ closeWindow: true });
+      loadOrder();
+    }
   },
 );
 
@@ -841,8 +1586,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopPaymentDeadlineTimer();
+  stopLinePayPolling({ closeWindow: true });
   viewVersion++;
   requestVersion++;
+  cvsStoreRequestVersion++;
 });
 </script>
 
@@ -868,13 +1615,43 @@ onUnmounted(() => {
 .form-field { min-width: 0; }
 .form-field--full { grid-column: 1 / -1; }
 .form-field label { display: block; margin-bottom: 7px; color: #343a40; font-size: .85rem; font-weight: 650; }
-.form-field input, .form-field textarea { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid #ced4da; border-radius: 6px; background: #fff; color: #111; }
-.form-field input:focus, .form-field textarea:focus { border-color: #111; outline: 2px solid rgba(17,17,17,.12); }
-.form-field input:disabled, .form-field textarea:disabled, .form-field input[readonly] { background: #f8f9fa; color: #6c757d; }
+.form-field input, .form-field select, .form-field textarea { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid #ced4da; border-radius: 6px; background: #fff; color: #111; }
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus { border-color: #111; outline: 2px solid rgba(17,17,17,.12); }
+.form-field input:disabled, .form-field select:disabled, .form-field textarea:disabled, .form-field input[readonly] { background: #f8f9fa; color: #6c757d; }
 .form-field [aria-invalid="true"] { border-color: #b42318; }
 .field-hint, .field-error, .simulation-note { margin: 7px 0 0; font-size: .78rem; line-height: 1.5; }
 .field-hint, .simulation-note { color: #6c757d; }
 .field-error { color: #b42318; }
+.cvs-store-picker { display: grid; gap: 14px; }
+.cvs-store-picker__label { color: #343a40; font-size: .85rem; font-weight: 650; }
+.cvs-store-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.cvs-store-option { min-height: 38px; padding: 8px 13px; border: 1px solid #ced4da; border-radius: 999px; background: #fff; color: #343a40; font-weight: 650; }
+.cvs-store-option--active { border-color: #111; background: #111; color: #fff; }
+.cvs-store-option:disabled { cursor: not-allowed; opacity: .6; }
+.cvs-store-search { display: grid; grid-template-columns: minmax(150px, .45fr) minmax(0, 1fr); gap: 12px; }
+.cvs-store-state, .cvs-store-result-count { margin: 0; color: #6c757d; font-size: .84rem; line-height: 1.5; }
+.cvs-store-results { display: grid; gap: 10px; max-height: 430px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.cvs-store-results li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid #e9ecef; border-radius: 8px; }
+.cvs-store-result__details { display: grid; min-width: 0; gap: 4px; }
+.cvs-store-result__actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 8px; }
+.cvs-store-results strong, .cvs-store-results span { overflow-wrap: anywhere; }
+.cvs-store-results span { color: #6c757d; font-size: .8rem; line-height: 1.45; }
+.cvs-store-results .secondary-button { flex: 0 0 auto; }
+.cvs-picker-modal .notice p { margin: 0 0 10px; }
+.cvs-selection-card { display: grid; gap: 5px; padding: 15px; border: 1px solid #e9ecef; border-radius: 8px; background: #f8f9fa; }
+.cvs-selection-card__label, .cvs-selection-card__empty { margin: 0; color: #6c757d; font-size: .8rem; }
+.cvs-selection-card strong { overflow-wrap: anywhere; }
+.cvs-selection-card span { color: #495057; font-size: .84rem; line-height: 1.45; overflow-wrap: anywhere; }
+.cvs-selection-card__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-self: start; margin-top: 8px; }
+.cvs-picker-modal { position: fixed; z-index: 1100; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, .52); }
+.cvs-picker-modal__dialog { display: flex; width: min(760px, 100%); max-height: min(820px, calc(100vh - 48px)); flex-direction: column; overflow: hidden; border-radius: 12px; background: #fff; box-shadow: 0 22px 70px rgba(0, 0, 0, .24); }
+.cvs-picker-modal__header { display: flex; align-items: start; justify-content: space-between; gap: 24px; padding: 22px 24px; border-bottom: 1px solid #e9ecef; }
+.cvs-picker-modal__header h2 { margin: 0; font-size: 1.25rem; }
+.cvs-picker-modal__close { display: grid; width: 38px; height: 38px; padding: 0; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #343a40; font-size: 1.7rem; line-height: 1; }
+.cvs-picker-modal__close:hover { background: #f1f3f5; }
+.cvs-picker-modal__close:disabled { cursor: not-allowed; opacity: .5; }
+.cvs-picker-modal__body { display: grid; min-height: 0; gap: 16px; padding: 22px 24px; overflow-y: auto; }
+.cvs-picker-modal__footer { display: flex; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid #e9ecef; }
 .readonly-fact { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border-radius: 7px; background: #f8f9fa; color: #6c757d; }
 .readonly-fact strong { color: #111; }
 .notice { padding: 12px 14px; border-radius: 7px; font-size: .88rem; line-height: 1.55; }
@@ -887,6 +1664,8 @@ onUnmounted(() => {
 .transfer-instructions dl div { display: flex; justify-content: space-between; gap: 20px; }
 .transfer-instructions dt { color: #6c757d; font-weight: 500; }
 .transfer-instructions dd { margin: 0; font-weight: 650; text-align: right; overflow-wrap: anywhere; }
+.line-pay-instructions { padding: 18px; border: 1px solid #e9ecef; border-radius: 8px; background: #f8f9fa; }
+.line-pay-instructions p { margin: 8px 0 0; color: #495057; line-height: 1.6; }
 .checkout-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .primary-button, .secondary-button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 10px 17px; border: 1px solid #111; border-radius: 6px; font-weight: 700; text-decoration: none; }
 .primary-button { background: #111; color: #fff; }
@@ -921,6 +1700,12 @@ onUnmounted(() => {
   .panel-heading { flex-direction: column; gap: 10px; }
   .form-grid { grid-template-columns: 1fr; }
   .form-field--full { grid-column: auto; }
+  .cvs-store-search { grid-template-columns: 1fr; }
+  .cvs-store-results li { align-items: stretch; flex-direction: column; }
+  .cvs-picker-modal { padding: 12px; }
+  .cvs-picker-modal__dialog { max-height: calc(100vh - 24px); }
+  .cvs-picker-modal__header, .cvs-picker-modal__body { padding: 18px; }
+  .cvs-picker-modal__footer { padding: 14px 18px; }
   .checkout-actions, .state-actions { align-items: stretch; flex-direction: column; }
   .primary-button, .secondary-button { width: 100%; }
   .summary-product { grid-template-columns: 82px minmax(0, 1fr); }

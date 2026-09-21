@@ -17,7 +17,7 @@ function evaluateAuctionService() {
       get: (...args) => record("GET", args),
       patch: (...args) => record("PATCH", args),
       post: (...args) => record("POST", args),
-      put: () => {},
+      put: (...args) => record("PUT", args),
       delete: () => {},
     },
   };
@@ -27,7 +27,10 @@ function evaluateAuctionService() {
     return request;
   }
   vm.runInNewContext(
-    source + "\nglobalThis.subject = { getAuctionOrderDetail, updateAuctionOrderCheckout, payAuctionOrder };",
+    source +
+      "\nglobalThis.subject = { getAuctionOrderDetail, updateAuctionOrderCheckout, payAuctionOrder, " +
+      "getAuctionCvsSelection, getAuctionCvsStores, selectAuctionCvsStore, requestAuctionLinePay, " +
+      "getAuctionLinePayStatus };",
     context,
   );
   return { ...context.subject, requests };
@@ -96,6 +99,50 @@ test("auction service GETs detail, PATCHes only receiver fields and POSTs pay wi
   assert.equal(pay.url, "/auction-orders/AO%2F%E6%B8%AC%E8%A9%A6/pay");
   assert.equal(pay.args.length, 1);
   assert.equal(pay.body, undefined);
+});
+
+test("auction service keeps in-app CVS list, selection and LINE Pay scoped to auction endpoints", () => {
+  const service = evaluateAuctionService();
+
+  const selection = service.getAuctionCvsSelection("AO/測試");
+  assert.equal(selection.method, "GET");
+  assert.equal(selection.url, "/auction-orders/AO%2F%E6%B8%AC%E8%A9%A6/cvs-selection");
+
+  const stores = service.getAuctionCvsStores("AO/測試", "UNIMART");
+  assert.equal(stores.method, "GET");
+  assert.equal(stores.url, "/auction-orders/AO%2F%E6%B8%AC%E8%A9%A6/cvs/stores");
+  assert.deepEqual(JSON.parse(JSON.stringify(stores.body)), {
+    params: { storeType: "UNIMART" },
+  });
+
+  const selected = service.selectAuctionCvsStore("AO/測試", {
+    storeType: "FAMI",
+    storeId: "000123",
+    storeName: "不可送出",
+    storeAddress: "不可送出",
+  });
+  assert.equal(selected.method, "PUT");
+  assert.equal(selected.url, "/auction-orders/AO%2F%E6%B8%AC%E8%A9%A6/cvs-selection");
+  assert.deepEqual(JSON.parse(JSON.stringify(selected.body)), {
+    storeType: "FAMI",
+    storeId: "000123",
+  });
+
+  const linePay = service.requestAuctionLinePay("AO/測試");
+  assert.equal(linePay.method, "POST");
+  assert.equal(linePay.url, "/auction-orders/AO%2F%E6%B8%AC%E8%A9%A6/line-pay/request");
+  assert.equal(linePay.args.length, 1);
+  assert.equal(linePay.body, undefined);
+
+  const linePayStatus = service.getAuctionLinePayStatus("AO/測試", "ALP-STRING-ID");
+  assert.equal(linePayStatus.method, "GET");
+  assert.equal(
+    linePayStatus.url,
+    "/auction-orders/AO%2F%E6%B8%AC%E8%A9%A6/line-pay/status",
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(linePayStatus.body)), {
+    params: { merchantOrderId: "ALP-STRING-ID" },
+  });
 });
 
 test("buyer list routes payable orders to checkout and all other orders to detail", () => {

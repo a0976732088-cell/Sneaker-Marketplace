@@ -41,6 +41,44 @@ export function payAuctionOrder(orderNumber) {
   );
 }
 
+/** 查詢競標訂單目前已選取的超商門市；未選店仍由後端回 selected=false。 */
+export function getAuctionCvsSelection(orderNumber) {
+  return httpClient.get(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/cvs-selection",
+  );
+}
+
+/** 門市清單只以後端 allowlist 店別查詢；縣市與關鍵字由 Checkout 在記憶體篩選。 */
+export function getAuctionCvsStores(orderNumber, storeType) {
+  return httpClient.get(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/cvs/stores",
+    { params: { storeType } },
+  );
+}
+
+/** 選店只傳固定店別與 provider store id，其餘門市資料由後端清單決定。 */
+export function selectAuctionCvsStore(orderNumber, { storeType, storeId }) {
+  return httpClient.put(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/cvs-selection",
+    { storeType, storeId },
+  );
+}
+
+/** LINE Pay 金額與商品資訊完全由後端訂單決定，不傳 Request Body。 */
+export function requestAuctionLinePay(orderNumber) {
+  return httpClient.post(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/line-pay/request",
+  );
+}
+
+/** 只以後端產生的付款 attempt id 查詢目前 LINE Pay 狀態。 */
+export function getAuctionLinePayStatus(orderNumber, merchantOrderId) {
+  return httpClient.get(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/line-pay/status",
+    { params: { merchantOrderId } },
+  );
+}
+
 
 /**
  * 查詢競標列表。

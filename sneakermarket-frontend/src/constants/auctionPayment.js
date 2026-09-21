@@ -1,6 +1,7 @@
 export const AUCTION_PAYMENT_METHOD = Object.freeze({
   CREDIT_CARD: "信用卡",
   TRANSFER: "轉帳",
+  LINE_PAY: "LINE Pay",
 });
 
 /**

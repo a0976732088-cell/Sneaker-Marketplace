@@ -18,6 +18,7 @@ import com.project.sneakermarket.auction.entity.AuctionPaymentStatus;
 import com.project.sneakermarket.auction.entity.AuctionShippingStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
+import com.project.sneakermarket.auction.logistics.ecpay.AuctionCvsStoreSelectionService;
 import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.AuctionOrderRepository;
 import com.project.sneakermarket.common.exception.ForbiddenException;
@@ -29,6 +30,7 @@ class AuctionOrderPaymentServiceTests {
 
     private AuctionOrderRepository orders;
     private AuctionTime time;
+    private AuctionCvsStoreSelectionService stores;
     private AuctionPrivateNotificationEventPublisher privateNotificationEvents;
     private AuctionOrderPaymentService service;
     private AuctionOrder order;
@@ -37,8 +39,9 @@ class AuctionOrderPaymentServiceTests {
     void setup() {
         orders = mock(AuctionOrderRepository.class);
         time = mock(AuctionTime.class);
+        stores = mock(AuctionCvsStoreSelectionService.class);
         privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
-        service = new AuctionOrderPaymentService(orders, time, privateNotificationEvents);
+        service = new AuctionOrderPaymentService(orders, time, stores, privateNotificationEvents);
         order = pendingOrder();
         when(orders.findByOrderNumberForUpdate("AO-PAY-001")).thenReturn(Optional.of(order));
     }
@@ -67,7 +70,52 @@ class AuctionOrderPaymentServiceTests {
         assertEquals(PAYMENT_AT, response.updatedAt());
         verify(orders).save(order);
         verify(time).now();
+        verify(stores).requireSelectedStoreIfNeeded(order);
         verifyPaidEvent(PAYMENT_AT);
+    }
+
+    @Test
+    void creditCardStillUsesExistingPayFlow() {
+        order.setPaymentMethod("信用卡");
+        when(time.now()).thenReturn(PAYMENT_AT);
+
+        var response = service.pay("AO-PAY-001", 10L);
+
+        assertEquals("信用卡", response.paymentMethod());
+        assertEquals(AuctionPaymentStatus.PAID, response.paymentStatus());
+        assertEquals(AuctionOrderStatus.PAID, response.orderStatus());
+        verify(stores).requireSelectedStoreIfNeeded(order);
+        verifyPaidEvent(PAYMENT_AT);
+    }
+
+    @Test
+    void linePayCannotBypassProviderThroughExistingPayEndpoint() {
+        order.setPaymentMethod("LINE Pay");
+        var before = snapshot(order);
+
+        AuctionConflictException error = assertThrows(AuctionConflictException.class,
+                () -> service.pay("AO-PAY-001", 10L));
+
+        assertEquals("LINE Pay 訂單必須透過 LINE Pay 完成付款", error.getMessage());
+        assertEquals(before, snapshot(order));
+        verifyNoInteractions(time, stores, privateNotificationEvents);
+        verify(orders, never()).save(any());
+    }
+
+    @Test
+    void cvsSelectionGuardAlsoProtectsExistingPayEndpoint() {
+        when(time.now()).thenReturn(PAYMENT_AT);
+        doThrow(new AuctionConflictException("請先選擇超商取貨門市"))
+                .when(stores).requireSelectedStoreIfNeeded(order);
+
+        AuctionConflictException error = assertThrows(AuctionConflictException.class,
+                () -> service.pay("AO-PAY-001", 10L));
+
+        assertEquals("請先選擇超商取貨門市", error.getMessage());
+        assertEquals(AuctionPaymentStatus.PENDING, order.getPaymentStatus());
+        assertEquals(AuctionOrderStatus.PENDING_PAYMENT, order.getOrderStatus());
+        verify(orders, never()).save(any());
+        verifyNoInteractions(privateNotificationEvents);
     }
 
     @Test

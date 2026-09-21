@@ -14,6 +14,12 @@ import {
   TAIWAN_CITIES,
   normalizeTaiwanCity,
 } from "../src/constants/auctionFormOptions.js";
+import {
+  AUCTION_CVS_RESULT_LIMIT,
+  AUCTION_CVS_STORE_OPTIONS,
+  AUCTION_CVS_STORE_TYPE,
+} from "../src/constants/auctionCvs.js";
+import { AUCTION_PAYMENT_METHOD } from "../src/constants/auctionPayment.js";
 
 test("auction form options expose the shared shoe size allowlist", () => {
   assert.deepEqual([...AUCTION_SHOE_SIZES], [
@@ -47,7 +53,7 @@ test("auction form options expose the exact preset copy", () => {
     "郵寄",
     "超商寄送",
   ]);
-  assert.deepEqual([...AUCTION_PAYMENT_METHOD_OPTIONS], ["轉帳", "信用卡"]);
+  assert.deepEqual([...AUCTION_PAYMENT_METHOD_OPTIONS], ["轉帳", "信用卡", "LINE Pay"]);
   assert.deepEqual([...AUCTION_WARRANTY_NOTE_OPTIONS], [
     "無額外保固",
     "依原購買通路／品牌規範",
@@ -74,6 +80,28 @@ test("auction form UI sentinels stay distinct from backend values", () => {
   });
   assert.equal(Object.isFrozen(DELIVERY_OPTION_VALUES), true);
   assert.equal(Object.hasOwn(DELIVERY_OPTION_VALUES, "MEETUP_ONLY"), false);
+});
+
+test("auction payment and CVS constants expose only the supported integration values", () => {
+  assert.equal(AUCTION_PAYMENT_METHOD.LINE_PAY, "LINE Pay");
+  assert.equal(Object.isFrozen(AUCTION_PAYMENT_METHOD), true);
+  assert.deepEqual(AUCTION_CVS_STORE_TYPE, {
+    UNIMART: "UNIMART",
+    FAMI: "FAMI",
+    HILIFE: "HILIFE",
+  });
+  assert.deepEqual(
+    AUCTION_CVS_STORE_OPTIONS.map(({ value, label }) => ({ value, label })),
+    [
+      { value: "UNIMART", label: "7-ELEVEN" },
+      { value: "FAMI", label: "全家" },
+      { value: "HILIFE", label: "萊爾富" },
+    ],
+  );
+  assert.equal(Object.isFrozen(AUCTION_CVS_STORE_TYPE), true);
+  assert.equal(Object.isFrozen(AUCTION_CVS_STORE_OPTIONS), true);
+  assert.equal(AUCTION_CVS_RESULT_LIMIT, 100);
+  assert.equal(JSON.stringify(AUCTION_CVS_STORE_OPTIONS).includes("C2C"), false);
 });
 
 test("auction form options expose the exact 22 official Taiwan cities", () => {

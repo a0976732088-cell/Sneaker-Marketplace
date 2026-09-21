@@ -132,7 +132,7 @@ test("Auction Edit exposes the five shared preset selectors with inline Custom i
     "二手平台購入",
   ]);
   assert.deepEqual(AUCTION_SHIPPING_METHOD_OPTIONS, ["宅配", "郵寄", "超商寄送"]);
-  assert.deepEqual(AUCTION_PAYMENT_METHOD_OPTIONS, ["轉帳", "信用卡"]);
+  assert.deepEqual(AUCTION_PAYMENT_METHOD_OPTIONS, ["轉帳", "信用卡", "LINE Pay"]);
   assert.deepEqual(AUCTION_WARRANTY_NOTE_OPTIONS, [
     "無額外保固",
     "依原購買通路／品牌規範",
