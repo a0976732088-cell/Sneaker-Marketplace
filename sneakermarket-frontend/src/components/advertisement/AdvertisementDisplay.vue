@@ -16,6 +16,10 @@ const props = defineProps({
     type: Array,
     default: () => ["BANNER", "POPUP", "SMALL_BLOCK", "CATEGORY_CARD"],
   },
+  bannerImageClickable: {
+    type: Boolean,
+    default: true,
+  },
   // 指定目前頁面要顯示哪一組 BANNER
   bannerOrder: {
     type: Number,
@@ -30,6 +34,15 @@ const props = defineProps({
   smallBlockOrder: {
     type: Number,
     default: null,
+  },
+  showSmallBlockAction: {
+    type: Boolean,
+    default: false,
+  },
+
+  smallBlockActionLabel: {
+    type: String,
+    default: "立即報名",
   },
 });
 const emit = defineEmits(["select-category"]);
@@ -211,8 +224,8 @@ function restartBannerTimer() {
 
   // 重新從三秒開始倒數
   bannerTimer = window.setTimeout(() => {
-    nextBanner(); // 4.5秒後切換下一張
-  }, 4500);
+    nextBanner(); // 6.5秒後切換下一張
+  }, 6500);
 }
 const showPopup = ref(true);
 const showSmallBlock = ref(true);
@@ -220,6 +233,18 @@ const allowPopupThisMount = ref(false);
 
 const currentBanner = computed(() => {
   return displayedBannerAds.value[bannerIndex.value] || null;
+});
+
+const isCommerceBanner = computed(() => {
+  const targetType = currentBanner.value?.targetType;
+
+  return ["PRODUCT", "CATEGORY"].includes(targetType);
+});
+
+const isAuctionBanner = computed(() => {
+  const targetType = currentBanner.value?.targetType;
+
+  return ["AUCTION", "HOT_AUCTION"].includes(targetType);
 });
 
 watch(
@@ -394,9 +419,42 @@ onUnmounted(() => {
             class="banner-image"
             :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
             :alt="currentBanner.adName"
-            :class="{ 'static-banner-image': staticBanner }"
-            @click="!staticBanner && goToAdvertisementTarget(currentBanner)"
+            :class="{
+              'static-banner-image': staticBanner || !bannerImageClickable,
+            }"
+            @click="
+              bannerImageClickable &&
+              !staticBanner &&
+              goToAdvertisementTarget(currentBanner)
+            "
           />
+        </Transition>
+        <Transition name="banner-fade">
+          <div
+            v-if="isCommerceBanner || isAuctionBanner"
+            :key="`banner-actions-${currentBanner.adId}`"
+            class="banner-actions"
+          >
+            <RouterLink
+              v-if="isCommerceBanner"
+              :to="{ name: 'commerce' }"
+              class="banner-action banner-action-primary"
+              @click.stop="trackAdvertisementClick(currentBanner)"
+            >
+              立即選購
+              <span aria-hidden="true">→</span>
+            </RouterLink>
+
+            <RouterLink
+              v-if="isAuctionBanner"
+              :to="{ name: 'auction' }"
+              class="banner-action banner-action-auction-primary"
+              @click.stop="trackAdvertisementClick(currentBanner)"
+            >
+              探索競標
+              <span aria-hidden="true">→</span>
+            </RouterLink>
+          </div>
         </Transition>
 
         <button
@@ -444,7 +502,6 @@ onUnmounted(() => {
       >
         <slot name="category-result"></slot>
       </AdvertisementCategoryCarousel>
-
       <aside
         v-if="
           hasPlacement('SMALL_BLOCK') &&
@@ -466,8 +523,18 @@ onUnmounted(() => {
         <img
           :src="resolveAdvertisementImageUrl(currentSmallBlock.imageUrl)"
           :alt="currentSmallBlock.adName"
-          @click="goToAdvertisementTarget(currentSmallBlock)"
         />
+        <button
+          v-if="
+            showSmallBlockAction && currentSmallBlock.targetType === 'EVENT'
+          "
+          type="button"
+          class="small-block-action"
+          @click="goToAdvertisementTarget(currentSmallBlock)"
+        >
+          {{ smallBlockActionLabel }}
+          <span aria-hidden="true">→</span>
+        </button>
       </aside>
 
       <Transition

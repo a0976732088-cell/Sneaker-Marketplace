@@ -27,6 +27,62 @@
   object-fit: cover;
   cursor: pointer;
 }
+.banner-actions {
+  position: absolute;
+  z-index: 3;
+  left: clamp(24px, 5vw, 72px);
+  bottom: clamp(24px, 4vw, 48px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.banner-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 150px;
+  min-height: 52px;
+  padding: 12px 24px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.banner-action:hover {
+  transform: translateY(-2px);
+}
+
+.banner-action:focus-visible {
+  outline: 3px solid rgb(255 255 255 / 65%);
+  outline-offset: 3px;
+}
+.banner-action-primary {
+  color: #fff;
+  background: #111;
+}
+.banner-action-auction-primary {
+  color: #111;
+  background: #fff;
+}
+.banner-action-primary:hover {
+  color: #fff;
+  background: #333;
+}
+.banner-action-secondary:hover {
+  border-color: #111;
+  color: #111;
+  background: #fff;
+}
 /*過場動畫*/
 .banner-fade-enter-active,
 .banner-fade-leave-active {
@@ -129,18 +185,20 @@
 
 .small-block-ad {
   position: fixed;
-  right: 110px;
-  bottom: 250px;
+  right: clamp(16px, 3vw, 48px);
+  bottom: clamp(24px, 6vh, 80px);
   z-index: 1000;
 }
 
 /* SMALL_BLOCK 長方形圖片 */
 .small-block-ad img {
-  width: 150px;
-  height: 300px;
+  display: block;
+  width: clamp(110px, 10vw, 150px);
+  height: auto;
+  aspect-ratio: 1 / 2;
   border-radius: 12px;
   object-fit: cover;
-  cursor: pointer;
+  cursor: default;
 }
 
 /* SMALL_BLOCK 關閉按鈕 */
@@ -271,5 +329,81 @@
   .popup-ios-leave-active .popup-ad {
     animation: none;
     transition: none;
+  }
+}
+@media (max-width: 576px) {
+  .banner-actions {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    gap: 8px;
+  }
+
+  .banner-action {
+    flex: 1;
+    min-width: 0;
+    min-height: 42px;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
+
+.small-block-action {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  bottom: 16px;
+  z-index: 2;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 6px;
+
+  color: #111;
+  background-color: white;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+
+  transform: translateX(-50%);
+}
+
+.small-block-action:hover {
+  background-color: #f1f1f1;
+  transform: translateX(-50%) translateY(-2px);
+}
+@media (max-width: 1366px) {
+  .small-block-ad {
+    right: 16px;
+    bottom: 24px;
+  }
+
+  .small-block-ad img {
+    width: 110px;
+  }
+
+  .small-block-action {
+    bottom: 10px;
+    padding: 7px 9px;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .small-close {
+    top: -9px;
+    right: -9px;
+    width: 24px;
+    height: 24px;
+    font-size: 15px;
+  }
+}
+@media (max-width: 1680px) {
+  .small-block-ad {
+    display: none;
   }
 }

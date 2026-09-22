@@ -43,6 +43,9 @@ const loopingAdvertisements = computed(() => {
 let categoryLoopResetTimer = null;
 let categoryAutoScrollTimer = null;
 
+let categoryManualNavigationLocked = false;
+let categoryManualUnlockTimer = null;
+
 function getCategoryScrollStep(track) {
   const firstCard = track.querySelector(".category-card");
 
@@ -72,10 +75,7 @@ function scheduleCategoryLoopReset(track, loopWidth) {
   clearCategoryLoopResetTimer();
 
   categoryLoopResetTimer = window.setTimeout(() => {
-    if (
-      track === categoryTrack.value &&
-      track.scrollLeft >= loopWidth - 2
-    ) {
+    if (track === categoryTrack.value) {
       setCategoryScrollInstantly(
         track,
         track.scrollLeft - loopWidth,
@@ -83,10 +83,11 @@ function scheduleCategoryLoopReset(track, loopWidth) {
     }
 
     categoryLoopResetTimer = null;
-  }, 500);
+  }, 700);
 }
 
 function scrollCategoryCards(direction) {
+  clearCategoryLoopResetTimer();
   const track = categoryTrack.value;
 
   if (!track) return;
@@ -133,8 +134,17 @@ function startCategoryAutoScroll() {
 }
 
 function navigateCategoryCards(direction) {
+  if (categoryManualNavigationLocked) return;
+
+  categoryManualNavigationLocked = true;
+
   scrollCategoryCards(direction);
   startCategoryAutoScroll();
+
+  categoryManualUnlockTimer = window.setTimeout(() => {
+    categoryManualNavigationLocked = false;
+    categoryManualUnlockTimer = null;
+  }, 750);
 }
 
 function selectAdvertisement(ad) {
@@ -162,6 +172,9 @@ onMounted(() => {
 onUnmounted(() => {
   stopCategoryAutoScroll();
   clearCategoryLoopResetTimer();
+   if (categoryManualUnlockTimer !== null) {
+    window.clearTimeout(categoryManualUnlockTimer);
+  }
   disposeAdvertisementTracking();
 });
 </script>

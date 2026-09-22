@@ -1,9 +1,27 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { getAuctions } from "@/service/auctionService";
-import AuctionCountdown from "@/components/auction/AuctionCountdown.vue";
-import { formatTwd } from "@/utils/auctionMoney";
+import HomeAuctionCountdown from "@/components/advertisement/HomeAuctionCountdown.vue";
 import { resolveAuctionImageUrl } from "@/utils/auctionImageUrl";
+
+const props = defineProps({
+  limit: {
+    type: Number,
+    default: 4,
+  },
+  heading: {
+    type: String,
+    default: "熱門競標",
+  },
+  sort: {
+    type: Array,
+    default: () => ["bidCount,desc", "endAt,asc"],
+  },
+  compact: {
+    type: Boolean,
+    default: false,
+  },
+});
 
 const auctions = ref([]);
 const loading = ref(false);
@@ -28,14 +46,13 @@ async function loadHotAuctions({ silent = false } = {}) {
   try {
     const response = await getAuctions({
       status: "ACTIVE",
-      sort: ["bidCount,desc", "endAt,asc"],
+      sort: props.sort,
       page: 0,
-      size: 4,
+      size: props.limit,
     });
 
     auctions.value = response.data?.data?.items ?? [];
     errorMessage.value = "";
-
   } catch (error) {
     console.error("首頁熱門競標讀取失敗：", error);
 
@@ -72,19 +89,16 @@ onBeforeUnmount(() => {
   <section
     v-if="loading || errorMessage || auctions.length"
     class="home-auction-section"
+    :class="{ compact }"
     aria-labelledby="home-auction-title"
   >
     <header class="home-auction-header">
       <div class="hot-auction-heading">
-        <span class="hot-auction-live">
-          <i aria-hidden="true"></i>
-          LIVE
-        </span>
-        <h2 id="home-auction-title">熱門競標</h2>
+        <h2 id="home-auction-title">{{ heading }}</h2>
       </div>
 
       <RouterLink :to="{ name: 'auction' }" class="view-all-link">
-        查看全部競標
+        查看全部
       </RouterLink>
     </header>
 
@@ -96,7 +110,7 @@ onBeforeUnmount(() => {
 
     <div v-else class="home-auction-grid">
       <RouterLink
-        v-for="(auction, index) in auctions"
+        v-for="auction in auctions"
         :key="auction.auctionId"
         :to="{
           name: 'auction-detail',
@@ -115,45 +129,20 @@ onBeforeUnmount(() => {
           <div v-else class="auction-image-placeholder">尚無圖片</div>
 
           <span class="live-badge">競標中</span>
-
-          <span class="auction-rank">
-            HOT {{ String(index + 1).padStart(2, "0") }}
-          </span>
         </div>
 
         <div class="home-auction-content">
+          <h3>{{ auction.productName }}</h3>
+
           <p class="auction-brand">
             {{ auction.brandName || "品牌未提供" }}
           </p>
 
-          <h3>{{ auction.productName }}</h3>
-
-          <div class="auction-price">
-            <span>目前價格</span>
-            <Transition name="auction-price-change" mode="out-in">
-              <strong
-                :key="`${auction.auctionId}-${auction.currentPrice}`"
-                aria-live="polite"
-              >
-                {{ formatTwd(auction.currentPrice) }}
-              </strong>
-            </Transition>
-          </div>
-
-          <div class="auction-meta">
-            <span>{{ auction.bidCount ?? 0 }} 次出價</span>
-
-            <span class="auction-time">
-              剩餘
-              <AuctionCountdown
-                :end-at="auction.endAt"
-                :status="auction.status"
-              />
-            </span>
-          </div>
-          <div class="auction-card-action">
-            <span>前往競標</span>
-            <b aria-hidden="true">→</b>
+          <div class="auction-card-summary">
+            <HomeAuctionCountdown
+              :end-at="auction.endAt"
+              :status="auction.status"
+            />
           </div>
         </div>
       </RouterLink>
