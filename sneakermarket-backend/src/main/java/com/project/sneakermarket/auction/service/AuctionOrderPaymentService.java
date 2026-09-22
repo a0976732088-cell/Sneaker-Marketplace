@@ -12,6 +12,7 @@ import com.project.sneakermarket.auction.entity.AuctionOrderStatus;
 import com.project.sneakermarket.auction.entity.AuctionPaymentStatus;
 import com.project.sneakermarket.auction.exception.AuctionConflictException;
 import com.project.sneakermarket.auction.exception.AuctionUnauthorizedException;
+import com.project.sneakermarket.auction.logistics.ecpay.AuctionCvsStoreSelectionService;
 import com.project.sneakermarket.auction.notification.AuctionPrivateNotificationEventPublisher;
 import com.project.sneakermarket.auction.repository.AuctionOrderRepository;
 import com.project.sneakermarket.common.exception.ForbiddenException;
@@ -29,6 +30,7 @@ public class AuctionOrderPaymentService {
 
     private final AuctionOrderRepository orders;
     private final AuctionTime time;
+    private final AuctionCvsStoreSelectionService stores;
     private final AuctionPrivateNotificationEventPublisher privateNotificationEvents;
 
     @Transactional
@@ -54,10 +56,15 @@ public class AuctionOrderPaymentService {
             throw new AuctionConflictException("此競標訂單目前無法付款");
         }
 
+        if ("LINE Pay".equals(order.getPaymentMethod())) {
+            throw new AuctionConflictException("LINE Pay 訂單必須透過 LINE Pay 完成付款");
+        }
+
         LocalDateTime paidAt = time.now();
         if (order.getPaymentDueAt() != null && !paidAt.isBefore(order.getPaymentDueAt())) {
             throw new AuctionConflictException("競標訂單付款期限已過");
         }
+        stores.requireSelectedStoreIfNeeded(order);
         order.setPaymentStatus(AuctionPaymentStatus.PAID);
         order.setOrderStatus(AuctionOrderStatus.PAID);
         order.setPaidAt(paidAt);

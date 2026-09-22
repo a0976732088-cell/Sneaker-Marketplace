@@ -59,6 +59,8 @@ class AuctionQueryContractTests {
         when(auctions.findPublicById(12L)).thenReturn(Optional.of(auction));
         when(products.findById(3L)).thenReturn(Optional.of(product));
         when(images.findByAuctionProductIdOrderBySortOrderAsc(3L)).thenReturn(List.of());
+        when(images.findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(anyList()))
+                .thenReturn(List.of());
         when(references.getOptions()).thenReturn(new AuctionOptionsResponse(
                 List.of(new AuctionLookupOption(71L, "Actual brand")),
                 List.of(new AuctionLookupOption(92L, "Actual category"))));
@@ -192,6 +194,56 @@ class AuctionQueryContractTests {
     }
 
     @Test
+    void pagedListLoadsImagesOnceAndPrefersPrimaryWithFirstImageFallback() {
+        Auction secondAuction = auction(13L, 4L);
+        Auction thirdAuction = auction(14L, 5L);
+        AuctionProduct secondProduct = product(4L, 43L, "第二雙鞋");
+        AuctionProduct thirdProduct = product(5L, 44L, "第三雙鞋");
+        when(auctions.findAll(any(Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(
+                        List.of(auction, secondAuction, thirdAuction),
+                        PageRequest.of(0, 20),
+                        3));
+        when(products.findAllById(any())).thenReturn(List.of(product, secondProduct, thirdProduct));
+        when(members.findAllById(any())).thenReturn(List.of(
+                member(42L, "王小明"), member(43L, "陳小華"), member(44L, "林小美")));
+        when(images.findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(anyList()))
+                .thenReturn(List.of(
+                        image(3L, "/images/first.jpg", 0, false),
+                        image(3L, "/images/primary.jpg", 1, true),
+                        image(4L, "/images/fallback.jpg", 0, false),
+                        image(4L, "/images/second.jpg", 1, false)));
+
+        var result = query.searchAuctions(
+                new AuctionSearchCriteria(),
+                PageRequest.of(0, 20));
+
+        assertEquals("/images/primary.jpg", result.items().get(0).imageUrl());
+        assertEquals("/images/fallback.jpg", result.items().get(1).imageUrl());
+        assertNull(result.items().get(2).imageUrl());
+        verify(images, times(1))
+                .findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(
+                        argThat(ids -> ids.equals(List.of(3L, 4L, 5L))));
+        verify(images, never()).findByAuctionProductIdOrderBySortOrderAsc(anyLong());
+    }
+
+    @Test
+    void allListUsesOneBatchImageQuery() {
+        when(auctions.findAll(any(Specification.class))).thenReturn(List.of(auction));
+        when(products.findAllById(any())).thenReturn(List.of(product));
+        when(members.findAllById(any())).thenReturn(List.of(member(42L, "王小明")));
+        when(images.findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(anyList()))
+                .thenReturn(List.of(image(3L, "/images/all-primary.jpg", 0, true)));
+
+        var result = query.getAllAuctions();
+
+        assertEquals("/images/all-primary.jpg", result.get(0).imageUrl());
+        verify(images, times(1))
+                .findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(List.of(3L));
+        verify(images, never()).findByAuctionProductIdOrderBySortOrderAsc(anyLong());
+    }
+
+    @Test
     void detailReturnsSellerNameWithoutChangingOwnerCheck() {
         when(members.findById(42L)).thenReturn(Optional.of(member(42L, "王小明")));
 
@@ -276,6 +328,19 @@ class AuctionQueryContractTests {
         Member value = new Member();
         value.setMemberId(id);
         value.setName(name);
+        return value;
+    }
+
+    private AuctionProductImage image(
+            Long productId,
+            String imageUrl,
+            int sortOrder,
+            boolean primary) {
+        AuctionProductImage value = new AuctionProductImage();
+        value.setAuctionProductId(productId);
+        value.setImageUrl(imageUrl);
+        value.setSortOrder(sortOrder);
+        value.setIsPrimary(primary);
         return value;
     }
 

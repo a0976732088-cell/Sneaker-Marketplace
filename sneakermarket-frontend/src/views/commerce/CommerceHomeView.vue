@@ -1,168 +1,199 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import httpClient from '@/service/httpClient'
-import { getBrands } from '@/service/brandService'
-import { useRoute } from 'vue-router' // zwei導向分類
+import { ref, computed, onMounted } from "vue";
+import httpClient from "@/service/httpClient";
+import { getBrands } from "@/service/brandService";
+import { useRoute } from "vue-router"; // zwei導向分類
+// 引入廣告顯示元件
+import AdvertisementDisplay from "@/components/advertisement/AdvertisementDisplay.vue";
 
 const route = useRoute(); //zwei導向分類
 
-const products = ref([])
-const loading = ref(true)
-const errorMessage = ref('')
+const products = ref([]);
+const loading = ref(true);
+const errorMessage = ref("");
 
-const keyword = ref('')
-const categoryId = ref(null)
-const size = ref(null)
-const brandId = ref(null)
+const keyword = ref("");
+const categoryId = ref(null);
+const size = ref(null);
+const brandId = ref(null);
 
-const brands = ref([])
-const loadingBrands = ref(true)
+const brands = ref([]);
+const loadingBrands = ref(true);
 
-const openBrand = ref(false)
-const openSize = ref(false)
-const showFilters = ref(true)
-const sortBy = ref('')
-const currentPage = ref(1)
-const pageSize = 9
+const openBrand = ref(false);
+const openSize = ref(false);
+const showFilters = ref(true);
+const sortBy = ref("");
+const currentPage = ref(1);
+const pageSize = 9;
 
 const categories = [
-  { id: 1, name: '籃球鞋' },
-  { id: 2, name: '慢跑鞋' },
-  { id: 3, name: '休閒鞋' },
-  { id: 4, name: '滑板鞋' },
-]
+  { id: 1, name: "籃球鞋" },
+  { id: 2, name: "慢跑鞋" },
+  { id: 3, name: "休閒鞋" },
+  { id: 4, name: "滑板鞋" },
+];
 
-const sizeOptions = ['US 8', 'US 8.5', 'US 9', 'US 9.5', 'US 10', 'US 10.5', 'US 11']
+const sizeOptions = [
+  "US 8",
+  "US 8.5",
+  "US 9",
+  "US 9.5",
+  "US 10",
+  "US 10.5",
+  "US 11",
+];
 
 const currentCategoryLabel = computed(() => {
-  const found = categories.find(c => c.id === categoryId.value)
-  return found ? found.name : '全部商品'
-})
+  const found = categories.find((c) => c.id === categoryId.value);
+  return found ? found.name : "全部商品";
+});
 
-const totalPages = computed(() => Math.max(1, Math.ceil(products.value.length / pageSize)))
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(products.value.length / pageSize)),
+);
 
 const sortedProducts = computed(() => {
-  const list = [...products.value]
-  if (sortBy.value === 'price_asc') {
-    list.sort((a, b) => a.price - b.price)
-  } else if (sortBy.value === 'price_desc') {
-    list.sort((a, b) => b.price - a.price)
-  } else if (sortBy.value === 'newest') {
-    list.sort((a, b) => b.productId - a.productId)
+  const list = [...products.value];
+  if (sortBy.value === "price_asc") {
+    list.sort((a, b) => a.price - b.price);
+  } else if (sortBy.value === "price_desc") {
+    list.sort((a, b) => b.price - a.price);
+  } else if (sortBy.value === "newest") {
+    list.sort((a, b) => b.productId - a.productId);
   }
-  return list
-})
+  return list;
+});
 
 const pagedProducts = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return sortedProducts.value.slice(start, start + pageSize)
-})
+  const start = (currentPage.value - 1) * pageSize;
+  return sortedProducts.value.slice(start, start + pageSize);
+});
 
 async function fetchProducts() {
-  loading.value = true
+  loading.value = true;
   try {
-    const response = await httpClient.get('/products', {
+    const response = await httpClient.get("/products", {
       params: {
         keyword: keyword.value || undefined,
         categoryId: categoryId.value || undefined,
         size: size.value || undefined,
         brandId: brandId.value || undefined,
-      }
-    })
-    products.value = response.data
-    currentPage.value = 1
+      },
+    });
+    products.value = response.data;
+    currentPage.value = 1;
   } catch (error) {
-    errorMessage.value = '商品資料載入失敗，請確認後端是否啟動'
+    errorMessage.value = "商品資料載入失敗，請確認後端是否啟動";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function loadBrands() {
-  loadingBrands.value = true
+  loadingBrands.value = true;
   try {
-    const response = await getBrands()
-    brands.value = response.data
+    const response = await getBrands();
+    brands.value = response.data;
   } finally {
-    loadingBrands.value = false
+    loadingBrands.value = false;
   }
 }
 
 function toggleCategory(id) {
-  categoryId.value = categoryId.value === id ? null : id
-  fetchProducts()
+  categoryId.value = categoryId.value === id ? null : id;
+  fetchProducts();
 }
 
 function toggleBrand(id) {
-  brandId.value = brandId.value === id ? null : id
-  fetchProducts()
+  brandId.value = brandId.value === id ? null : id;
+  fetchProducts();
 }
 
 function toggleSize(value) {
-  size.value = size.value === value ? null : value
-  fetchProducts()
+  size.value = size.value === value ? null : value;
+  fetchProducts();
 }
 
 function clearFilters() {
-  categoryId.value = null
-  brandId.value = null
-  size.value = null
-  fetchProducts()
+  categoryId.value = null;
+  brandId.value = null;
+  size.value = null;
+  fetchProducts();
 }
 
 function goToPage(page) {
-  if (page < 1 || page > totalPages.value) return
-  currentPage.value = page
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function formatPrice(price) {
-  return price != null ? 'NT$ ' + Number(price).toLocaleString('zh-TW') : '-'
+  return price != null ? "NT$ " + Number(price).toLocaleString("zh-TW") : "-";
 }
 
 onMounted(() => {
   // zwei導向分類，取得id後再執行fetchProducts
-  categoryId.value = Number(route.query.categoryId) || null 
-  loadBrands()
-  fetchProducts()
-})
+  categoryId.value = Number(route.query.categoryId) || null;
+  loadBrands();
+  fetchProducts();
+});
 </script>
 
 <template>
   <section>
+    <!-- 一般商城顯示專用的靜態、 BANNER 與 SMALL_BLOCK -->
+    <!-- 移除了:banner-order="1" :static-banner="true" -->
+    <AdvertisementDisplay
+      :placements="['SMALL_BLOCK']"
+      :small-block-order="1"
+    />
     <div class="shop-hero">
       <div class="container py-5">
         <span class="hero-icon" aria-hidden="true">👟</span>
         <div class="hero-content">
-          <p class="text-uppercase small text-white-50 mb-2 fw-semibold" style="letter-spacing: 0.15em;">SneakerMarket</p>
+          <p
+            class="text-uppercase small text-white-50 mb-2 fw-semibold"
+            style="letter-spacing: 0.15em"
+          >
+            SneakerMarket
+          </p>
           <h1 class="display-5 fw-bold mb-2">一般商城</h1>
           <p class="text-white-50 mb-4">嚴選球鞋，找到你的下一雙戰靴</p>
 
-          <form class="d-flex gap-2 hero-search" @submit.prevent="fetchProducts">
+          <form
+            class="d-flex gap-2 hero-search"
+            @submit.prevent="fetchProducts"
+          >
             <input
               v-model="keyword"
               type="text"
               class="form-control"
               placeholder="搜尋商品名稱"
-            >
-            <button type="submit" class="btn btn-light px-4 hero-search-btn">搜尋</button>
+            />
+            <button type="submit" class="btn btn-light px-4 hero-search-btn">
+              搜尋
+            </button>
           </form>
         </div>
       </div>
     </div>
 
     <div class="container py-4">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 list-header">
+      <div
+        class="d-flex justify-content-between align-items-center flex-wrap gap-2 list-header"
+      >
         <h2 class="h4 fw-bold mb-0">
-          {{ currentCategoryLabel }}<span v-if="categoryId && !loading"> ({{ products.length }})</span>
+          {{ currentCategoryLabel
+          }}<span v-if="categoryId && !loading"> ({{ products.length }})</span>
         </h2>
         <div class="d-flex align-items-center gap-3">
           <button
             type="button"
             class="btn btn-link btn-sm text-dark text-decoration-none filter-toggle-btn"
             @click="showFilters = !showFilters"
-            >
-            {{ showFilters ? '« 隱藏篩選條件' : '» 顯示篩選條件' }}
+          >
+            {{ showFilters ? "« 隱藏篩選條件" : "» 顯示篩選條件" }}
           </button>
           <select
             v-model="sortBy"
@@ -196,33 +227,48 @@ onMounted(() => {
             </div>
 
             <div class="filter-group">
-              <button type="button" class="filter-toggle" @click="openBrand = !openBrand">
+              <button
+                type="button"
+                class="filter-toggle"
+                @click="openBrand = !openBrand"
+              >
                 <span>
                   品牌
                   <span v-if="brandId" class="filter-count">1</span>
                 </span>
-                <span class="filter-icon">{{ openBrand ? '−' : '+' }}</span>
+                <span class="filter-icon">{{ openBrand ? "−" : "+" }}</span>
               </button>
               <div v-show="openBrand" class="filter-options">
-                <div v-if="loadingBrands" class="text-secondary small">載入中...</div>
-                <label v-for="brand in brands" v-else :key="brand.brandId" class="filter-option">
+                <div v-if="loadingBrands" class="text-secondary small">
+                  載入中...
+                </div>
+                <label
+                  v-for="brand in brands"
+                  v-else
+                  :key="brand.brandId"
+                  class="filter-option"
+                >
                   <input
                     type="checkbox"
                     :checked="brandId === brand.brandId"
                     @change="toggleBrand(brand.brandId)"
-                  >
+                  />
                   {{ brand.brandName }}
                 </label>
               </div>
             </div>
 
             <div class="filter-group">
-              <button type="button" class="filter-toggle" @click="openSize = !openSize">
+              <button
+                type="button"
+                class="filter-toggle"
+                @click="openSize = !openSize"
+              >
                 <span>
                   尺寸
                   <span v-if="size" class="filter-count">1</span>
                 </span>
-                <span class="filter-icon">{{ openSize ? '−' : '+' }}</span>
+                <span class="filter-icon">{{ openSize ? "−" : "+" }}</span>
               </button>
               <div v-show="openSize" class="filter-options">
                 <label v-for="s in sizeOptions" :key="s" class="filter-option">
@@ -230,7 +276,7 @@ onMounted(() => {
                     type="checkbox"
                     :checked="size === s"
                     @change="toggleSize(s)"
-                  >
+                  />
                   {{ s }}
                 </label>
               </div>
@@ -260,7 +306,10 @@ onMounted(() => {
           <template v-else>
             <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-4">
               <div v-for="p in pagedProducts" :key="p.productId" class="col">
-                <router-link :to="`/products/${p.productId}`" class="text-decoration-none text-dark">
+                <router-link
+                  :to="`/products/${p.productId}`"
+                  class="text-decoration-none text-dark"
+                >
                   <div class="card h-100 product-card border-0">
                     <div class="product-card-img-wrap">
                       <img
@@ -268,9 +317,16 @@ onMounted(() => {
                         :src="p.imageUrl"
                         :alt="p.productName"
                         class="product-card-img"
+                      />
+                      <div
+                        v-else
+                        class="product-card-img product-card-img-empty"
                       >
-                      <div v-else class="product-card-img product-card-img-empty">尚無圖片</div>
-                      <span v-if="p.totalStock === 0" class="stock-badge">缺貨</span>
+                        尚無圖片
+                      </div>
+                      <span v-if="p.totalStock === 0" class="stock-badge"
+                        >缺貨</span
+                      >
                     </div>
                     <div class="card-body px-1">
                       <p class="text-secondary small mb-1">{{ p.brandName }}</p>
@@ -285,7 +341,9 @@ onMounted(() => {
             <nav v-if="totalPages > 1" class="mt-5">
               <ul class="pagination justify-content-center">
                 <li class="page-item" :class="{ disabled: currentPage === 1 }">
-                  <button class="page-link" @click="goToPage(currentPage - 1)">上一頁</button>
+                  <button class="page-link" @click="goToPage(currentPage - 1)">
+                    上一頁
+                  </button>
                 </li>
                 <li
                   v-for="page in totalPages"
@@ -293,10 +351,17 @@ onMounted(() => {
                   class="page-item"
                   :class="{ active: page === currentPage }"
                 >
-                  <button class="page-link" @click="goToPage(page)">{{ page }}</button>
+                  <button class="page-link" @click="goToPage(page)">
+                    {{ page }}
+                  </button>
                 </li>
-                <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-                  <button class="page-link" @click="goToPage(currentPage + 1)">下一頁</button>
+                <li
+                  class="page-item"
+                  :class="{ disabled: currentPage === totalPages }"
+                >
+                  <button class="page-link" @click="goToPage(currentPage + 1)">
+                    下一頁
+                  </button>
                 </li>
               </ul>
             </nav>
@@ -331,7 +396,8 @@ onMounted(() => {
   line-height: 1;
   opacity: 0.1;
   pointer-events: none;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-family:
+    "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
 }
 
 .hero-search {
@@ -349,9 +415,9 @@ onMounted(() => {
 
 .list-header {
   position: sticky;
-  top: 0;
+  top: 56px;
   z-index: 20;
-  background-color: #F8F9FA;
+  background-color: #ffffff;
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
 }
@@ -374,7 +440,7 @@ onMounted(() => {
 
 .filter-sidebar {
   position: sticky;
-  top: 4.5rem;
+  top: 103px;
   font-size: 0.82rem;
 }
 

@@ -20,8 +20,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class EventFollowService {
 
-    private final EventFollowRepository eventFollowRepository;
-    private final CalendarEventRepository calendarEventRepository;
+    private final EventFollowRepository
+            eventFollowRepository;
+
+    private final CalendarEventRepository
+            calendarEventRepository;
+
+    private final GoogleCalendarSyncService
+            googleCalendarSyncService;
 
     @Transactional
     public EventFollowResponse followEvent(
@@ -29,12 +35,15 @@ public class EventFollowService {
             Long eventId,
             Integer remindBeforeMinutes
     ) {
-        CalendarEvent event = calendarEventRepository
-                .findById(eventId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "找不到活動"
-                ));
+        CalendarEvent event =
+                calendarEventRepository
+                        .findById(eventId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "找不到活動"
+                                )
+                        );
 
         if ("INACTIVE".equals(event.getStatus())
                 || "DRAFT".equals(event.getStatus())
@@ -46,28 +55,63 @@ public class EventFollowService {
             );
         }
 
-        if (!event.getStartAt().isAfter(LocalDateTime.now())) {
+        if (!event.getStartAt()
+                .isAfter(LocalDateTime.now())) {
+
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "活動已經開始或結束"
             );
         }
 
-        EventFollow follow = eventFollowRepository
-                .findByMemberIdAndEventId(memberId, eventId)
-                .orElseGet(() -> {
-                    EventFollow newFollow = new EventFollow();
-                    newFollow.setMemberId(memberId);
-                    newFollow.setEventId(eventId);
-                    newFollow.setReminded(false);
-                    return newFollow;
-                });
+        EventFollow follow =
+                eventFollowRepository
+                        .findByMemberIdAndEventId(
+                                memberId,
+                                eventId
+                        )
+                        .orElseGet(() -> {
+                            EventFollow newFollow =
+                                    new EventFollow();
 
-        follow.setRemindBeforeMinutes(remindBeforeMinutes);
+                            newFollow.setMemberId(
+                                    memberId
+                            );
 
-        EventFollow saved = eventFollowRepository.save(follow);
+                            newFollow.setEventId(
+                                    eventId
+                            );
 
-        return EventFollowResponse.from(saved);
+                            newFollow.setReminded(
+                                    false
+                            );
+
+                            return newFollow;
+                        });
+
+        follow.setRemindBeforeMinutes(
+                remindBeforeMinutes
+        );
+
+        EventFollow saved =
+                eventFollowRepository.save(
+                        follow
+                );
+
+        /*
+         * 已連結 Google Calendar 時：
+         * 新關注會新增行程；
+         * 已關注則更新提醒時間。
+         */
+        googleCalendarSyncService.syncFollow(
+                memberId,
+                event,
+                remindBeforeMinutes
+        );
+
+        return EventFollowResponse.from(
+                saved
+        );
     }
 
     @Transactional
@@ -75,9 +119,25 @@ public class EventFollowService {
             Long memberId,
             Long eventId
     ) {
+        /*
+         * 先嘗試刪除 Google 行程，
+         * 再刪除站內關注。
+         *
+         * Google 同步失敗不會阻止站內取消關注。
+         */
+        googleCalendarSyncService.removeFollow(
+                memberId,
+                eventId
+        );
+
         eventFollowRepository
-                .findByMemberIdAndEventId(memberId, eventId)
-                .ifPresent(eventFollowRepository::delete);
+                .findByMemberIdAndEventId(
+                        memberId,
+                        eventId
+                )
+                .ifPresent(
+                        eventFollowRepository::delete
+                );
     }
 
     @Transactional(readOnly = true)
@@ -85,7 +145,9 @@ public class EventFollowService {
             Long memberId
     ) {
         return eventFollowRepository
-                .findByMemberIdOrderByCreatedAtDesc(memberId)
+                .findByMemberIdOrderByCreatedAtDesc(
+                        memberId
+                )
                 .stream()
                 .map(EventFollowResponse::from)
                 .toList();

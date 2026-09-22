@@ -99,7 +99,7 @@ server.servlet.session.cookie.secure=true
 
 ```properties
 spring.servlet.multipart.max-file-size=5MB
-spring.servlet.multipart.max-request-size=20MB
+spring.servlet.multipart.max-request-size=100MB
 ```
 
 ### JPA / Hibernate

@@ -11,5 +11,5 @@ public record AuctionMyBidResponse(
         AuctionStatus status, AuctionAdminManagementState managementState,
         boolean leading, boolean won,
         AuctionResultStatus resultStatus, BigDecimal finalPrice,
-        LocalDateTime lastBidAt, LocalDateTime endAt) {
+        LocalDateTime lastBidAt, LocalDateTime endAt, String imageUrl) {
 }

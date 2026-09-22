@@ -11,4 +11,8 @@ public class CreateOrderRequest {
     private String receiverPhone;
     private String shippingAddress;
     private Long couponId;
+    private String shippingMethod;
+    private String cvsStoreId;
+    private String cvsStoreName;
+    private String cvsAddress;
 }

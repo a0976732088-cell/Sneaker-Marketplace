@@ -114,6 +114,42 @@
                     placeholder="請輸入活動詳細內容..."
                   ></textarea>
                 </div>
+                <div class="border rounded-3 p-3 mb-3">
+                  <h5 class="fw-bold mb-3">活動地點</h5>
+
+                  <div class="mb-3">
+                    <label class="form-label">場地名稱</label>
+                    <input
+                      v-model.trim="form.venueName"
+                      type="text"
+                      class="form-control"
+                      maxlength="150"
+                      placeholder="例如：台北流行音樂中心"
+                    />
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label">活動地址</label>
+                    <input
+                      v-model.trim="form.address"
+                      type="text"
+                      class="form-control"
+                      maxlength="300"
+                      placeholder="例如：台北市南港區市民大道八段99號"
+                    />
+                  </div>
+
+                  <LocationPickerMap
+                    :venue-name="form.venueName"
+                    :address="form.address"
+                    v-model:latitude="form.latitude"
+                    v-model:longitude="form.longitude"
+                  />
+
+                  <div class="form-text">
+                    有完整地址時請按「依地址定位」；沒有詳細地址時，可直接點擊地圖標記。
+                  </div>
+                </div>
 
                 <div class="mb-3">
                   <label class="form-label">活動圖片</label>
@@ -217,6 +253,7 @@
 <script setup>
 import { ref, reactive } from "vue";
 import { createEvent } from "@/service/eventService";
+import LocationPickerMap from "@/components/events/LocationPickerMap.vue";
 
 const loading = ref(false);
 const errorMessage = ref("");
@@ -232,6 +269,10 @@ const initialFormState = {
   startAt: "",
   endAt: null,
   description: "",
+  venueName: "",
+  address: "",
+  latitude: null,
+  longitude: null,
   targetUrl: "",
   sourceType: "",
   sourceId: null,
@@ -251,10 +292,43 @@ const handleFileChange = (event) => {
   };
 };
 
+const normalizeOptionalNumber = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : null;
+};
+
 const submitForm = async () => {
-  loading.value = true;
   errorMessage.value = "";
   successMessage.value = "";
+
+  const latitude = normalizeOptionalNumber(form.latitude);
+
+  const longitude = normalizeOptionalNumber(form.longitude);
+
+  if ((latitude === null) !== (longitude === null)) {
+    errorMessage.value = "緯度與經度必須同時填寫。";
+
+    return;
+  }
+
+  if (latitude !== null && (latitude < -90 || latitude > 90)) {
+    errorMessage.value = "緯度必須介於 -90 到 90。";
+
+    return;
+  }
+
+  if (longitude !== null && (longitude < -180 || longitude > 180)) {
+    errorMessage.value = "經度必須介於 -180 到 180。";
+
+    return;
+  }
+
+  loading.value = true;
 
   const payload = {
     ...form,
@@ -264,6 +338,13 @@ const submitForm = async () => {
     endAt: form.endAt || null,
     targetUrl: form.targetUrl || null,
     description: form.description || null,
+
+    venueName: form.venueName || null,
+
+    address: form.address || null,
+
+    latitude,
+    longitude,
   };
 
   try {

@@ -23,7 +23,6 @@ import java.util.Objects;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +31,7 @@ public class CalendarEventService {
     private final CalendarEventRepository calendarEventRepo;
     private final EventFollowRepository eventFollowRepository;
     private final NotificationService notificationService;
+    private final GoogleCalendarSyncService googleCalendarSyncService;
 
     public CalendarEvent createEvent(CalendarEventDTO dto) {
         CalendarEvent event = new CalendarEvent();
@@ -40,9 +40,14 @@ public class CalendarEventService {
         event.setEventType(dto.getEventType());
         event.setTitle(dto.getTitle());
         event.setDescription(dto.getDescription());
+        event.setVenueName(dto.getVenueName());
+        event.setAddress(dto.getAddress());
+        event.setLatitude(dto.getLatitude());
+        event.setLongitude(dto.getLongitude());
         event.setStartAt(dto.getStartAt());
         event.setEndAt(dto.getEndAt());
         event.setTargetUrl(dto.getTargetUrl());
+        event.setPhotoUrl(dto.getPhotoUrl());
         event.setSourceType(dto.getSourceType());
         event.setSourceId(dto.getSourceId());
         event.setStatus(dto.getStatus());
@@ -85,9 +90,14 @@ public class CalendarEventService {
         calendarEvent.setEventType(dto.getEventType());
         calendarEvent.setTitle(dto.getTitle());
         calendarEvent.setDescription(dto.getDescription());
+        calendarEvent.setVenueName(dto.getVenueName());
+        calendarEvent.setAddress(dto.getAddress());
+        calendarEvent.setLatitude(dto.getLatitude());
+        calendarEvent.setLongitude(dto.getLongitude());
         calendarEvent.setStartAt(dto.getStartAt());
         calendarEvent.setEndAt(dto.getEndAt());
         calendarEvent.setTargetUrl(dto.getTargetUrl());
+        calendarEvent.setPhotoUrl(dto.getPhotoUrl());
         calendarEvent.setSourceType(dto.getSourceType());
         calendarEvent.setSourceId(dto.getSourceId());
         calendarEvent.setStatus(dto.getStatus());
@@ -115,6 +125,11 @@ public class CalendarEventService {
         calendarEventRepo.save(calendarEvent);
 
         if (becameCancelled) {
+            googleCalendarSyncService
+                    .removeEventFromAllCalendars(
+                            eventId
+                    );
+
             List<Long> followerMemberIds =
                     eventFollowRepository
                             .findByEventId(eventId)
@@ -131,6 +146,15 @@ public class CalendarEventService {
 
             return;
         }
+
+        /*
+         * 不只時間變更，標題、說明、結束時間與網址
+         * 也會同步更新到 Google Calendar。
+         */
+        googleCalendarSyncService
+                .syncEventForAllFollowers(
+                        calendarEvent
+                );
 
         if (startTimeChanged && canNotifyTimeChange) {
             List<Long> followerMemberIds =
@@ -181,6 +205,11 @@ public class CalendarEventService {
         event.setStatus("CANCELLED");
 
         calendarEventRepo.save(event);
+
+        googleCalendarSyncService
+                .removeEventFromAllCalendars(
+                        eventId
+                );
 
         notificationService
                 .createEventCancelledNotifications(

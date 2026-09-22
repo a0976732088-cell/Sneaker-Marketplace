@@ -87,7 +87,7 @@ const emit = defineEmits([
           <label
             >廣告類型<select v-model="form.adType" required>
               <option value="NEW_PRODUCT">新品推薦</option>
-              <option value="HOT_PRODUCT">熱門商品</option>
+              <option value="HOT_PRODUCT">行事曆活動</option>
               <option value="AUCTION">競標活動</option>
               <!-- <option value="DISCOUNT">折扣優惠</option> -->
             </select></label
@@ -97,13 +97,37 @@ const emit = defineEmits([
               v-model="form.adPlacement"
               @change="emit('placement-change')"
             >
-              <option value="BANNER">首頁橫幅</option>
-              <option value="POPUP">首頁彈窗</option>
-              <option value="SMALL_BLOCK">商品頁側欄</option>
-              <option value="CATEGORY_CARD">分類卡片</option>
+              <option value="BANNER">橫幅</option>
+              <option value="POPUP">彈窗</option>
+              <option value="SMALL_BLOCK">側欄</option>
+              <option value="CATEGORY_CARD">分類</option>
             </select>
           </label>
         </div>
+        <!-- BANNER 和 SMALL_BLOCK 可以指定顯示頁面 -->
+        <label
+          v-if="
+            form.adPlacement === 'BANNER' || form.adPlacement === 'SMALL_BLOCK'
+          "
+          >廣告顯示頁面
+
+          <select v-model.number="form.sortOrder" required>
+            <option :value="0">首頁</option>
+            <option :value="1">一般商城</option>
+            <option :value="2">競標商城</option>
+          </select>
+        </label>
+
+        <!-- POPUP 使用 sortOrder 區分顯示對象 -->
+        <label v-if="form.adPlacement === 'POPUP'">
+          顯示對象
+
+          <select v-model.number="form.sortOrder" required>
+            <option :value="0">未登入會員</option>
+            <option :value="1">已登入會員</option>
+          </select>
+        </label>
+
         <AdvertisementImageUploadField
           :current-image-rule="currentImageRule"
           :image-url="form.imageUrl"
@@ -111,7 +135,17 @@ const emit = defineEmits([
           @image-change="emit('image-change', $event)"
         />
 
+        <!-- 未登入會員 POPUP：固定前往註冊頁，不需設定導向 -->
+        <p
+          v-if="form.adPlacement === 'POPUP' && form.sortOrder === 0"
+          class="target-help"
+        >
+          未登入會員固定前往會員註冊頁
+        </p>
+
+        <!-- 已登入 POPUP 與其他廣告，維持原本的導向設定 -->
         <AdvertisementTargetField
+          v-else
           v-model:target-type="form.targetType"
           v-model:target-id="form.targetId"
           v-model:target-url="form.targetUrl"

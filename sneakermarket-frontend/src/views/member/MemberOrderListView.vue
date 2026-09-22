@@ -86,7 +86,7 @@ async function loadOrders() {
       return;
     }
 
-    console.error("讀取訂單失敗：", error);
+    console.error("讀取訂單失敗：");
 
     errorMessage.value = error.response?.data?.message || "無法載入訂單資料";
   } finally {

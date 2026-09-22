@@ -36,7 +36,8 @@ class AuctionOrderPaymentAccessTests {
         references = mock(AuctionReferenceService.class);
         payments = mock(AuctionOrderPaymentService.class);
         mvc = MockMvcBuilders.standaloneSetup(new AuctionOrderController(
-                        mock(AuctionMemberQueryService.class), payments,
+                        mock(AuctionMemberQueryService.class),
+                        mock(AuctionOrderCheckoutService.class), payments,
                         new AuctionSessionMemberResolver(references)))
                 .setControllerAdvice(new AuctionExceptionHandler(), new GlobalExceptionHandler())
                 .build();

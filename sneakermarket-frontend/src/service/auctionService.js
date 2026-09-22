@@ -17,15 +17,65 @@ export function getMyAuctionSales({ page = 0, size = 10 } = {}) {
   return httpClient.get("/auction-orders/me/sales", { params: { page, size } });
 }
 
-/** 單筆競標訂單由後端 Session 驗證 buyer 身分。 */
+/** 單筆競標訂單由後端 Session 驗證 buyer / seller 身分及回傳欄位可見性。 */
 export function getAuctionOrderDetail(orderNumber) {
   return httpClient.get("/auction-orders/" + encodeURIComponent(orderNumber));
+}
+
+/** 付款前只允許更新訂單既有的收件 Snapshot。 */
+export function updateAuctionOrderCheckout(orderNumber, payload) {
+  return httpClient.patch(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/checkout",
+    {
+      receiverName: payload.receiverName,
+      receiverPhone: payload.receiverPhone,
+      shippingAddress: payload.shippingAddress,
+    },
+  );
 }
 
 /** 付款內容完全由後端既有訂單決定，不傳 Request Body。 */
 export function payAuctionOrder(orderNumber) {
   return httpClient.post(
     "/auction-orders/" + encodeURIComponent(orderNumber) + "/pay",
+  );
+}
+
+/** 查詢競標訂單目前已選取的超商門市；未選店仍由後端回 selected=false。 */
+export function getAuctionCvsSelection(orderNumber) {
+  return httpClient.get(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/cvs-selection",
+  );
+}
+
+/** 門市清單只以後端 allowlist 店別查詢；縣市與關鍵字由 Checkout 在記憶體篩選。 */
+export function getAuctionCvsStores(orderNumber, storeType) {
+  return httpClient.get(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/cvs/stores",
+    { params: { storeType } },
+  );
+}
+
+/** 選店只傳固定店別與 provider store id，其餘門市資料由後端清單決定。 */
+export function selectAuctionCvsStore(orderNumber, { storeType, storeId }) {
+  return httpClient.put(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/cvs-selection",
+    { storeType, storeId },
+  );
+}
+
+/** LINE Pay 金額與商品資訊完全由後端訂單決定，不傳 Request Body。 */
+export function requestAuctionLinePay(orderNumber) {
+  return httpClient.post(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/line-pay/request",
+  );
+}
+
+/** 只以後端產生的付款 attempt id 查詢目前 LINE Pay 狀態。 */
+export function getAuctionLinePayStatus(orderNumber, merchantOrderId) {
+  return httpClient.get(
+    "/auction-orders/" + encodeURIComponent(orderNumber) + "/line-pay/status",
+    { params: { merchantOrderId } },
   );
 }
 
@@ -39,6 +89,10 @@ export function payAuctionOrder(orderNumber) {
 export function getAuctions(params = {}) {
   return httpClient.get("/auctions", {
     params,
+    // Spring 以重複 query parameter 綁定多選條件，例如 brandIds=1&brandIds=2。
+    paramsSerializer: {
+      indexes: null,
+    },
   });
 }
 

@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import com.project.sneakermarket.calendar.entity.CalendarEvent;
+import com.project.sneakermarket.notification.service.NotificationPreferencePolicyService.DeliveryDecision;
 
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
@@ -35,7 +36,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +49,7 @@ public class NotificationService {
     private final MemberRepository memberRepo;
     private final EventFollowRepository eventFollowRepo;
     private final NotificationEmailJobService emailJobService;
+    private final NotificationPreferencePolicyService preferencePolicyService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -56,6 +57,7 @@ public class NotificationService {
 
     public Notification createNotice(NotificationDTO dto) {
         Notification notice = new Notification();
+
         notice.setNotificationType(dto.getNotificationType());
         notice.setTitle(dto.getTitle());
         notice.setContent(dto.getContent());
@@ -66,19 +68,44 @@ public class NotificationService {
         return notificationRepo.save(notice);
     }
 
-    public void updateNoticeById(Long notificationId, NotificationDTO dto) {
-        Optional<Notification> op = notificationRepo.findById(notificationId);
-        if (op.isPresent()) {
-            Notification notification = op.get();
-            notification.setNotificationType(dto.getNotificationType());
-            notification.setTitle(dto.getTitle());
-            notification.setContent(dto.getContent());
-            notification.setTargetType(dto.getTargetType());
-            notification.setTargetId(dto.getTargetId());
-            notification.setTargetUrl(dto.getTargetUrl());
-            notificationRepo.save(notification);
+    public void updateNoticeById(
+            Long notificationId,
+            NotificationDTO dto
+    ) {
+        Notification notification =
+                notificationRepo
+                        .findById(notificationId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "找不到指定通知"
+                                )
+                        );
+
+        if (Boolean.TRUE.equals(notification.getIsSent())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "已發送的通知不可編輯"
+            );
         }
+
+        notification.setNotificationType(
+                dto.getNotificationType()
+        );
+
+        notification.setTitle(dto.getTitle());
+        notification.setContent(dto.getContent());
+
+        notification.setTargetType(
+                dto.getTargetType()
+        );
+
+        notification.setTargetId(dto.getTargetId());
+        notification.setTargetUrl(dto.getTargetUrl());
+
+        notificationRepo.save(notification);
     }
+
 
     public void deleteNoticeById(Long notificationId) {
         notificationRepo.deleteById(notificationId);
@@ -90,6 +117,7 @@ public class NotificationService {
             String notificationType,
             String targetType,
             Boolean isRead,
+            Boolean isSent,
             LocalDateTime startCreatedAt,
             LocalDateTime endCreatedAt,
             LocalDateTime startReadAt,
@@ -123,6 +151,11 @@ public class NotificationService {
             // 4. 是否已讀
             if (isRead != null) {
                 predicates.add(cb.equal(root.get("isRead"), isRead));
+            }
+            if (isSent != null) {
+                predicates.add(
+                        cb.equal(root.get("isSent"), isSent)
+                );
             }
             // 5. 通知產生時間區間 (createdAt >= startCreatedAt & <= endCreatedAt)
             if (startCreatedAt != null) {
@@ -216,28 +249,52 @@ public class NotificationService {
             );
         }
 
-        LocalDateTime sentAt = LocalDateTime.now();
-
-        // 5. 批次發送
         List<Long> uniqueMemberIds =
                 memberIds.stream()
                         .distinct()
                         .toList();
 
+        Map<Long, DeliveryDecision> deliveryDecisions =
+                preferencePolicyService.resolveForMembers(
+                        uniqueMemberIds,
+                        template.getNotificationType(),
+                        template.getTargetType()
+                );
+
+        List<Long> deliverableMemberIds =
+                uniqueMemberIds.stream()
+                        .filter(memberId -> {
+                            DeliveryDecision decision =
+                                    deliveryDecisions.get(memberId);
+
+                            return decision != null
+                                    && decision.anyEnabled();
+                        })
+                        .toList();
+
+        if (deliverableMemberIds.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "所有收件人都已關閉此類通知"
+            );
+        }
+
+        LocalDateTime sentAt = LocalDateTime.now();
+
         int totalSent = 0;
 
         for (
                 int start = 0;
-                start < uniqueMemberIds.size();
+                start < deliverableMemberIds.size();
                 start += NOTIFICATION_BATCH_SIZE
         ) {
             int end = Math.min(
                     start + NOTIFICATION_BATCH_SIZE,
-                    uniqueMemberIds.size()
+                    deliverableMemberIds.size()
             );
 
             List<Long> batchMemberIds =
-                    uniqueMemberIds.subList(start, end);
+                    deliverableMemberIds.subList(start, end);
 
             List<Notification> batchNotifications =
                     batchMemberIds.stream()
@@ -245,7 +302,8 @@ public class NotificationService {
                                     createMemberNotification(
                                             template,
                                             memberId,
-                                            sentAt
+                                            sentAt,
+                                            deliveryDecisions.get(memberId)
                                     )
                             )
                             .toList();
@@ -254,7 +312,10 @@ public class NotificationService {
             List<Notification> savedNotifications =
                     notificationRepo.saveAll(batchNotifications);
 
-            createEmailJobs(savedNotifications);
+            createEmailJobs(
+                    savedNotifications,
+                    deliveryDecisions
+            );
 
             entityManager.flush();
 
@@ -334,7 +395,7 @@ public class NotificationService {
             Long memberId
     ) {
         Notification notification = notificationRepo
-                .findByNotificationIdAndMemberId(
+                .findByNotificationIdAndMemberIdAndInAppVisibleTrue(
                         notificationId,
                         memberId
                 )
@@ -354,7 +415,9 @@ public class NotificationService {
         LocalDateTime now = LocalDateTime.now();
 
         List<Notification> notifications = notificationRepo
-                .findByMemberIdAndIsSentTrueOrderByCreatedAtDesc(memberId);
+                .findByMemberIdAndInAppVisibleTrueAndIsSentTrueOrderByCreatedAtDesc(
+                        memberId
+                );
 
         for (Notification notification : notifications) {
             if (!Boolean.TRUE.equals(notification.getIsRead())) {
@@ -369,7 +432,9 @@ public class NotificationService {
             Long memberId
     ) {
         return notificationRepo
-                .findByMemberIdAndIsSentTrueOrderByCreatedAtDesc(memberId)
+                .findByMemberIdAndInAppVisibleTrueAndIsSentTrueOrderByCreatedAtDesc(
+                        memberId
+                )
                 .stream()
                 .map(MemberNotificationResponse::from)
                 .toList();
@@ -389,27 +454,70 @@ public class NotificationService {
         LocalDateTime now = LocalDateTime.now();
 
         DateTimeFormatter formatter =
-                DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm");
+                DateTimeFormatter.ofPattern(
+                        "yyyy/MM/dd HH:mm"
+                );
 
-        String oldTime = previousStartAt.format(formatter);
-        String newTime = event.getStartAt().format(formatter);
+        String oldTime =
+                previousStartAt.format(formatter);
+
+        String newTime =
+                event.getStartAt().format(formatter);
 
         String notificationTitle =
                 "活動時間異動：" + event.getTitle();
 
-        List<Notification> notifications =
+        /*
+         * 一次取得全部活動關注者的通知偏好。
+         */
+        Map<Long, DeliveryDecision> deliveryDecisions =
+                preferencePolicyService.resolveForMembers(
+                        followerMemberIds,
+                        "EVENT_TIME_CHANGED",
+                        "EVENT"
+                );
+
+        /*
+         * 站內通知與 Email 都關閉的會員不建立通知。
+         */
+        List<Long> deliverableMemberIds =
                 followerMemberIds.stream()
                         .distinct()
+                        .filter(memberId -> {
+                            DeliveryDecision decision =
+                                    deliveryDecisions.get(
+                                            memberId
+                                    );
+
+                            return decision != null
+                                    && decision.anyEnabled();
+                        })
+                        .toList();
+
+        if (deliverableMemberIds.isEmpty()) {
+            return;
+        }
+
+        List<Notification> notifications =
+                deliverableMemberIds.stream()
                         .map(memberId -> {
+                            DeliveryDecision decision =
+                                    deliveryDecisions.get(
+                                            memberId
+                                    );
+
                             Notification notification =
                                     new Notification();
 
                             notification.setMemberId(memberId);
+
                             notification.setNotificationType(
                                     "EVENT_TIME_CHANGED"
                             );
 
-                            notification.setTitle(notificationTitle);
+                            notification.setTitle(
+                                    notificationTitle
+                            );
 
                             notification.setContent(
                                     "您關注的活動時間已從 "
@@ -419,10 +527,14 @@ public class NotificationService {
                                             + "。"
                             );
 
-                            notification.setTargetType("EVENT");
+                            notification.setTargetType(
+                                    "EVENT"
+                            );
+
                             notification.setTargetId(
                                     event.getEventId()
                             );
+
                             notification.setTargetUrl(
                                     event.getTargetUrl()
                             );
@@ -431,14 +543,31 @@ public class NotificationService {
                             notification.setIsSent(true);
                             notification.setSentAt(now);
 
+                            /*
+                             * Email-only 的通知仍保存於資料庫，
+                             * 但不顯示在會員通知抽屜。
+                             */
+                            notification.setInAppVisible(
+                                    decision != null
+                                            && decision.inAppEnabled()
+                            );
+
                             return notification;
                         })
                         .toList();
 
         List<Notification> savedNotifications =
-                notificationRepo.saveAll(notifications);
+                notificationRepo.saveAll(
+                        notifications
+                );
 
-        createEmailJobs(savedNotifications);
+        /*
+         * 只有開啟 Email 的會員才建立 Email Job。
+         */
+        createEmailJobs(
+                savedNotifications,
+                deliveryDecisions
+        );
 
         createCompletedAutomaticEventLog(
                 event,
@@ -461,7 +590,9 @@ public class NotificationService {
         LocalDateTime now = LocalDateTime.now();
 
         DateTimeFormatter formatter =
-                DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm");
+                DateTimeFormatter.ofPattern(
+                        "yyyy/MM/dd HH:mm"
+                );
 
         String originalStartTime =
                 event.getStartAt().format(formatter);
@@ -469,19 +600,54 @@ public class NotificationService {
         String notificationTitle =
                 "活動已取消：" + event.getTitle();
 
-        List<Notification> notifications =
+        /*
+         * 活動取消也使用活動通知偏好。
+         */
+        Map<Long, DeliveryDecision> deliveryDecisions =
+                preferencePolicyService.resolveForMembers(
+                        followerMemberIds,
+                        "EVENT_CANCELLED",
+                        "EVENT_CANCELLED"
+                );
+
+        List<Long> deliverableMemberIds =
                 followerMemberIds.stream()
                         .distinct()
+                        .filter(memberId -> {
+                            DeliveryDecision decision =
+                                    deliveryDecisions.get(
+                                            memberId
+                                    );
+
+                            return decision != null
+                                    && decision.anyEnabled();
+                        })
+                        .toList();
+
+        if (deliverableMemberIds.isEmpty()) {
+            return;
+        }
+
+        List<Notification> notifications =
+                deliverableMemberIds.stream()
                         .map(memberId -> {
+                            DeliveryDecision decision =
+                                    deliveryDecisions.get(
+                                            memberId
+                                    );
+
                             Notification notification =
                                     new Notification();
 
                             notification.setMemberId(memberId);
+
                             notification.setNotificationType(
                                     "EVENT_CANCELLED"
                             );
 
-                            notification.setTitle(notificationTitle);
+                            notification.setTitle(
+                                    notificationTitle
+                            );
 
                             notification.setContent(
                                     "您關注的活動原訂於 "
@@ -490,29 +656,41 @@ public class NotificationService {
                             );
 
                             /*
-                             * 取消後前台不再顯示活動，
-                             * 所以通知只保留 eventId，不提供跳轉。
+                             * 活動取消後不能再進入活動內容，
+                             * 因此保留 eventId，但不提供跳轉網址。
                              */
                             notification.setTargetType(
                                     "EVENT_CANCELLED"
                             );
+
                             notification.setTargetId(
                                     event.getEventId()
                             );
+
                             notification.setTargetUrl(null);
 
                             notification.setIsRead(false);
                             notification.setIsSent(true);
                             notification.setSentAt(now);
 
+                            notification.setInAppVisible(
+                                    decision != null
+                                            && decision.inAppEnabled()
+                            );
+
                             return notification;
                         })
                         .toList();
 
         List<Notification> savedNotifications =
-                notificationRepo.saveAll(notifications);
+                notificationRepo.saveAll(
+                        notifications
+                );
 
-        createEmailJobs(savedNotifications);
+        createEmailJobs(
+                savedNotifications,
+                deliveryDecisions
+        );
 
         createCompletedAutomaticEventLog(
                 event,
@@ -523,22 +701,34 @@ public class NotificationService {
     }
 
     private void createEmailJobs(
-            List<Notification> savedNotifications
+            List<Notification> savedNotifications,
+            Map<Long, DeliveryDecision> deliveryDecisions
     ) {
         if (savedNotifications == null
                 || savedNotifications.isEmpty()) {
             return;
         }
 
-        List<Long> memberIds =
+        List<Long> emailMemberIds =
                 savedNotifications.stream()
                         .map(Notification::getMemberId)
                         .filter(memberId -> memberId != null)
+                        .filter(memberId -> {
+                            DeliveryDecision decision =
+                                    deliveryDecisions.get(memberId);
+
+                            return decision != null
+                                    && decision.emailEnabled();
+                        })
                         .distinct()
                         .toList();
 
+        if (emailMemberIds.isEmpty()) {
+            return;
+        }
+
         Map<Long, Member> memberMap =
-                memberRepo.findAllById(memberIds)
+                memberRepo.findAllById(emailMemberIds)
                         .stream()
                         .collect(
                                 Collectors.toMap(
@@ -548,8 +738,20 @@ public class NotificationService {
                         );
 
         for (Notification notification : savedNotifications) {
+            DeliveryDecision decision =
+                    deliveryDecisions.get(
+                            notification.getMemberId()
+                    );
+
+            if (decision == null
+                    || !decision.emailEnabled()) {
+                continue;
+            }
+
             Member member =
-                    memberMap.get(notification.getMemberId());
+                    memberMap.get(
+                            notification.getMemberId()
+                    );
 
             if (member == null) {
                 continue;
@@ -596,48 +798,53 @@ public class NotificationService {
 
 
 
-private Notification createMemberNotification(
-        Notification template,
-        Long memberId,
-        LocalDateTime sentAt
-) {
-    Notification notification = new Notification();
+    private Notification createMemberNotification(
+            Notification template,
+            Long memberId,
+            LocalDateTime sentAt,
+            DeliveryDecision decision
+    ) {
+        Notification notification = new Notification();
 
-    notification.setMemberId(memberId);
+        notification.setMemberId(memberId);
 
-    notification.setNotificationType(
-            template.getNotificationType()
-    );
+        notification.setNotificationType(
+                template.getNotificationType()
+        );
 
-    notification.setTitle(
-            template.getTitle()
-    );
+        notification.setTitle(
+                template.getTitle()
+        );
 
-    notification.setContent(
-            template.getContent()
-    );
+        notification.setContent(
+                template.getContent()
+        );
 
-    notification.setTargetType(
-            template.getTargetType()
-    );
+        notification.setTargetType(
+                template.getTargetType()
+        );
 
-    notification.setTargetId(
-            template.getTargetId()
-    );
+        notification.setTargetId(
+                template.getTargetId()
+        );
 
-    notification.setTargetUrl(
-            template.getTargetUrl()
-    );
+        notification.setTargetUrl(
+                template.getTargetUrl()
+        );
 
-    notification.setIsRead(false);
-    notification.setReadAt(null);
+        notification.setIsRead(false);
+        notification.setReadAt(null);
 
-    notification.setIsSent(true);
-    notification.setSentAt(sentAt);
+        notification.setIsSent(true);
+        notification.setSentAt(sentAt);
 
-    return notification;
-}
+        notification.setInAppVisible(
+                decision != null
+                        && decision.inAppEnabled()
+        );
 
+        return notification;
+    }
     private List<Long> resolveRecipientMemberIds(
             Notification template,
             String audienceType
@@ -704,4 +911,5 @@ private Notification createMemberNotification(
                 .distinct()
                 .toList();
     }
+
 }

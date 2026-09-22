@@ -10,6 +10,8 @@ import com.project.sneakermarket.auction.realtime.AuctionRealtimeEventType;
 import com.project.sneakermarket.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
@@ -21,6 +23,7 @@ class AuctionCommandValidationTests {
     private AuctionReferenceRepository references;
     private AuctionRepository auctions;
     private AuctionProductRepository products;
+    private AuctionProductImageRepository productImages;
     private AuctionBidRepository bids;
     private ImageStorageService images;
     private AuctionRealtimeEventPublisher realtimeEvents;
@@ -34,12 +37,13 @@ class AuctionCommandValidationTests {
         references = mock(AuctionReferenceRepository.class);
         auctions = mock(AuctionRepository.class);
         products = mock(AuctionProductRepository.class);
+        productImages = mock(AuctionProductImageRepository.class);
         bids = mock(AuctionBidRepository.class);
         images = mock(ImageStorageService.class);
         realtimeEvents = mock(AuctionRealtimeEventPublisher.class);
         privateNotificationEvents = mock(AuctionPrivateNotificationEventPublisher.class);
         var time = new AuctionTime(Clock.fixed(Instant.parse("2026-09-07T04:00:00Z"), ZoneOffset.UTC));
-        service = new AuctionCommandService(products, mock(AuctionProductImageRepository.class),
+        service = new AuctionCommandService(products, productImages,
                 auctions, bids, images, new AuctionReferenceService(references), time,
                 realtimeEvents, privateNotificationEvents);
         when(references.isActiveMember(42L)).thenReturn(true);
@@ -76,6 +80,18 @@ class AuctionCommandValidationTests {
                 BigDecimal.ONE, start, now.plusDays(3));
     }
 
+    private List<MultipartFile> uploadedImages(int count) {
+        List<MultipartFile> uploadedImages = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            uploadedImages.add(new MockMultipartFile(
+                    "images",
+                    "shoe-" + index + ".jpg",
+                    "image/jpeg",
+                    ("image-" + index).getBytes()));
+        }
+        return uploadedImages;
+    }
+
     @Test
     void nonexistentBrandFailsBeforeAnyProductOrImageWrite() {
         assertThrows(BusinessException.class, () -> service.createAuction(42L, createRequest(99L, 9L), List.of()));
@@ -93,6 +109,58 @@ class AuctionCommandValidationTests {
         assertThrows(AuctionUnauthorizedException.class,
                 () -> service.createAuction(88L, createRequest(7L, 9L), List.of()));
         verifyNoInteractions(products, images);
+    }
+
+    @Test
+    void tenImagesPassServiceValidationAndKeepImageOrdering() {
+        when(products.saveAndFlush(any(AuctionProduct.class))).thenAnswer(invocation -> {
+            AuctionProduct savedProduct = invocation.getArgument(0);
+            savedProduct.setAuctionProductId(3L);
+            return savedProduct;
+        });
+        when(images.store(any(MultipartFile.class), eq(3L))).thenAnswer(invocation -> {
+            MultipartFile image = invocation.getArgument(0);
+            return "/uploads/auctions/3/" + image.getOriginalFilename();
+        });
+
+        List<AuctionProductImage> savedImageRows = new ArrayList<>();
+        when(productImages.saveAllAndFlush(anyList())).thenAnswer(invocation -> {
+            List<AuctionProductImage> imageRows = invocation.getArgument(0);
+            savedImageRows.addAll(imageRows);
+            return imageRows;
+        });
+        when(auctions.saveAndFlush(any(Auction.class))).thenAnswer(invocation -> {
+            Auction savedAuction = invocation.getArgument(0);
+            savedAuction.setAuctionId(12L);
+            return savedAuction;
+        });
+
+        Long auctionId = service.createAuction(
+                42L,
+                createRequest(7L, 9L),
+                uploadedImages(10));
+
+        assertEquals(12L, auctionId);
+        verify(images, times(10)).store(any(MultipartFile.class), eq(3L));
+        assertEquals(10, savedImageRows.size());
+        for (int index = 0; index < savedImageRows.size(); index++) {
+            AuctionProductImage imageRow = savedImageRows.get(index);
+            assertEquals(index, imageRow.getSortOrder());
+            assertEquals(index == 0, imageRow.getIsPrimary());
+        }
+    }
+
+    @Test
+    void elevenImagesFailServiceValidationBeforeAnyWrite() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.createAuction(
+                        42L,
+                        createRequest(7L, 9L),
+                        uploadedImages(11)));
+
+        assertEquals("競標商品最多只能上傳 10 張圖片", exception.getMessage());
+        verifyNoInteractions(products, productImages, images, auctions);
     }
 
     @Test

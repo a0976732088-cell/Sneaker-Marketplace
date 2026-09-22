@@ -1,15 +1,35 @@
 <script setup>
 import { useRouter } from "vue-router";
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   getPublicActiveAdvertisements,
   resolveAdvertisementImageUrl,
 } from "@/service/advertisementService";
+import { getCurrentMember } from "@/service/authService";
+import { claimMemberPopup } from "@/utils/advertisementPopupMemory";
+import { useAdvertisementTracking } from "@/composables/advertisement/useAdvertisementTracking";
+import { getAuctions } from "@/service/auctionService";
+import AdvertisementCategoryCarousel from "./AdvertisementCategoryCarousel.vue";
 
 const props = defineProps({
   placements: {
     type: Array,
     default: () => ["BANNER", "POPUP", "SMALL_BLOCK", "CATEGORY_CARD"],
+  },
+  // 指定目前頁面要顯示哪一組 BANNER
+  bannerOrder: {
+    type: Number,
+    default: null,
+  },
+  // true 表示單張靜態 BANNER，不輪播也不能點擊
+  staticBanner: {
+    type: Boolean,
+    default: false,
+  },
+  // 這個頁面要顯示哪一個排序的 SMALL_BLOCK
+  smallBlockOrder: {
+    type: Number,
+    default: null,
   },
 });
 const emit = defineEmits(["select-category"]);
@@ -19,10 +39,53 @@ function hasPlacement(placement) {
 }
 
 const ads = ref([]);
+const hotAuction = ref(null);
+
+const { trackAdvertisementClick, vViewableAd, disposeAdvertisementTracking } =
+  useAdvertisementTracking();
+
 const router = useRouter();
+// 是否已有會員登入
+const isLoggedIn = ref(false);
+
+// 是否已完成 Session 檢查
+// 避免檢查完成前先閃出未登入者的 POPUP
+const sessionChecked = ref(false);
+
+async function loadLoginStatus() {
+  // 沒有使用 POPUP 的頁面，不需要呼叫會員 Session API
+  if (!hasPlacement("POPUP")) {
+    sessionChecked.value = true;
+    return;
+  }
+
+  try {
+    // 成功取得會員資料，代表 Session 仍然有效
+    await getCurrentMember();
+    isLoggedIn.value = true;
+  } catch (error) {
+    // 401 代表目前沒有登入
+    isLoggedIn.value = false;
+
+    // 不是正常的 401 才輸出錯誤
+    if (error.status !== 401) {
+      console.error("會員登入狀態讀取失敗：");
+    }
+  } finally {
+    // 不論有沒有登入，都表示檢查已完成
+    sessionChecked.value = true;
+  }
+}
 
 function goToAdvertisementTarget(ad) {
   if (!ad) return;
+
+  if (ad.targetType === "HOT_AUCTION" && !hotAuction.value) {
+    return;
+  }
+
+  // 放!ad後面避免空值上報
+  trackAdvertisementClick(ad);
 
   if (ad.targetType === "CATEGORY") {
     if (ad.targetId) {
@@ -58,15 +121,61 @@ function goToAdvertisementTarget(ad) {
       router.push({ name: "auction" });
     }
   }
+
+  if (ad.targetType === "HOT_AUCTION") {
+    router.push({
+      name: "auction-detail",
+      params: { id: hotAuction.value.auctionId },
+    });
+    return;
+  }
+
+  if (ad.targetType === "EVENT") {
+    router.push({
+      name: "calendar",
+      query: ad.targetId ? { eventId: ad.targetId } : {},
+    });
+    return;
+  }
 }
+
 const loading = ref(false);
 const errorMessage = ref("");
+
+async function loadHotAuction() {
+  try {
+    const response = await getAuctions({
+      status: "ACTIVE",
+      sort: "bidCount,desc",
+      page: 0,
+      size: 1,
+    });
+
+    hotAuction.value = response.data?.data?.items?.[0] ?? null;
+  } catch (error) {
+    console.error("熱門競標讀取失敗：", error);
+    hotAuction.value = null;
+  }
+}
 
 const bannerAds = computed(() =>
   ads.value.filter(
     (ad) => ad.adPlacement === "BANNER" && ad.adStatus === "ACTIVE",
   ),
 );
+
+// 根據目前頁面指定的 bannerOrder，取得這個頁面可以顯示的 BANNER
+const displayedBannerAds = computed(() => {
+  // 沒有指定 bannerOrder 時，維持原本行為：顯示全部 BANNER
+  if (props.bannerOrder === null) {
+    return bannerAds.value;
+  }
+
+  // 只保留 sortOrder 符合目前頁面的 BANNER
+  return bannerAds.value.filter(
+    (ad) => Number(ad.sortOrder) === props.bannerOrder,
+  );
+});
 
 const popupAds = computed(() =>
   ads.value.filter(
@@ -97,45 +206,103 @@ function restartBannerTimer() {
     window.clearTimeout(bannerTimer);
   }
 
-  // 只有一張或沒有 BANNER 時，不需要自動切換
-  if (bannerAds.value.length <= 1) return;
+  // 靜態 BANNER，或目前只有一張圖片時，不啟動自動輪播
+  if (props.staticBanner || displayedBannerAds.value.length <= 1) return;
 
   // 重新從三秒開始倒數
   bannerTimer = window.setTimeout(() => {
-    nextBanner(); // 三秒後切換下一張
+    nextBanner(); // 4.5秒後切換下一張
   }, 4500);
 }
 const showPopup = ref(true);
 const showSmallBlock = ref(true);
+const allowPopupThisMount = ref(false);
 
 const currentBanner = computed(() => {
-  return bannerAds.value[bannerIndex.value] || null;
+  return displayedBannerAds.value[bannerIndex.value] || null;
 });
+
+watch(
+  [sessionChecked, isLoggedIn, popupAds],
+  ([checked, loggedIn, popups]) => {
+    if (!checked) return;
+
+    if (!loggedIn) {
+      allowPopupThisMount.value = true;
+      return;
+    }
+
+    if (allowPopupThisMount.value) return;
+
+    const hasMemberPopup = popups.some((ad) => Number(ad.sortOrder) === 1);
+
+    if (!hasMemberPopup) return;
+
+    allowPopupThisMount.value = claimMemberPopup();
+  },
+  {
+    immediate: true,
+  },
+);
 
 const currentPopup = computed(() => {
-  return popupAds.value[0] || null;
+  // Session 還沒確認完成時，先不要顯示 POPUP
+  if (!sessionChecked.value || !allowPopupThisMount.value) return null;
+
+  // 未登入使用 0，已登入使用 1
+  const popupOrder = isLoggedIn.value ? 1 : 0;
+
+  // 找到對應使用者狀態的 POPUP
+  return (
+    popupAds.value.find((ad) => Number(ad.sortOrder) === popupOrder) || null
+  );
 });
+// 點擊目前顯示的 POPUP
+function handlePopupClick() {
+  if (!currentPopup.value) return;
+
+  // 未登入者固定前往註冊頁
+  if (!isLoggedIn.value) {
+    trackAdvertisementClick(currentPopup.value);
+    router.push({ name: "register" });
+    return;
+  }
+
+  // 已登入者按照廣告設定前往指定商品
+  goToAdvertisementTarget(currentPopup.value);
+}
 
 const currentSmallBlock = computed(() => {
-  return smallBlockAds.value[0] || null;
+  // 沒有指定排序時，維持原本行為：取得第一則廣告
+  if (props.smallBlockOrder === null) {
+    return smallBlockAds.value[0] || null;
+  }
+
+  // 找到 sortOrder 符合目前頁面的 SMALL_BLOCK
+  return (
+    smallBlockAds.value.find(
+      (ad) => Number(ad.sortOrder) === props.smallBlockOrder,
+    ) || null
+  );
 });
 
 function nextBanner() {
-  if (bannerAds.value.length === 0) return;
+  if (displayedBannerAds.value.length === 0) return;
 
   // 切換到下一張，到最後一張會回到第一張
-  bannerIndex.value = (bannerIndex.value + 1) % bannerAds.value.length;
+  bannerIndex.value = (bannerIndex.value + 1) % displayedBannerAds.value.length;
 
   // 切換完成後，重新倒數三秒
   restartBannerTimer();
 }
 
 function previousBanner() {
-  if (bannerAds.value.length === 0) return;
+  if (displayedBannerAds.value.length === 0) return;
 
   // 切換到上一張，第一張再往前會回到最後一張
   bannerIndex.value =
-    (bannerIndex.value - 1 + bannerAds.value.length) % bannerAds.value.length;
+    (bannerIndex.value - 1 + displayedBannerAds.value.length) %
+    displayedBannerAds.value.length;
 
   // 使用者操作後，重新倒數三秒
   restartBannerTimer();
@@ -158,8 +325,17 @@ async function loadAdvertisements(silent = false) {
   try {
     const result = await getPublicActiveAdvertisements();
     ads.value = result.data || [];
+    const hasHotAuctionAd = ads.value.some(
+      (ad) => ad.targetType === "HOT_AUCTION" && hasPlacement(ad.adPlacement),
+    );
+
+    if (hasHotAuctionAd) {
+      await loadHotAuction();
+    } else {
+      hotAuction.value = null;
+    }
     errorMessage.value = "";
-    if (bannerIndex.value >= bannerAds.value.length) {
+    if (bannerIndex.value >= displayedBannerAds.value.length) {
       bannerIndex.value = 0;
     }
   } catch (error) {
@@ -173,9 +349,12 @@ async function loadAdvertisements(silent = false) {
     }
   }
 }
+
 let advertisementRefreshTimer = null;
+
 onMounted(async () => {
-  await loadAdvertisements();
+  // 廣告與 Session 狀態可以同時讀取
+  await Promise.all([loadAdvertisements(), loadLoginStatus()]);
   restartBannerTimer();
 
   advertisementRefreshTimer = window.setInterval(async () => {
@@ -183,6 +362,7 @@ onMounted(async () => {
     restartBannerTimer();
   }, 60000);
 });
+
 onUnmounted(() => {
   if (bannerTimer !== null) {
     window.clearTimeout(bannerTimer);
@@ -191,6 +371,7 @@ onUnmounted(() => {
   if (advertisementRefreshTimer !== null) {
     window.clearInterval(advertisementRefreshTimer);
   }
+  disposeAdvertisementTracking();
 });
 </script>
 
@@ -202,15 +383,24 @@ onUnmounted(() => {
       {{ errorMessage }}
     </div>
     <template v-else>
-      <section v-if="hasPlacement('BANNER') && currentBanner" class="banner-ad">
-        <img
-          :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
-          :alt="currentBanner.adName"
-          @click="goToAdvertisementTarget(currentBanner)"
-        />
+      <section
+        v-if="hasPlacement('BANNER') && currentBanner"
+        v-viewable-ad="currentBanner"
+        class="banner-ad"
+      >
+        <Transition name="banner-fade">
+          <img
+            :key="currentBanner.adId"
+            class="banner-image"
+            :src="resolveAdvertisementImageUrl(currentBanner.imageUrl)"
+            :alt="currentBanner.adName"
+            :class="{ 'static-banner-image': staticBanner }"
+            @click="!staticBanner && goToAdvertisementTarget(currentBanner)"
+          />
+        </Transition>
 
         <button
-          v-if="bannerAds.length > 1"
+          v-if="!staticBanner && displayedBannerAds.length > 1"
           type="button"
           class="banner-arrow left"
           @click="previousBanner"
@@ -219,7 +409,7 @@ onUnmounted(() => {
         </button>
 
         <button
-          v-if="bannerAds.length > 1"
+          v-if="!staticBanner && displayedBannerAds.length > 1"
           type="button"
           class="banner-arrow right"
           @click="nextBanner"
@@ -227,9 +417,12 @@ onUnmounted(() => {
           ›
         </button>
 
-        <div v-if="bannerAds.length > 1" class="banner-dots">
+        <div
+          v-if="!staticBanner && displayedBannerAds.length > 1"
+          class="banner-dots"
+        >
           <button
-            v-for="(ad, index) in bannerAds"
+            v-for="(ad, index) in displayedBannerAds"
             :key="ad.adId"
             type="button"
             :class="{ active: index === bannerIndex }"
@@ -242,61 +435,24 @@ onUnmounted(() => {
         目前沒有上架中的 BANNER 廣告
       </p>
 
-      <section
+      <slot name="after-banner"></slot>
+
+      <AdvertisementCategoryCarousel
         v-if="hasPlacement('CATEGORY_CARD') && categoryCardAds.length"
-        class="category-card-section"
+        :advertisements="categoryCardAds"
+        @select-ad="goToAdvertisementTarget"
       >
-        <header class="category-card-header">
-          <h2>(っ•‿•)っ 🎀 【我真的特別愛你】 🎀</h2>
-        </header>
-
-        <div class="category-card-track">
-          <article
-            v-for="ad in categoryCardAds"
-            :key="ad.adId"
-            class="category-card"
-          >
-            <button
-              type="button"
-              class="category-card-image-button"
-              @click="goToAdvertisementTarget(ad)"
-            >
-              <img
-                :src="resolveAdvertisementImageUrl(ad.imageUrl)"
-                :alt="ad.adName"
-              />
-            </button>
-
-            <div class="category-card-footer">
-              <button
-                type="button"
-                class="category-card-title"
-                @click="goToAdvertisementTarget(ad)"
-              >
-                <strong>{{ ad.adName }}</strong>
-              </button>
-
-              <RouterLink
-                v-if="ad.targetType === 'CATEGORY' && ad.targetId"
-                class="category-view-link"
-                :to="{
-                  name: 'commerce',
-                  query: {
-                    categoryId: ad.targetId,
-                  },
-                }"
-              >
-                查看相關
-              </RouterLink>
-            </div>
-          </article>
-        </div>
-      </section>
+        <slot name="category-result"></slot>
+      </AdvertisementCategoryCarousel>
 
       <aside
         v-if="
-          hasPlacement('SMALL_BLOCK') && showSmallBlock && currentSmallBlock
+          hasPlacement('SMALL_BLOCK') &&
+          showSmallBlock &&
+          currentSmallBlock &&
+          (currentSmallBlock.targetType !== 'HOT_AUCTION' || hotAuction)
         "
+        v-viewable-ad="currentSmallBlock"
         class="small-block-ad"
       >
         <button
@@ -318,7 +474,7 @@ onUnmounted(() => {
         v-if="hasPlacement('POPUP') && showPopup && currentPopup"
         class="popup-background"
       >
-        <article class="popup-ad">
+        <article v-viewable-ad="currentPopup" class="popup-ad">
           <button type="button" class="popup-close" @click="showPopup = false">
             ×
           </button>
@@ -326,7 +482,7 @@ onUnmounted(() => {
           <img
             :src="resolveAdvertisementImageUrl(currentPopup.imageUrl)"
             :alt="currentPopup.adName"
-            @click="goToAdvertisementTarget(currentPopup)"
+            @click="handlePopupClick"
           />
         </article>
       </div>

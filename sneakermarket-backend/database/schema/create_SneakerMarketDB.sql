@@ -39,6 +39,9 @@ CREATE TABLE dbo.advertisement_stats (
 
                                          updated_at DATETIME2(0) NOT NULL,
 
+                                         CONSTRAINT UQ_advertisement_stats_ad_date
+                                             UNIQUE (ad_id, stat_date),
+
                                          FOREIGN KEY (ad_id)
                                              REFERENCES dbo.advertisements(ad_id)
 );

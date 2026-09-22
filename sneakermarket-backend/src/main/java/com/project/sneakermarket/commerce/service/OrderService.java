@@ -1,8 +1,10 @@
 package com.project.sneakermarket.commerce.service;
-
+import com.project.sneakermarket.commerce.email.OrderCreatedEvent;
 import com.project.sneakermarket.commerce.dto.OrderDetailResponse;
 import com.project.sneakermarket.commerce.dto.OrderItemResponse;
 import com.project.sneakermarket.commerce.dto.OrderListItemResponse;
+
+import com.project.sneakermarket.commerce.email.PaymentSuccessEvent;
 import com.project.sneakermarket.commerce.entity.Cart;
 import com.project.sneakermarket.commerce.entity.CartItem;
 import com.project.sneakermarket.commerce.entity.Order;
@@ -11,10 +13,12 @@ import com.project.sneakermarket.commerce.repository.*;
 import com.project.sneakermarket.common.exception.ForbiddenException;
 import com.project.sneakermarket.coupon.service.CouponService;
 import com.project.sneakermarket.member.service.MemberService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
+import com.project.sneakermarket.commerce.entity.ProductImage;
+import com.project.sneakermarket.commerce.repository.ProductImageRepository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -31,8 +35,10 @@ public class OrderService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final ProductImageRepository productImageRepository;
     private final MemberService memberService;
     private final CouponService couponService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 查看「我的訂單列表」：一次列出這個會員的所有訂單摘要
     public List<OrderListItemResponse> getMyOrders(Long memberId) {
@@ -72,7 +78,8 @@ public class OrderService {
                         orderItem.getSpecification(),
                         orderItem.getUnitPrice(),
                         orderItem.getQuantity(),
-                        orderItem.getLineTotal()
+                        orderItem.getLineTotal(),
+                        orderItem.getImageUrl()
                 ))
                 .collect(Collectors.toList());
 
@@ -88,6 +95,10 @@ public class OrderService {
                 order.getReceiverName(),
                 order.getReceiverPhone(),
                 order.getShippingAddress(),
+                order.getShippingMethod(),
+                order.getCvsStoreId(),
+                order.getCvsStoreName(),
+                order.getCvsAddress(),
                 order.getCreatedAt(),
                 order.getPaidAt(),
                 order.getCompletedAt(),
@@ -101,7 +112,11 @@ public class OrderService {
                                            String receiverName,
                                            String receiverPhone,
                                            String shippingAddress,
-                                           Long couponId) {
+                                           Long couponId,
+                                           String shippingMethod,
+                                           String cvsStoreId,
+                                           String cvsStoreName,
+                                           String cvsAddress) {
 
         Cart cart = cartRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new RuntimeException("找不到這個購物車"));
@@ -143,12 +158,15 @@ public class OrderService {
         order.setDiscountAmount(discount);
         order.setShippingFee(BigDecimal.valueOf(100));
         order.setTotalAmount(subtotal.add(BigDecimal.valueOf(100)).subtract(discount));
-        order.setPaymentMethod("MOCK_CREDIT_CARD");
-        order.setStatus("PAID");
+        order.setPaymentMethod("ECPAY_CREDIT_CARD");
+        order.setStatus("PENDING");
         order.setReceiverName(receiverName);
         order.setReceiverPhone(receiverPhone);
         order.setShippingAddress(shippingAddress);
-        order.setPaidAt(LocalDateTime.now());
+        order.setShippingMethod(shippingMethod);
+        order.setCvsStoreId(cvsStoreId);
+        order.setCvsStoreName(cvsStoreName);
+        order.setCvsAddress(cvsAddress);
         orderRepository.save(order);
 
         // 每個勾選品項各自建立一筆訂單明細，並扣掉對應庫存
@@ -161,6 +179,13 @@ public class OrderService {
             orderItem.setUnitPrice(item.getVariant().getPrice());
             orderItem.setQuantity(item.getQuantity());
             orderItem.setLineTotal(item.getVariant().getPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
+
+            Long productId = item.getVariant().getProduct().getProductId();
+            List<ProductImage> images =
+                    productImageRepository.findByProductProductIdAndIsPrimaryTrue(productId);
+            String imageUrl = images.isEmpty() ? null : images.get(0).getImageUrl();
+            orderItem.setImageUrl(imageUrl);
+
             orderItemRepository.save(orderItem);
 
             int newStock = item.getVariant().getStock() - item.getQuantity();
@@ -171,7 +196,30 @@ public class OrderService {
         // 迴圈跑完、全部品項都處理完才清空購物車，不能提早清
         cartItemRepository.deleteAll(selectedItems);
 
+        // 交易完成後要通知會員的下訂單事件（此時交易尚未 commit，事件會排隊等 commit 後才觸發）
+        eventPublisher.publishEvent(new OrderCreatedEvent(order.getOrderId(), memberId));
+
         // 全部存完才組回傳值（借用 getOrderDetail 邏輯）
         return getOrderDetail(memberId,order.getOrderId());
+
+    }
+    // 綠界確認付款成功後呼叫，把訂單狀態改成已付款
+    @Transactional
+    public void confirmPayment(Long orderId) {
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("找不到這張訂單"));
+
+        order.setStatus("PAID");
+        order.setPaidAt(LocalDateTime.now());
+
+        orderRepository.save(order);
+
+        eventPublisher.publishEvent(
+                new PaymentSuccessEvent(
+                        order.getOrderId(),
+                        order.getMemberId()
+                )
+        );
     }
 }

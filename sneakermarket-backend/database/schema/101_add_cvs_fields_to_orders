@@ -1,0 +1,6 @@
+//一般商城模組的 orders 表新增了 3 個欄位
+//（超商取貨用：cvs_store_id、cvs_store_name、cvs_address）
+
+ALTER TABLE orders ADD cvs_store_id NVARCHAR(20);
+ALTER TABLE orders ADD cvs_store_name NVARCHAR(100);
+ALTER TABLE orders ADD cvs_address NVARCHAR(200);

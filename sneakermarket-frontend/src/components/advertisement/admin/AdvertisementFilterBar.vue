@@ -55,10 +55,10 @@ const emit = defineEmits([
       @change="emit('update:placement', $event.target.value)"
     >
       <option>全部版位</option>
-      <option>首頁橫幅</option>
-      <option>首頁彈窗</option>
-      <option>商品頁側欄</option>
-      <option>分類卡片</option>
+      <option>橫幅</option>
+      <option>彈窗</option>
+      <option>側欄</option>
+      <option>分類</option>
     </select>
   </div>
 </template>

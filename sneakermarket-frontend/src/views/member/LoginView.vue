@@ -2,19 +2,39 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { login } from "@/service/authService";
+import { resetMemberPopup } from "@/utils/advertisementPopupMemory";
 
 const router = useRouter();
 
+// =====================================================
 // 表單資料
+// =====================================================
+
 const account = ref("");
 const password = ref("");
 
+// 控制密碼是否顯示
+const showPassword = ref(false);
+
+// =====================================================
 // 畫面狀態
+// =====================================================
 
 const errorMessage = ref("");
 const loading = ref(false);
 
+// =====================================================
+// 顯示 / 隱藏密碼
+// =====================================================
+
+function togglePasswordVisibility() {
+  showPassword.value = !showPassword.value;
+}
+
+// =====================================================
 // 登入功能
+// =====================================================
+
 async function handleLogin() {
   errorMessage.value = "";
 
@@ -34,25 +54,32 @@ async function handleLogin() {
 
   try {
     const member = await login({
-  account: account.value.trim(),
-  password: password.value,
-});
+      account: account.value.trim(),
+      password: password.value,
+    });
 
-console.log("登入成功");
-console.log("登入角色：", member.role);
+    // ADMIN → 管理後台
+    if (member.role === "ROLE_ADMIN") {
+      await router.push("/admin");
+    } else {
+      // 新的一次登入，重設會員 POPUP 顯示狀態
+      resetMemberPopup();
 
-// ADMIN → 管理後台
-if (member.role === "ROLE_ADMIN") {
-
-  await router.push("/admin");
-
-} else {
-
-  // 一般會員 → 會員中心
-  await router.push("/member");
-}
+      // 一般會員 → 商城首頁
+      await router.push("/ads/storefront");
+    }
   } catch (error) {
-    console.error("登入失敗：", error);
+    console.error("登入失敗");
+
+    /*
+     * 登入失敗：
+     * 保留 account，
+     * 清空 password。
+     *
+     * 使用者不需要重新輸入帳號，
+     * 只需要重新輸入密碼。
+     */
+    password.value = "";
 
     // fetch 版本使用 error.status
     if (error.status === 400 || error.status === 401) {
@@ -84,7 +111,10 @@ if (member.role === "ROLE_ADMIN") {
 
       <!-- 登入表單 -->
       <form @submit.prevent="handleLogin">
+        <!-- ================================================= -->
         <!-- 帳號 -->
+        <!-- ================================================= -->
+
         <div class="mb-3">
           <label for="account" class="form-label"> 帳號 </label>
 
@@ -99,29 +129,53 @@ if (member.role === "ROLE_ADMIN") {
           />
         </div>
 
+        <!-- ================================================= -->
         <!-- 密碼 -->
+        <!-- ================================================= -->
+
         <div class="mb-4">
           <label for="password" class="form-label"> 密碼 </label>
 
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            class="form-control"
-            placeholder="請輸入密碼"
-            autocomplete="current-password"
-            :disabled="loading"
-          />
+          <!--
+            使用 input-group，
+            讓顯示 / 隱藏按鈕放在密碼框右側。
+          -->
+          <div class="input-group">
+            <input
+              id="password"
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              class="form-control"
+              placeholder="請輸入密碼"
+              autocomplete="current-password"
+              :disabled="loading"
+            />
+
+            <button
+              type="button"
+              class="btn btn-outline-secondary password-toggle-btn"
+              :disabled="loading"
+              @click="togglePasswordVisibility"
+            >
+              {{ showPassword ? "隱藏" : "顯示" }}
+            </button>
+          </div>
         </div>
 
+        <!-- ================================================= -->
         <!-- 登入按鈕 -->
+        <!-- ================================================= -->
+
         <button type="submit" class="btn btn-dark w-100" :disabled="loading">
           <span v-if="loading"> 登入中... </span>
 
           <span v-else> 登入 </span>
         </button>
 
+        <!-- ================================================= -->
         <!-- 註冊連結 -->
+        <!-- ================================================= -->
+
         <div class="text-center mt-4">
           <span class="text-secondary"> 還沒有會員帳號？ </span>
 
@@ -177,6 +231,13 @@ if (member.role === "ROLE_ADMIN") {
 
 .btn {
   min-height: 42px;
+}
+
+/*
+ * 顯示 / 隱藏密碼按鈕
+ */
+.password-toggle-btn {
+  min-width: 70px;
 }
 
 .register-link {

@@ -1,5 +1,5 @@
 <template>
-  <div class="container py-4">
+  <section class="auction-detail-page">
     <!-- 背景同步警告獨立於主要頁面狀態，保留已載入的詳細資料。 -->
     <div
       v-if="auction && statusSyncMessage"
@@ -9,305 +9,314 @@
       {{ statusSyncMessage }}
     </div>
 
-    <!-- 資料載入中 -->
-    <div v-if="loading">載入中...</div>
+    <div v-if="loading" class="detail-state" role="status">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      正在載入競標商品
+    </div>
 
-    <!-- API 發生錯誤 -->
     <div v-else-if="errorMessage" class="alert alert-danger">
       {{ errorMessage }}
     </div>
 
-    <!-- 競標詳細資料 -->
     <div v-else-if="auction">
-      <h1 class="mb-4">
-        {{ auction.productName }}
-      </h1>
+      <RouterLink :to="{ name: 'auction' }" class="back-link">
+        ← 返回競標商城
+      </RouterLink>
 
-      <!-- 賣家競標操作 -->
-      <div v-if="auction.isOwner" class="card mb-4">
-        <div class="card-header">我的競標操作</div>
-
-        <div class="card-body">
-          <!-- 尚可編輯／取消 -->
-          <div v-if="canOwnerManageAuction" class="d-flex gap-2">
-            <RouterLink
-              :to="{
-                name: 'auction-edit',
-                params: {
-                  id: auction.auctionId,
-                },
-              }"
-              class="btn btn-primary"
-            >
-              編輯競標
-            </RouterLink>
-
-            <button
-              type="button"
-              class="btn btn-outline-danger"
-              :disabled="cancelling"
-              @click="handleCancelAuction"
-            >
-              {{ cancelling ? "取消中..." : "取消競標" }}
-            </button>
-          </div>
-
-          <!-- 本人的競標，但現在不能再操作 -->
-          <div v-else class="text-muted">
-            {{ ownerManageMessage }}
-          </div>
+      <div class="detail-layout">
+        <div class="gallery-column">
+          <AuctionImageGallery
+            :image-urls="auction.imageUrls"
+            :product-name="auction.productName"
+          />
         </div>
-      </div>
 
-      <!-- 商品圖片 -->
-      <div class="mb-4">
-        <h5>商品圖片</h5>
-
-        <div v-if="auction.imageUrls?.length">
-          <div class="row g-3">
-            <div
-              v-for="(imageUrl, index) in auction.imageUrls"
-              :key="`${imageUrl}-${index}`"
-              class="col-md-4"
+        <div class="auction-summary">
+          <!-- 競標資訊 -->
+          <div class="summary-heading">
+            <span
+              class="status-badge"
+              :class="'status-' + auction.status.toLowerCase()"
             >
-              <img
-                :src="resolveImageUrl(imageUrl)"
-                :alt="`${auction.productName} 圖片 ${index + 1}`"
-                class="img-fluid border rounded"
-              />
+              {{ formatStatus(auction.status) }}
+            </span>
+            <h1>{{ auction.productName }}</h1>
+            <p class="brand-category">
+              {{ auction.brandName ?? "品牌資料未提供" }}
+              <span aria-hidden="true">／</span>
+              {{ auction.categoryName ?? "分類資料未提供" }}
+            </p>
+          </div>
+
+          <dl class="product-meta-grid">
+            <div>
+              <dt>型號</dt>
+              <dd>{{ auction.model || "-" }}</dd>
             </div>
-          </div>
-        </div>
+            <div>
+              <dt>尺寸</dt>
+              <dd>{{ auction.size }}</dd>
+            </div>
+            <div>
+              <dt>商品狀況</dt>
+              <dd>{{ formatCondition(auction.condition) }}</dd>
+            </div>
+            <div>
+              <dt>刊登會員</dt>
+              <dd>賣家：{{ auction.sellerName || "會員資料未提供" }}</dd>
+            </div>
+          </dl>
 
-        <div v-else class="text-muted">目前沒有商品圖片。</div>
-      </div>
-
-      <p>
-        品牌：{{ auction.brandName ?? "品牌資料未提供" }} ／ 分類：{{
-          auction.categoryName ?? "分類資料未提供"
-        }}
-      </p>
-      <!-- 商品資訊 -->
-      <div class="card mb-4">
-        <div class="card-header">商品資訊</div>
-
-        <div class="card-body">
-          <p>型號：{{ auction.model || "-" }}</p>
-
-          <p>尺寸：{{ auction.size }}</p>
-
-          <p>
-            商品狀況：
-            {{ formatCondition(auction.condition) }}
-          </p>
-
-          <p>商品描述：{{ auction.description }}</p>
-
-          <p>
-            瑕疵說明：
-            {{ auction.defectNote || "無" }}
-          </p>
-
-          <p>
-            真偽／來源說明：
-            {{ auction.authenticityNote || "-" }}
-          </p>
-
-          <p>
-            商品所在地：
-            {{ auction.location || "-" }}
-          </p>
-        </div>
-      </div>
-
-      <!-- 競標資訊 -->
-      <div class="card mb-4">
-        <div class="card-header">競標資訊</div>
-
-        <div class="card-body">
-          <p>賣家：{{ auction.sellerName || "會員資料未提供" }}</p>
-
-          <p>起標價：{{ formatTwd(auction.startPrice) }}</p>
-
-          <p>目前價格：{{ formatTwd(auction.currentPrice) }}</p>
-
-          <p>最低加價：{{ formatTwd(auction.minIncrement) }}</p>
-
-          <p>下一次最低出價：{{ formatTwd(auction.nextMinimumBid) }}</p>
-
-          <p>
-            出價次數：
-            {{ auction.bidCount }}
-          </p>
-
-          <p>
-            開始時間：
-            {{ formatDateTime(auction.startAt) }}
-          </p>
-
-          <p>
-            結束時間：
-            {{ formatDateTime(auction.endAt) }}
-          </p>
-
-          <p>
-            競標狀態：
-            {{ formatStatus(auction.status) }}
-          </p>
-        </div>
-      </div>
-
-      <!-- 出價操作 -->
-      <div class="card mb-4">
-        <div class="card-header">我要出價</div>
-
-        <div class="card-body">
-          <p class="mb-2">
-            目前價格：<strong>{{ formatTwd(auction.currentPrice) }}</strong>
-          </p>
-
-          <p class="mb-2">
-            最低加價：<strong>{{ formatTwd(auction.minIncrement) }}</strong>
-          </p>
-
-          <p class="mb-3">
-            目前最低可出價：
-            <strong>{{ formatTwd(auction.nextMinimumBid) }}</strong>
-          </p>
-
-          <div v-if="auction.isOwner" class="alert alert-secondary mb-0">
-            賣家不可對自己的競標出價。
+          <div class="current-price-block">
+            <span>目前價格</span>
+            <strong>{{ formatTwd(auction.currentPrice) }}</strong>
+            <small>起標價 {{ formatTwd(auction.startPrice) }}</small>
           </div>
 
-          <form v-else @submit.prevent="handlePlaceBid">
-            <div class="d-flex align-items-center gap-3 mb-3">
-              <button
-                type="button"
-                class="btn btn-outline-secondary"
-                :disabled="
-                  !canPlaceBid || submittingBid || isCandidateAtMinimum
-                "
-                aria-label="減少一個最低加價級距"
-                @click="decreaseCandidateBid"
-              >
-                −
-              </button>
+          <dl class="auction-metrics">
+            <div>
+              <dt>出價次數</dt>
+              <dd>{{ auction.bidCount }} 次</dd>
+            </div>
+            <div>
+              <dt>最低加價</dt>
+              <dd>{{ formatTwd(auction.minIncrement) }}</dd>
+            </div>
+            <div>
+              <dt>下次最低出價</dt>
+              <dd>{{ formatTwd(auction.nextMinimumBid) }}</dd>
+            </div>
+          </dl>
 
-              <strong class="fs-4" aria-live="polite">
-                {{ formatTwd(candidateBid) }}
+          <div class="auction-time-panel">
+            <div>
+              <span>開始時間</span>
+              <strong>{{ formatDateTime(auction.startAt) }}</strong>
+            </div>
+            <div>
+              <span>結束時間</span>
+              <strong>{{ formatDateTime(auction.endAt) }}</strong>
+            </div>
+            <div class="remaining-row">
+              <span>剩餘時間</span>
+              <strong>
+                <AuctionCountdown :end-at="auction.endAt" :status="auction.status" />
               </strong>
+            </div>
+          </div>
+
+          <!-- 出價操作 -->
+          <section class="bid-panel" aria-labelledby="bid-panel-title">
+            <div class="section-title-row">
+              <div>
+                <p>限時競價</p>
+                <h2 id="bid-panel-title">準備出價</h2>
+              </div>
+              <span>最低 {{ formatTwd(auction.nextMinimumBid) }}</span>
+            </div>
+
+            <div v-if="auction.isOwner" class="owner-bid-notice">
+              賣家不可對自己的競標出價。
+            </div>
+
+            <form v-else @submit.prevent="handlePlaceBid">
+              <div class="bid-stepper">
+                <button
+                  type="button"
+                  :disabled="
+                    !canPlaceBid || submittingBid || isCandidateAtMinimum
+                  "
+                  aria-label="減少一個最低加價級距"
+                  @click="decreaseCandidateBid"
+                >
+                  −
+                </button>
+
+                <strong aria-live="polite">
+                  {{ formatTwd(candidateBid) }}
+                </strong>
+
+                <button
+                  type="button"
+                  :disabled="!canPlaceBid || submittingBid"
+                  aria-label="增加一個最低加價級距"
+                  @click="increaseCandidateBid"
+                >
+                  +
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                class="place-bid-button"
+                :disabled="!canPlaceBid || submittingBid"
+              >
+                {{
+                  submittingBid
+                    ? "出價中..."
+                    : `確認出價 ${formatTwd(candidateBid)}`
+                }}
+              </button>
+
+              <p v-if="!canPlaceBid" class="bid-availability-message">
+                {{ bidAvailabilityMessage }}
+              </p>
+
+              <div v-if="bidSuccessMessage" class="alert alert-success mt-3 mb-0">
+                {{ bidSuccessMessage }}
+              </div>
+
+              <div v-if="bidErrorMessage" class="alert alert-danger mt-3 mb-0">
+                {{ bidErrorMessage }}
+              </div>
+            </form>
+          </section>
+
+          <!-- 賣家競標操作 -->
+          <section v-if="auction.isOwner" class="seller-panel">
+            <h2>我的競標操作</h2>
+
+            <div v-if="canOwnerManageAuction" class="seller-actions">
+              <RouterLink
+                :to="{
+                  name: 'auction-edit',
+                  params: {
+                    id: auction.auctionId,
+                  },
+                }"
+                class="seller-edit-button"
+              >
+                編輯競標
+              </RouterLink>
 
               <button
                 type="button"
-                class="btn btn-outline-secondary"
-                :disabled="!canPlaceBid || submittingBid"
-                aria-label="增加一個最低加價級距"
-                @click="increaseCandidateBid"
+                class="seller-cancel-button"
+                :disabled="cancelling"
+                @click="handleCancelAuction"
               >
-                +
+                {{ cancelling ? "取消中..." : "取消競標" }}
               </button>
             </div>
 
-            <button
-              type="submit"
-              class="btn btn-success"
-              :disabled="!canPlaceBid || submittingBid"
-            >
-              {{
-                submittingBid
-                  ? "出價中..."
-                  : `確認出價 ${formatTwd(candidateBid)}`
-              }}
-            </button>
-
-            <div v-if="!canPlaceBid" class="text-muted mt-2">
-              {{ bidAvailabilityMessage }}
-            </div>
-
-            <div v-if="bidSuccessMessage" class="alert alert-success mt-3 mb-0">
-              {{ bidSuccessMessage }}
-            </div>
-
-            <div v-if="bidErrorMessage" class="alert alert-danger mt-3 mb-0">
-              {{ bidErrorMessage }}
-            </div>
-          </form>
+            <p v-else class="seller-message">
+              {{ ownerManageMessage }}
+            </p>
+          </section>
         </div>
       </div>
 
-      <!-- 交易資訊 -->
-      <div class="card mb-4">
-        <div class="card-header">交易資訊</div>
+      <div class="detail-information">
+        <section class="information-section" aria-labelledby="product-info-title">
+          <header>
+            <p>Product</p>
+            <h2 id="product-info-title">商品資訊</h2>
+          </header>
 
-        <div class="card-body">
-          <p>
-            運送方式：
-            {{ auction.shippingMethod }}
-          </p>
+          <dl class="information-list">
+            <div class="full-row">
+              <dt>商品描述</dt>
+              <dd>{{ auction.description || "-" }}</dd>
+            </div>
+            <div>
+              <dt>商品狀況</dt>
+              <dd>{{ formatCondition(auction.condition) }}</dd>
+            </div>
+            <div>
+              <dt>商品所在地</dt>
+              <dd>{{ auction.location || "-" }}</dd>
+            </div>
+            <div class="full-row">
+              <dt>瑕疵說明</dt>
+              <dd>{{ auction.defectNote || "無" }}</dd>
+            </div>
+            <div class="full-row">
+              <dt>真偽／來源說明</dt>
+              <dd>{{ auction.authenticityNote || "-" }}</dd>
+            </div>
+          </dl>
+        </section>
 
-          <p>運費：{{ formatTwd(auction.shippingFee) }}</p>
+        <!-- 交易資訊 -->
+        <section class="information-section" aria-labelledby="transaction-info-title">
+          <header>
+            <p>Transaction</p>
+            <h2 id="transaction-info-title">交易資訊</h2>
+          </header>
 
-          <p>
-            付款方式：
-            {{ auction.paymentMethod }}
-          </p>
-
-          <p>
-            允許面交：
-            {{ formatBoolean(auction.allowMeetup) }}
-          </p>
-
-          <p>
-            允許退貨：
-            {{ formatBoolean(auction.allowReturn) }}
-          </p>
-
-          <p>
-            保固／售後：
-            {{ auction.warrantyNote || "-" }}
-          </p>
-        </div>
+          <dl class="information-list">
+            <div>
+              <dt>交付方式</dt>
+              <dd>
+                {{
+                  formatDeliveryMethod(
+                    auction.shippingMethod,
+                    auction.allowMeetup,
+                  )
+                }}
+              </dd>
+            </div>
+            <div>
+              <dt>運費</dt>
+              <dd>{{ formatTwd(auction.shippingFee) }}</dd>
+            </div>
+            <div>
+              <dt>付款方式</dt>
+              <dd>{{ auction.paymentMethod }}</dd>
+            </div>
+            <div>
+              <dt>允許退貨</dt>
+              <dd>{{ formatBoolean(auction.allowReturn) }}</dd>
+            </div>
+            <div class="full-row">
+              <dt>保固／售後</dt>
+              <dd>{{ auction.warrantyNote || "-" }}</dd>
+            </div>
+          </dl>
+        </section>
       </div>
 
       <!-- 出價紀錄 -->
-      <div class="card">
-        <div class="card-header">出價紀錄</div>
-
-        <div class="card-body">
-          <div v-if="bids.length === 0">目前尚無出價紀錄。</div>
-
-          <div v-else class="table-responsive">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>出價者</th>
-                  <th>出價金額</th>
-                  <th>出價時間</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                <tr
-                  v-for="(bid, index) in bids"
-                  :key="`${bid.createdAt}-${index}`"
-                >
-                  <td>
-                    {{ bid.bidderName || "會員資料未提供" }}
-                  </td>
-
-                  <td>{{ formatTwd(bid.bidAmount) }}</td>
-
-                  <td>
-                    {{ formatDateTime(bid.createdAt) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+      <section class="bid-history-section" aria-labelledby="bid-history-title">
+        <header>
+          <div>
+            <p>Bid history</p>
+            <h2 id="bid-history-title">出價紀錄</h2>
           </div>
+          <span>{{ bids.length }} 筆</span>
+        </header>
+
+        <div v-if="bids.length === 0" class="empty-bid-history">
+          目前尚無出價紀錄。
         </div>
-      </div>
+
+        <div v-else class="table-responsive">
+          <table class="table bid-history-table">
+            <thead>
+              <tr>
+                <th>出價者</th>
+                <th>出價金額</th>
+                <th>出價時間</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr
+                v-for="(bid, index) in bids"
+                :key="`${bid.createdAt}-${index}`"
+              >
+                <td>
+                  {{ bid.bidderName || "會員資料未提供" }}
+                </td>
+                <td>{{ formatTwd(bid.bidAmount) }}</td>
+                <td>{{ formatDateTime(bid.createdAt) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup>
@@ -316,6 +325,8 @@ import { formatTwd } from "@/utils/auctionMoney";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import AuctionCountdown from "@/components/auction/AuctionCountdown.vue";
+import AuctionImageGallery from "@/components/auction/AuctionImageGallery.vue";
 import {
   handleAuctionAccessError,
   cancelAuction,
@@ -897,7 +908,7 @@ const ownerManageMessage = computed(() => {
     return "此競標已到截止時間，無法修改或取消。";
 
   const statusMessageMap = {
-    SOLD: "此競標已成交，無法再修改或取消。",
+    SOLD: "此競標已結標，無法再修改或取消。",
     UNSOLD: "此競標已流標，無法再修改或取消。",
     CANCELLED: "此競標已取消。",
     REMOVED: "此競標已廢標。",
@@ -1034,6 +1045,18 @@ function formatBoolean(value) {
   return value ? "是" : "否";
 }
 
+/**
+ * 將既有運送方式與面交 Boolean 組合成清楚的公開交付說明。
+ */
+function formatDeliveryMethod(shippingMethod, allowMeetup) {
+  const method =
+    typeof shippingMethod === "string" && shippingMethod.trim()
+      ? shippingMethod.trim()
+      : "-";
+
+  return allowMeetup ? `${method}／可協調面交` : method;
+}
+
 // 頁面載入後先取得完整詳細資料，再開始同步最新狀態。
 onMounted(async () => {
   await loadAuctionDetail();
@@ -1086,3 +1109,602 @@ function resolveImageUrl(imageUrl) {
   return `${backendBaseUrl}${imageUrl}`;
 }
 </script>
+
+<style scoped>
+.auction-detail-page {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+  color: #212529;
+}
+
+.detail-state {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  color: #6c757d;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  color: #495057;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: #111;
+  text-decoration: underline;
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.95fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
+}
+
+.gallery-column {
+  position: sticky;
+  top: 1rem;
+  min-width: 0;
+}
+
+.auction-summary {
+  min-width: 0;
+}
+
+.summary-heading {
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  margin-bottom: 0.85rem;
+  padding: 0.2rem 0.68rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.status-active {
+  background: #111;
+  color: #fff;
+}
+
+.status-scheduled {
+  background: #f1f3f5;
+  color: #343a40;
+}
+
+.status-sold {
+  background: #e6f4ea;
+  color: #1e7e34;
+}
+
+.status-unsold,
+.status-cancelled,
+.status-removed {
+  background: #f1f1f1;
+  color: #6c757d;
+}
+
+.summary-heading h1 {
+  margin: 0;
+  color: #111;
+  font-size: clamp(1.75rem, 3.3vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.13;
+  letter-spacing: -0.035em;
+}
+
+.brand-category {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.8rem 0 0;
+  color: #6c757d;
+  font-size: 0.92rem;
+}
+
+.product-meta-grid,
+.auction-metrics,
+.information-list {
+  margin: 0;
+}
+
+.product-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.product-meta-grid div,
+.auction-metrics div,
+.information-list div {
+  min-width: 0;
+}
+
+.product-meta-grid dt,
+.auction-metrics dt,
+.information-list dt {
+  margin-bottom: 0.25rem;
+  color: #6c757d;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.product-meta-grid dd,
+.auction-metrics dd,
+.information-list dd {
+  margin: 0;
+  color: #212529;
+  overflow-wrap: anywhere;
+}
+
+.product-meta-grid dd {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.current-price-block {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 0 1.25rem;
+}
+
+.current-price-block > span {
+  color: #6c757d;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.current-price-block > strong {
+  margin-top: 0.15rem;
+  color: #111;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.current-price-block > small {
+  margin-top: 0.3rem;
+  color: #8a9096;
+}
+
+.auction-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid #e9ecef;
+}
+
+.auction-metrics div {
+  padding: 0.85rem;
+}
+
+.auction-metrics div + div {
+  border-left: 1px solid #e9ecef;
+}
+
+.auction-metrics dd {
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.auction-time-panel {
+  margin-top: 1.25rem;
+  border-top: 1px solid #e9ecef;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.auction-time-panel > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0;
+}
+
+.auction-time-panel > div + div {
+  border-top: 1px solid #f1f3f5;
+}
+
+.auction-time-panel span {
+  color: #6c757d;
+  font-size: 0.78rem;
+}
+
+.auction-time-panel strong {
+  color: #343a40;
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.auction-time-panel .remaining-row strong {
+  color: #111;
+  font-size: 1rem;
+}
+
+.bid-panel {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: #f8f9fa;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.section-title-row p,
+.information-section header p,
+.bid-history-section header p {
+  margin: 0 0 0.25rem;
+  color: #8a9096;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.section-title-row h2,
+.seller-panel h2,
+.information-section h2,
+.bid-history-section h2 {
+  margin: 0;
+  color: #111;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.section-title-row > span {
+  color: #6c757d;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.owner-bid-notice,
+.seller-message,
+.bid-availability-message {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.bid-stepper {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+}
+
+.bid-stepper button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #ced4da;
+  border-radius: 50%;
+  background: #fff;
+  color: #111;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.bid-stepper button:hover:not(:disabled) {
+  border-color: #111;
+}
+
+.bid-stepper button:disabled {
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+
+.bid-stepper strong {
+  min-width: 0;
+  color: #111;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.place-bid-button,
+.seller-edit-button,
+.seller-cancel-button {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.place-bid-button {
+  width: 100%;
+  padding: 0.7rem 1.5rem;
+  border: 1px solid #111;
+  background: #111;
+  color: #fff;
+}
+
+.place-bid-button:hover:not(:disabled) {
+  background: #2c2c2c;
+}
+
+.place-bid-button:disabled {
+  border-color: #adb5bd;
+  background: #adb5bd;
+  cursor: not-allowed;
+}
+
+.bid-availability-message {
+  margin-top: 0.65rem;
+  text-align: center;
+}
+
+.seller-panel {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.seller-actions {
+  display: flex;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
+.seller-edit-button,
+.seller-cancel-button {
+  flex: 1;
+  padding: 0.65rem 1rem;
+}
+
+.seller-edit-button {
+  border: 1px solid #111;
+  background: #111;
+  color: #fff;
+}
+
+.seller-edit-button:hover {
+  color: #fff;
+  background: #2c2c2c;
+}
+
+.seller-cancel-button {
+  border: 1px solid #ced4da;
+  background: #fff;
+  color: #495057;
+}
+
+.seller-cancel-button:hover:not(:disabled) {
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.seller-message {
+  margin-top: 0.65rem;
+}
+
+.detail-information {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3rem;
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid #dee2e6;
+}
+
+.information-section header,
+.bid-history-section > header {
+  margin-bottom: 1.25rem;
+}
+
+.information-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.information-list div {
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.information-list div:nth-child(odd):not(.full-row) {
+  padding-right: 1rem;
+}
+
+.information-list div:nth-child(even):not(.full-row) {
+  padding-left: 1rem;
+}
+
+.information-list .full-row {
+  grid-column: 1 / -1;
+}
+
+.information-list dd {
+  font-size: 0.88rem;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+.bid-history-section {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid #dee2e6;
+}
+
+.bid-history-section > header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.bid-history-section > header > span {
+  color: #6c757d;
+  font-size: 0.78rem;
+}
+
+.empty-bid-history {
+  padding: 2rem;
+  background: #f8f9fa;
+  color: #6c757d;
+  text-align: center;
+}
+
+.bid-history-table {
+  min-width: 620px;
+  margin-bottom: 0;
+}
+
+.bid-history-table th {
+  padding: 0.8rem 0.5rem;
+  border-bottom-color: #212529;
+  color: #6c757d;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.bid-history-table td {
+  padding: 1rem 0.5rem;
+  color: #343a40;
+  font-size: 0.86rem;
+  vertical-align: middle;
+}
+
+.bid-history-table td:nth-child(2) {
+  color: #111;
+  font-weight: 700;
+}
+
+@media (max-width: 991.98px) {
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 0.95fr);
+    gap: 2rem;
+  }
+
+  .auction-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auction-metrics div + div {
+    border-top: 1px solid #e9ecef;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .auction-detail-page {
+    padding-top: 0;
+  }
+
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gallery-column {
+    position: static;
+  }
+
+  .summary-heading h1 {
+    font-size: 1.8rem;
+  }
+
+  .auction-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .auction-metrics div + div {
+    border-top: 0;
+    border-left: 1px solid #e9ecef;
+  }
+
+  .detail-information {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2.5rem;
+    margin-top: 3rem;
+  }
+
+  .bid-history-section {
+    margin-top: 3rem;
+  }
+}
+
+@media (max-width: 479.98px) {
+  .product-meta-grid,
+  .information-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .information-list .full-row {
+    grid-column: auto;
+  }
+
+  .information-list div:nth-child(odd):not(.full-row),
+  .information-list div:nth-child(even):not(.full-row) {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .auction-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auction-metrics div + div {
+    border-top: 1px solid #e9ecef;
+    border-left: 0;
+  }
+
+  .auction-time-panel > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .auction-time-panel strong {
+    text-align: left;
+  }
+
+  .bid-panel {
+    margin-right: -0.25rem;
+    margin-left: -0.25rem;
+    padding: 1rem;
+  }
+
+  .bid-stepper {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+  }
+
+  .bid-stepper button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .bid-stepper strong {
+    font-size: 1.25rem;
+  }
+
+  .seller-actions {
+    flex-direction: column;
+  }
+}
+</style>

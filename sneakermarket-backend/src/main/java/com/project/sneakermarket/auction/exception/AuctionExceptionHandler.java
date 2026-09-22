@@ -20,4 +20,10 @@ public class AuctionExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.fail(ex.getMessage(), null));
     }
+
+    @ExceptionHandler(AuctionIntegrationException.class)
+    public ResponseEntity<ApiResponse<Void>> integration(AuctionIntegrationException ex) {
+        return ResponseEntity.status(ex.status())
+                .body(ApiResponse.fail(ex.getMessage(), null));
+    }
 }

@@ -52,7 +52,11 @@ public class OrderController {
                 request.getReceiverName(),
                 request.getReceiverPhone(),
                 request.getShippingAddress(),
-                request.getCouponId()
+                request.getCouponId(),
+                request.getShippingMethod(),
+                request.getCvsStoreId(),
+                request.getCvsStoreName(),
+                request.getCvsAddress()
         );
     }
 

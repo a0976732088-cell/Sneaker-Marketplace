@@ -1,6 +1,7 @@
 package com.project.sneakermarket.auction.service;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -51,7 +52,8 @@ class AuctionOrderDetailTests {
                 mock(AuctionBidRepository.class), auctions, products,
                 mock(AuctionResultRepository.class), orders, images, brands);
         mvc = MockMvcBuilders.standaloneSetup(
-                new AuctionOrderController(queries, mock(AuctionOrderPaymentService.class),
+                new AuctionOrderController(queries, mock(AuctionOrderCheckoutService.class),
+                        mock(AuctionOrderPaymentService.class),
                         new AuctionSessionMemberResolver(references)))
                 .setControllerAdvice(new AuctionExceptionHandler(), new GlobalExceptionHandler())
                 .build();
@@ -60,6 +62,7 @@ class AuctionOrderDetailTests {
         order.setOrderNumber("AO-123456");
         order.setAuctionId(7L);
         order.setBuyerId(10L);
+        order.setSellerId(20L);
         order.setFinalPrice(new BigDecimal("6500.00"));
         order.setPaymentMethod("Transfer");
         order.setPaymentStatus(AuctionPaymentStatus.PENDING);
@@ -115,6 +118,8 @@ class AuctionOrderDetailTests {
                 .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"))
                 .andExpect(jsonPath("$.data.shippingStatus").value("NOT_SHIPPED"))
                 .andExpect(jsonPath("$.data.orderStatus").value("PENDING_PAYMENT"))
+                .andExpect(jsonPath("$.data.viewerRole").value("BUYER"))
+                .andExpect(jsonPath("$.data.receiverInfoVisible").value(true))
                 .andExpect(jsonPath("$.data.receiverName").value("收件人"))
                 .andExpect(jsonPath("$.data.receiverPhone").value("0912345678"))
                 .andExpect(jsonPath("$.data.shippingAddress").value("台北市測試路 1 號"))
@@ -153,6 +158,54 @@ class AuctionOrderDetailTests {
     }
 
     @Test
+    void sellerGetsPendingDetailWithoutReceiverInformation() throws Exception {
+        stubDetail();
+
+        mvc.perform(get("/api/auction-orders/AO-123456").session(activeSession(20L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.viewerRole").value("SELLER"))
+                .andExpect(jsonPath("$.data.receiverInfoVisible").value(false))
+                .andExpect(jsonPath("$.data.receiverName").value(nullValue()))
+                .andExpect(jsonPath("$.data.receiverPhone").value(nullValue()))
+                .andExpect(jsonPath("$.data.shippingAddress").value(nullValue()))
+                .andExpect(jsonPath("$.data.buyerId").doesNotExist())
+                .andExpect(jsonPath("$.data.sellerId").doesNotExist())
+                .andExpect(jsonPath("$.data.buyerEmail").doesNotExist())
+                .andExpect(jsonPath("$.data.sellerEmail").doesNotExist());
+    }
+
+    @Test
+    void sellerGetsPaidDetailWithReceiverInformation() throws Exception {
+        order.setPaymentStatus(AuctionPaymentStatus.PAID);
+        order.setOrderStatus(AuctionOrderStatus.PAID);
+        order.setPaidAt(LocalDateTime.of(2026, 9, 14, 11, 0));
+        stubDetail();
+
+        mvc.perform(get("/api/auction-orders/AO-123456").session(activeSession(20L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.viewerRole").value("SELLER"))
+                .andExpect(jsonPath("$.data.receiverInfoVisible").value(true))
+                .andExpect(jsonPath("$.data.receiverName").value("收件人"))
+                .andExpect(jsonPath("$.data.receiverPhone").value("0912345678"))
+                .andExpect(jsonPath("$.data.shippingAddress").value("台北市測試路 1 號"));
+    }
+
+    @Test
+    void sellerGetsAbandonedDetailWithoutReceiverInformation() throws Exception {
+        order.setOrderStatus(AuctionOrderStatus.ABANDONED);
+        order.setAbandonedAt(LocalDateTime.of(2026, 9, 15, 10, 0));
+        stubDetail();
+
+        mvc.perform(get("/api/auction-orders/AO-123456").session(activeSession(20L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.viewerRole").value("SELLER"))
+                .andExpect(jsonPath("$.data.receiverInfoVisible").value(false))
+                .andExpect(jsonPath("$.data.receiverName").value(nullValue()))
+                .andExpect(jsonPath("$.data.receiverPhone").value(nullValue()))
+                .andExpect(jsonPath("$.data.shippingAddress").value(nullValue()));
+    }
+
+    @Test
     void missingOrderGets404() throws Exception {
         mvc.perform(get("/api/auction-orders/AO-missing").session(activeSession(10L)))
                 .andExpect(status().isNotFound());
@@ -185,6 +238,9 @@ class AuctionOrderDetailTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orderStatus").value("ABANDONED"))
                 .andExpect(jsonPath("$.data.paymentStatus").value("PENDING"))
+                .andExpect(jsonPath("$.data.viewerRole").value("BUYER"))
+                .andExpect(jsonPath("$.data.receiverInfoVisible").value(true))
+                .andExpect(jsonPath("$.data.receiverName").value("收件人"))
                 .andExpect(jsonPath("$.data.paymentDueAt").value("2026-09-15T10:00:00"))
                 .andExpect(jsonPath("$.data.abandonedAt").value("2026-09-15T10:00:00"))
                 .andExpect(jsonPath("$.data.buyerId").doesNotExist())

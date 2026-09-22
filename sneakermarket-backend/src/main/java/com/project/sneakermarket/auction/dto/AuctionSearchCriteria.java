@@ -1,6 +1,7 @@
 package com.project.sneakermarket.auction.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import com.project.sneakermarket.auction.entity.AuctionCondition;
 import com.project.sneakermarket.auction.entity.AuctionStatus;
@@ -26,17 +27,32 @@ public class AuctionSearchCriteria {
     // 商品品牌 ID
     private Long brandId;
 
+    // 商品品牌 ID 多選；保留 brandId 以相容既有單值 Query Parameter
+    private List<Long> brandIds;
+
     // 商品分類 ID
     private Long categoryId;
+
+    // 商品分類 ID 多選；保留 categoryId 以相容既有單值 Query Parameter
+    private List<Long> categoryIds;
 
     // 球鞋尺寸，例如 US 9、US 10
     private String shoeSize;
 
+    // 球鞋尺寸多選；保留 shoeSize 以相容既有單值 Query Parameter
+    private List<String> shoeSizes;
+
     // 商品狀況：NEW、LIKE_NEW、USED
     private AuctionCondition condition;
 
+    // 商品狀況多選；保留 condition 以相容既有單值 Query Parameter
+    private List<AuctionCondition> conditions;
+
     // 競標狀態
     private AuctionStatus status;
+
+    // 競標狀態多選；保留 status 以相容既有單值 Query Parameter
+    private List<AuctionStatus> statuses;
 
     // 最低目前價格
     private BigDecimal minPrice;

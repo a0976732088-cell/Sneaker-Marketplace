@@ -62,7 +62,7 @@ import com.project.sneakermarket.notification.repository.NotificationRepository;
 class AuctionPrivateNotificationIntegrationTests {
 
     private static final String PRIVATE_DESTINATION = "/queue/auction-events";
-    private static final LocalDateTime CLOSE_AT = LocalDateTime.of(2026, 9, 16, 12, 0);
+    private static final LocalDateTime CLOSE_AT = LocalDateTime.of(2099, 9, 16, 12, 0);
     private static final LocalDateTime BID_AT = CLOSE_AT.minusMinutes(10);
 
     @Autowired private AuctionBidService bidding;

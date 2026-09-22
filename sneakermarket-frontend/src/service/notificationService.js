@@ -79,3 +79,18 @@ export const getEmailJobs = (status = "FAILED", page = 0) =>
 
 export const retryEmailJob = (jobId) =>
   httpClient.post(`/admin/notification-email-jobs/${jobId}/retry`);
+
+export const getMyNotificationPreference = () => {
+  return httpClient.get(
+    "/notifications/preferences/me",
+  );
+};
+
+export const updateMyNotificationPreference = (
+  payload,
+) => {
+  return httpClient.put(
+    "/notifications/preferences/me",
+    payload,
+  );
+};

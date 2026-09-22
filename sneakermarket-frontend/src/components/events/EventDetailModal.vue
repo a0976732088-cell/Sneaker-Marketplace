@@ -25,12 +25,16 @@
             class="event-image-container mb-4 overflow-hidden rounded-3 shadow-sm"
           >
             <img
-              :src="`http://localhost:8080/api/calendar/event/${event?.id || event?.eventId}/photo?t=${timestamp}`"
+              v-if="event?.photoUrl || event?.hasPhoto"
+              :src="
+                event.photoUrl ||
+                `http://localhost:8080/api/calendar/event/${event.id || event.eventId}/photo?t=${timestamp}`
+              "
               class="img-fluid w-100 object-fit-cover"
               style="max-height: 350px"
-              alt="Event Image"
-              @error="(e) => (e.target.src = 'https://picsum.photos/800/400')"
+              :alt="event.title"
             />
+            <span v-else>EVENT</span>
           </div>
 
           <div class="text-start bg-light p-3 rounded-3">
@@ -59,7 +63,6 @@
 
 <script setup>
 import { ref } from "vue";
-
 
 defineProps({
   event: { type: Object, required: true },

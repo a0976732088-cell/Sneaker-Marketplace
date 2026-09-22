@@ -64,9 +64,9 @@ const imageFailed = ref(false);
 .event-card {
   position: relative;
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 10px;
-  min-height: 132px;
+  grid-template-columns: minmax(160px, 35%) minmax(0, 1fr);
+  gap: 18px;
+  min-height: 156px;
   padding: 8px;
   border: 1px solid #e8e8e8;
   border-radius: 16px;
@@ -93,7 +93,7 @@ const imageFailed = ref(false);
 
 .event-content {
   min-width: 0;
-  padding: 6px 0;
+  padding: 10px 4px 8px 0;
 }
 
 .event-meta {

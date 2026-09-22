@@ -10,5 +10,6 @@ public record AuctionMyListingResponse(
         BigDecimal currentPrice, Integer bidCount, AuctionStatus status,
         AuctionAdminManagementState managementState,
         AuctionResultStatus resultStatus, BigDecimal finalPrice,
-        LocalDateTime createdAt, LocalDateTime startAt, LocalDateTime endAt) {
+        LocalDateTime createdAt, LocalDateTime startAt, LocalDateTime endAt,
+        String imageUrl) {
 }

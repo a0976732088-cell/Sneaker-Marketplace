@@ -22,6 +22,10 @@ public class OrderDetailResponse {
     private String receiverName;
     private String receiverPhone;
     private String shippingAddress;
+    private String shippingMethod;
+    private String cvsStoreId;
+    private String cvsStoreName;
+    private String cvsAddress;
     private LocalDateTime createdAt;
     private LocalDateTime paidAt;
     private LocalDateTime completedAt;

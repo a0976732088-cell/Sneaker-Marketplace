@@ -3,14 +3,17 @@ package com.project.sneakermarket.advertisement.repository;
 import com.project.sneakermarket.advertisement.entity.Advertisement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementPlacement;
 import com.project.sneakermarket.advertisement.entity.AdvertisementStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface AdvertisementRepository extends JpaRepository<Advertisement, Long> , JpaSpecificationExecutor<Advertisement> {
 
@@ -60,5 +63,23 @@ public interface AdvertisementRepository extends JpaRepository<Advertisement, Lo
             // 新廣告的結束時間
             @Param("newEndAt")
             LocalDateTime newEndAt
+    );
+
+    // 悲觀鎖定
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+    SELECT advertisement
+    FROM Advertisement advertisement
+    WHERE advertisement.adId = :adId
+    """)
+    Optional<Advertisement> findByIdForUpdate(
+            @Param("adId") Long adId
+    );
+
+    // jpa衍生寫法
+    long countByAdStatusAndStartAtLessThanEqualAndEndAtAfter(
+            AdvertisementStatus adStatus,
+            LocalDateTime startAt,
+            LocalDateTime endAt
     );
 }

@@ -1,5 +1,6 @@
 package com.project.sneakermarket.auction.service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -40,6 +41,7 @@ public class AuctionMemberQueryService {
                 .map(AuctionMemberBidSummary::getAuctionId).toList());
         var productMap = productMap(List.copyOf(auctionMap.values()));
         var resultMap = resultMap(List.copyOf(auctionMap.values()));
+        var imageUrlMap = imageUrlMap(List.copyOf(auctionMap.values()));
         return pageData(summaries.map(bid -> {
             Auction auction = auctionMap.get(bid.getAuctionId());
             AuctionProduct product = productMap.get(auction.getAuctionProductId());
@@ -55,7 +57,8 @@ public class AuctionMemberQueryService {
                     result != null && result.getResultStatus() == AuctionResultStatus.SOLD
                             && memberId.equals(result.getWinnerId()),
                     result == null ? null : result.getResultStatus(),
-                    result == null ? null : result.getFinalPrice(), bid.getLastBidAt(), auction.getEndAt());
+                    result == null ? null : result.getFinalPrice(), bid.getLastBidAt(), auction.getEndAt(),
+                    imageUrlMap.get(auction.getAuctionProductId()));
         }));
     }
 
@@ -64,6 +67,7 @@ public class AuctionMemberQueryService {
                 pageRequest(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("auctionId"))));
         var productMap = productMap(listings.getContent());
         var resultMap = resultMap(listings.getContent());
+        var imageUrlMap = imageUrlMap(listings.getContent());
         return pageData(listings.map(auction -> {
             AuctionProduct product = productMap.get(auction.getAuctionProductId());
             AuctionResult result = resultMap.get(auction.getAuctionId());
@@ -74,7 +78,8 @@ public class AuctionMemberQueryService {
                     managementState,
                     result == null ? null : result.getResultStatus(),
                     result == null ? null : result.getFinalPrice(),
-                    auction.getCreatedAt(), auction.getStartAt(), auction.getEndAt());
+                    auction.getCreatedAt(), auction.getStartAt(), auction.getEndAt(),
+                    imageUrlMap.get(auction.getAuctionProductId()));
         }));
     }
 
@@ -101,19 +106,32 @@ public class AuctionMemberQueryService {
     private PageData<AuctionOrderSummaryResponse> orderSummaries(Page<AuctionOrder> orderPage) {
         var auctionMap = auctionMap(orderPage.getContent().stream().map(AuctionOrder::getAuctionId).toList());
         var productMap = productMap(List.copyOf(auctionMap.values()));
-        return pageData(orderPage.map(order -> new AuctionOrderSummaryResponse(
-                order.getOrderNumber(), order.getAuctionId(),
-                productMap.get(auctionMap.get(order.getAuctionId()).getAuctionProductId()).getProductName(),
-                order.getFinalPrice(), order.getPaymentMethod(), order.getPaymentStatus(),
-                order.getShippingStatus(), order.getOrderStatus(), order.getCreatedAt(), order.getUpdatedAt())));
+        var imageUrlMap = imageUrlMap(List.copyOf(auctionMap.values()));
+        return pageData(orderPage.map(order -> {
+            Auction auction = auctionMap.get(order.getAuctionId());
+            AuctionProduct product = productMap.get(auction.getAuctionProductId());
+            return new AuctionOrderSummaryResponse(
+                    order.getOrderNumber(), order.getAuctionId(), product.getProductName(),
+                    order.getFinalPrice(), order.getPaymentMethod(), order.getPaymentStatus(),
+                    order.getShippingStatus(), order.getOrderStatus(), order.getCreatedAt(), order.getUpdatedAt(),
+                    product.getModel(), product.getSize(), imageUrlMap.get(product.getAuctionProductId()),
+                    order.getPaymentDueAt(), managementState(auction));
+        }));
     }
 
     public AuctionOrderDetailResponse getAuctionOrderDetail(Long memberId, String orderNumber) {
         AuctionOrder order = orders.findByOrderNumber(orderNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("找不到指定的競標訂單"));
-        if (!order.getBuyerId().equals(memberId)) {
+        boolean isBuyer = order.getBuyerId().equals(memberId);
+        boolean isSeller = order.getSellerId().equals(memberId);
+        if (!isBuyer && !isSeller) {
             throw new ForbiddenException("無權查看此競標訂單");
         }
+        AuctionOrderViewerRole viewerRole =
+                isBuyer ? AuctionOrderViewerRole.BUYER : AuctionOrderViewerRole.SELLER;
+        boolean receiverInfoVisible = isBuyer
+                || (order.getPaymentStatus() == AuctionPaymentStatus.PAID
+                        && order.getOrderStatus() == AuctionOrderStatus.PAID);
 
         Auction auction = auctions.findById(order.getAuctionId())
                 .orElseThrow(() -> new ResourceNotFoundException("找不到此訂單的競標資料"));
@@ -131,7 +149,10 @@ public class AuctionMemberQueryService {
                 order.getFinalPrice().add(product.getShippingFee()),
                 product.getShippingMethod(), order.getPaymentMethod(),
                 order.getPaymentStatus(), order.getShippingStatus(), order.getOrderStatus(),
-                order.getReceiverName(), order.getReceiverPhone(), order.getShippingAddress(),
+                viewerRole, receiverInfoVisible,
+                receiverInfoVisible ? order.getReceiverName() : null,
+                receiverInfoVisible ? order.getReceiverPhone() : null,
+                receiverInfoVisible ? order.getShippingAddress() : null,
                 order.getCreatedAt(), order.getPaymentDueAt(), order.getAbandonedAt(),
                 order.getPaidAt(), order.getUpdatedAt());
     }
@@ -158,6 +179,26 @@ public class AuctionMemberQueryService {
         if (page.isEmpty()) return Map.of();
         return results.findByAuctionIdIn(page.stream().map(Auction::getAuctionId).toList()).stream()
                 .collect(Collectors.toMap(AuctionResult::getAuctionId, Function.identity()));
+    }
+
+    /** 與公開商城列表相同：主圖優先，否則使用 sortOrder 最前面的圖片。 */
+    private Map<Long, String> imageUrlMap(List<Auction> page) {
+        List<Long> productIds = page.stream()
+                .map(Auction::getAuctionProductId)
+                .distinct()
+                .toList();
+        if (productIds.isEmpty()) return Map.of();
+
+        Map<Long, AuctionProductImage> selectedImages = new LinkedHashMap<>();
+        images.findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(productIds)
+                .forEach(image -> selectedImages.merge(
+                        image.getAuctionProductId(),
+                        image,
+                        (selected, candidate) -> Boolean.TRUE.equals(candidate.getIsPrimary())
+                                && !Boolean.TRUE.equals(selected.getIsPrimary()) ? candidate : selected));
+
+        return selectedImages.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getImageUrl()));
     }
 
     private <T> PageData<T> pageData(Page<T> page) {

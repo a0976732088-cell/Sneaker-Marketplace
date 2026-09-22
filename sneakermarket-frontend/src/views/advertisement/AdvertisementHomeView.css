@@ -12,7 +12,6 @@
   /* 遵守 App.vue 外層 container，不再突破到瀏覽器兩側 */
   margin: 0;
 
-  background: #f6f7f9;
   color: var(--ink);
   font-family: Inter, "Noto Sans TC", system-ui, sans-serif;
 }
@@ -143,7 +142,7 @@
   width: 100%;
 
   /* 保留上下距離，取消左右額外縮排 */
-  padding: 32px 0 46px;
+  padding: 32px 0 0;
 }
 .workspace-header {
   display: flex;

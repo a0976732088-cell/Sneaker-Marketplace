@@ -1,5 +1,6 @@
 package com.project.sneakermarket.auction.service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -71,6 +72,7 @@ public class AuctionQueryService {
                 getProductMap(auctions);
         Map<Long, String> sellerNames = loadMemberNames(productMap.values().stream()
                 .map(AuctionProduct::getSellerId).toList());
+        Map<Long, String> primaryImageUrls = loadPrimaryImageUrls(auctions);
 
         AuctionOptionsResponse options = referenceService.getOptions();
 
@@ -78,7 +80,10 @@ public class AuctionQueryService {
         return auctions.stream()
                 .map(auction -> toSummaryResponse(
                         auction,
-                        productMap.get(auction.getAuctionProductId()), options, sellerNames
+                        productMap.get(auction.getAuctionProductId()),
+                        options,
+                        sellerNames,
+                        primaryImageUrls.get(auction.getAuctionProductId())
                 ))
                 .toList();
     }
@@ -114,6 +119,7 @@ public class AuctionQueryService {
                 getProductMap(auctions);
         Map<Long, String> sellerNames = loadMemberNames(productMap.values().stream()
                 .map(AuctionProduct::getSellerId).toList());
+        Map<Long, String> primaryImageUrls = loadPrimaryImageUrls(auctions);
 
         AuctionOptionsResponse options = referenceService.getOptions();
         List<AuctionSummaryResponse> items =
@@ -122,7 +128,10 @@ public class AuctionQueryService {
                                 auction,
                                 productMap.get(
                                         auction.getAuctionProductId()
-                                ), options, sellerNames
+                                ),
+                                options,
+                                sellerNames,
+                                primaryImageUrls.get(auction.getAuctionProductId())
                         ))
                         .toList();
 
@@ -386,6 +395,42 @@ public class AuctionQueryService {
                 ));
     }
 
+    /**
+     * 一次載入列表中所有商品圖片，優先選主圖，沒有主圖時使用排序第一張。
+     */
+    private Map<Long, String> loadPrimaryImageUrls(
+            List<Auction> auctions) {
+
+        List<Long> productIds = auctions.stream()
+                .map(Auction::getAuctionProductId)
+                .distinct()
+                .toList();
+
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, AuctionProductImage> selectedImages = new LinkedHashMap<>();
+
+        auctionProductImageRepository
+                .findByAuctionProductIdInOrderByAuctionProductIdAscSortOrderAsc(productIds)
+                .forEach(image -> selectedImages.merge(
+                        image.getAuctionProductId(),
+                        image,
+                        (selected, candidate) ->
+                                Boolean.TRUE.equals(candidate.getIsPrimary())
+                                        && !Boolean.TRUE.equals(selected.getIsPrimary())
+                                                ? candidate
+                                                : selected
+                ));
+
+        return selectedImages.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().getImageUrl()
+                ));
+    }
+
     private Map<Long, String> loadMemberNames(List<Long> memberIds) {
         List<Long> distinctIds = memberIds.stream()
                 .filter(Objects::nonNull)
@@ -409,7 +454,8 @@ public class AuctionQueryService {
             Auction auction,
             AuctionProduct product,
             AuctionOptionsResponse options,
-            Map<Long, String> sellerNames) {
+            Map<Long, String> sellerNames,
+            String imageUrl) {
 
         return new AuctionSummaryResponse(
                 auction.getAuctionId(),
@@ -427,7 +473,8 @@ public class AuctionQueryService {
                 product.getBrandId(),
                 product.getCategoryId(),
                 lookupName(options.brands(), product.getBrandId()),
-                lookupName(options.categories(), product.getCategoryId())
+                lookupName(options.categories(), product.getCategoryId()),
+                imageUrl
         );
     }
 

@@ -19,9 +19,9 @@ public class Notification {
     @Column(name = "notification_id", nullable = false)
     private Long notificationId;
 
-//      建立與 Member 的 FK 關聯
-@Column(name = "member_id")
-private Long memberId;
+    //      建立與 Member 的 FK 關聯
+    @Column(name = "member_id")
+    private Long memberId;
 
     @Column(name = "notification_type", nullable = false, length = 40)
     private String notificationType;
@@ -47,6 +47,9 @@ private Long memberId;
     @Column(name = "is_sent", nullable = false)
     private Boolean isSent = false; // 新增：是否已點擊發送
 
+    @Column(name = "in_app_visible", nullable = false)
+    private Boolean inAppVisible = true;
+
     @Column(name = "sent_at")
     private LocalDateTime sentAt; // 新增：發送時間
 
@@ -61,5 +64,6 @@ private Long memberId;
     public void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
+
 
 }

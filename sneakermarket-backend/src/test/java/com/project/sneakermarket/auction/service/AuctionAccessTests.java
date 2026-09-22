@@ -258,6 +258,8 @@ class AuctionAccessTests {
         mvc.perform(get("/api/auctions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].sellerName").value("王小明"))
+                .andExpect(jsonPath("$.data.items[0].imageUrl")
+                        .value("/uploads/auctions/3/main.jpg"))
                 .andExpect(jsonPath("$.data.items[0].sellerId").doesNotExist())
                 .andExpect(jsonPath("$.data.items[0].account").doesNotExist())
                 .andExpect(jsonPath("$.data.items[0].email").doesNotExist())
@@ -291,13 +293,41 @@ class AuctionAccessTests {
                 .andExpect(jsonPath("$.data[0].role").doesNotExist());
     }
 
+    @Test
+    void publicListBindsRepeatedPluralFiltersAndLegacyScalarFilters() throws Exception {
+        when(queries.searchAuctions(any(), any())).thenReturn(new PageData<>(
+                List.of(), 0, 12, 0, 0));
+
+        mvc.perform(get("/api/auctions")
+                        .param("brandId", "9")
+                        .param("brandIds", "11", "12")
+                        .param("categoryIds", "21", "22")
+                        .param("shoeSizes", "US 8", "US 9")
+                        .param("conditions", "NEW", "USED")
+                        .param("statuses", "ACTIVE", "SCHEDULED"))
+                .andExpect(status().isOk());
+
+        verify(queries).searchAuctions(
+                argThat(criteria ->
+                        Long.valueOf(9L).equals(criteria.getBrandId())
+                                && List.of(11L, 12L).equals(criteria.getBrandIds())
+                                && List.of(21L, 22L).equals(criteria.getCategoryIds())
+                                && List.of("US 8", "US 9").equals(criteria.getShoeSizes())
+                                && List.of(AuctionCondition.NEW, AuctionCondition.USED)
+                                        .equals(criteria.getConditions())
+                                && List.of(AuctionStatus.ACTIVE, AuctionStatus.SCHEDULED)
+                                        .equals(criteria.getStatuses())),
+                any());
+    }
+
     private AuctionSummaryResponse publicSummary() {
         return new AuctionSummaryResponse(
                 12L, 3L, "Air Jordan 1", "王小明", "AJ1", "US 9",
                 AuctionCondition.NEW, new BigDecimal("5000"), 2,
                 LocalDateTime.of(2026, 9, 7, 12, 0),
                 LocalDateTime.of(2026, 9, 8, 12, 0),
-                AuctionStatus.ACTIVE, 71L, 92L, "Nike", "球鞋");
+                AuctionStatus.ACTIVE, 71L, 92L, "Nike", "球鞋",
+                "/uploads/auctions/3/main.jpg");
     }
 
     private AuctionDetailResponse publicDetail() {

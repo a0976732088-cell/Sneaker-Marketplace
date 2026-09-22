@@ -143,13 +143,13 @@ const routes = [
     component: () => import("@/views/calendar/CalendarHomeView.vue"),
   },
 
-  // {
-  //   path: "/calendar/eventManage",
+  {
+    path: "/notifications/preferences",
 
-  //   name: "eventManage",
+    name: "notification-preferences",
 
-  //   component: () => import("@/views/calendar/EventManageView.vue"),
-  // },
+    component: () => import("@/views/notification/NotificationHomeView.vue"),
+  },
 
   // =====================================================
   // Auction - Member
@@ -171,7 +171,7 @@ const routes = [
   },
 
   {
-    path: "/auctions/me/bids",
+    path: "/member/auctions/bids",
 
     name: "auction-my-bids",
 
@@ -179,7 +179,7 @@ const routes = [
   },
 
   {
-    path: "/auctions/me/listings",
+    path: "/member/auctions/listings",
 
     name: "auction-my-listings",
 
@@ -187,7 +187,7 @@ const routes = [
   },
 
   {
-    path: "/auction-orders",
+    path: "/member/auctions/orders",
 
     name: "auction-orders",
 
@@ -195,11 +195,48 @@ const routes = [
   },
 
   {
+    path: "/auctions/me/bids",
+
+    redirect: { name: "auction-my-bids" },
+  },
+
+  {
+    path: "/auctions/me/listings",
+
+    redirect: { name: "auction-my-listings" },
+  },
+
+  {
+    path: "/auction-orders",
+
+    redirect: { name: "auction-orders" },
+  },
+
+  {
+    path: "/member/auctions/orders/:orderNumber/checkout",
+
+    name: "auction-order-checkout",
+
+    component: () => import("@/views/auction/AuctionOrderCheckoutView.vue"),
+  },
+
+  {
+    path: "/member/auctions/orders/:orderNumber",
+
+    name: "auction-order-detail",
+
+    component: () => import("@/views/auction/AuctionOrderDetailView.vue"),
+  },
+
+  {
     path: "/auction-orders/:orderNumber/payment",
 
     name: "auction-order-payment",
 
-    component: () => import("@/views/auction/AuctionOrderPaymentView.vue"),
+    redirect: (to) => ({
+      name: "auction-order-checkout",
+      params: { orderNumber: to.params.orderNumber },
+    }),
   },
 
   {
@@ -289,22 +326,28 @@ const routes = [
       // ================================================
       {
         path: "events",
-
-        name: "admin-events",
-
-        component: () => import("@/views/admin/AdminCalendarNotificationView.vue"),
+        name: "admin-activity-overview",
+        component: () =>
+          import("@/views/admin/calendarAndNotification/AdminActivityOverviewView.vue"),
       },
-      // ================================================
-      // Notification
-      // ================================================
+      {
+        path: "events/manage",
+        name: "admin-events",
+        component: () =>
+          import("@/views/admin/calendarAndNotification/AdminActivityManagementView.vue"),
+      },
       {
         path: "notifications",
-
         name: "admin-notifications",
-
-        component: () => import("@/views/admin/AdminCalendarNotificationView.vue"),
+        component: () =>
+          import("@/views/admin/calendarAndNotification/AdminNotificationCenterView.vue"),
       },
-
+      {
+        path: "notifications/logs",
+        name: "admin-notification-logs",
+        component: () =>
+          import("@/views/admin/calendarAndNotification/AdminNotificationLogView.vue"),
+      },
       // ================================================
       // Auction
       // ================================================
@@ -368,29 +411,15 @@ router.beforeEach(async (to) => {
   try {
     const member = await getCurrentMember();
 
-    console.log("目前登入會員：", member);
-
-    console.log("目前角色：", member.role);
-
-    // =============================================
-    // 不是 ADMIN
-    // =============================================
     if (member.role !== "ROLE_ADMIN") {
-      console.log("不是 ADMIN，禁止進入管理後台");
 
       return {
         name: "forbidden",
       };
     }
 
-    // =============================================
-    // ADMIN
-    // =============================================
-    console.log("ADMIN 驗證成功");
-
     return true;
   } catch (error) {
-    console.log("尚未登入，導向登入頁");
 
     return {
       name: "login",

@@ -14,6 +14,7 @@ public record AuctionOrderDetailResponse(
         String shippingMethod, String paymentMethod,
         AuctionPaymentStatus paymentStatus, AuctionShippingStatus shippingStatus,
         AuctionOrderStatus orderStatus,
+        AuctionOrderViewerRole viewerRole, boolean receiverInfoVisible,
         String receiverName, String receiverPhone, String shippingAddress,
         LocalDateTime createdAt, LocalDateTime paymentDueAt, LocalDateTime abandonedAt,
         LocalDateTime paidAt, LocalDateTime updatedAt) {

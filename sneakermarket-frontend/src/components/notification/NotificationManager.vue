@@ -1,10 +1,6 @@
 <!-- components/notification/NotificationManager.vue -->
 <template>
-  <div class="card shadow-sm border-0 rounded-3 p-4 bg-white">
-    <!-- 標題區域 -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h4 class="fw-bold mb-0">通知管理系統</h4>
-    </div>
+  <div class="notification-manager">
 
     <!-- 頂部搜尋與篩選區域 -->
     <div class="row g-3 mb-4">
@@ -60,31 +56,59 @@
     <!-- 資料表格 -->
     <div class="table-responsive">
       <table class="table table-hover align-middle notification-table">
-        <thead class="table-light">
+        <thead>
           <tr>
-            <th width="60">ID</th>
-            <th>通知標題</th>
-            <th width="150">類型</th>
-            <th width="120">對象類型</th>
-            <th width="180">建立時間</th>
+            <th>通知名稱</th>
+            <th>類型</th>
+            <th>發送對象</th>
+            <th>建立／發送時間</th>
+            <th>狀態</th>
             <th class="notification-action-heading">操作</th>
           </tr>
         </thead>
+
         <tbody>
           <tr v-for="item in notificationLogList" :key="item.notificationId">
-            <td>{{ item.notificationId }}</td>
-            <td class="fw-bold text-dark">{{ item.title }}</td>
-            <td>
-              <span class="badge bg-info text-dark">{{
-                item.notificationType
-              }}</span>
+            <td class="notification-title-cell">
+              <strong>{{ item.title }}</strong>
+
+              <small> ID #{{ item.notificationId }} </small>
             </td>
+
             <td>
-              <span class="badge bg-secondary">{{
-                item.targetType || "通用"
-              }}</span>
+              <span class="type-badge">
+                {{ item.notificationType }}
+              </span>
             </td>
-            <td>{{ formatDate(item.createdAt) }}</td>
+
+            <td>
+              <strong class="audience-label">
+                {{ notificationAudience(item) }}
+              </strong>
+
+              <small v-if="item.targetId"> 關聯 ID：{{ item.targetId }} </small>
+            </td>
+
+            <td>
+              <span>
+                {{ formatDate(item.sentAt || item.createdAt) }}
+              </span>
+
+              <small>
+                {{ item.sentAt ? "發送時間" : "建立時間" }}
+              </small>
+            </td>
+
+            <td>
+              <span
+                class="notification-status"
+                :class="notificationStatus(item).className"
+              >
+                <i></i>
+                {{ notificationStatus(item).label }}
+              </span>
+            </td>
+
             <td class="notification-action-cell">
               <div class="notification-actions">
                 <button
@@ -97,6 +121,7 @@
                 </button>
 
                 <button
+                  v-if="!item.isSent"
                   type="button"
                   class="notification-action action-edit"
                   title="編輯通知"
@@ -106,31 +131,31 @@
                 </button>
 
                 <button
+                  v-if="!item.isSent"
                   type="button"
                   class="notification-action action-all"
                   title="發送給全體會員"
-                  :disabled="item.isSent || item.isQueued"
+                  :disabled="item.isQueued"
                   @click="handleSendNotice(item, 'ALL_MEMBERS')"
                 >
                   發給全體
                 </button>
 
                 <button
+                  v-if="
+                    !item.isSent && item.targetType === 'EVENT' && item.targetId
+                  "
                   type="button"
                   class="notification-action action-followers"
                   title="發送給活動關注者"
-                  :disabled="
-                    item.isSent ||
-                    item.isQueued ||
-                    item.targetType !== 'EVENT' ||
-                    !item.targetId
-                  "
+                  :disabled="item.isQueued"
                   @click="handleSendNotice(item, 'EVENT_FOLLOWERS')"
                 >
                   發給關注者
                 </button>
 
                 <button
+                  v-if="!item.isSent"
                   type="button"
                   class="notification-action action-delete"
                   title="刪除通知"
@@ -141,8 +166,9 @@
               </div>
             </td>
           </tr>
+
           <tr v-if="notificationLogList.length === 0">
-            <td colspan="6" class="text-center py-4 text-muted">
+            <td colspan="6" class="text-center py-5 text-muted">
               目前查無通知資料
             </td>
           </tr>
@@ -201,7 +227,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, watch } from "vue";
 import {
   deleteNotification,
   getNotificationPage,
@@ -209,6 +235,14 @@ import {
 } from "@/service/notificationService";
 import NotificationDetailModal from "./NotificationDetailModal.vue";
 import NotificationEditModal from "./NotificationEditModal.vue";
+
+const props = defineProps({
+  sentStatus: {
+    type: String,
+    default: "ALL",
+    validator: (value) => ["ALL", "UNSENT", "SENT"].includes(value),
+  },
+});
 
 // 查詢條件與分頁狀態
 const searchParams = ref({
@@ -226,10 +260,15 @@ const showDetailModal = ref(false);
 const showEditModal = ref(false);
 const selectedNotification = ref(null);
 
-onMounted(() => {
-  fetchNotifications(1);
-});
-
+watch(
+  () => props.sentStatus,
+  () => {
+    fetchNotifications(1);
+  },
+  {
+    immediate: true,
+  },
+);
 // 時間格式處理 helper
 const formatToIsoDateTime = (dateTimeLocalStr) => {
   if (!dateTimeLocalStr) return null;
@@ -239,12 +278,20 @@ const formatToIsoDateTime = (dateTimeLocalStr) => {
 };
 
 // 撈取資料 API
-const fetchNotifications = async (page = 1) => {
+async function fetchNotifications(page = 1) {
   try {
     const params = {
       pageNumber: page,
       pageSize: 10,
     };
+
+    if (props.sentStatus === "UNSENT") {
+      params.isSent = false;
+    }
+
+    if (props.sentStatus === "SENT") {
+      params.isSent = true;
+    }
 
     if (searchParams.value.title?.trim()) {
       params.title = searchParams.value.title.trim();
@@ -267,7 +314,7 @@ const fetchNotifications = async (page = 1) => {
   } catch (err) {
     console.error("查詢失敗", err);
   }
-};
+}
 
 // 重設查詢
 const handleReset = () => {
@@ -366,6 +413,35 @@ const handleDelete = async (id) => {
     console.error("刪除失敗", err);
     alert("刪除失敗");
   }
+};
+
+const notificationStatus = (item) => {
+  if (item.isQueued) {
+    return {
+      label: "發送中",
+      className: "status-processing",
+    };
+  }
+
+  if (item.isSent) {
+    return {
+      label: "已發送",
+      className: "status-sent",
+    };
+  }
+
+  return {
+    label: "未發送",
+    className: "status-unsent",
+  };
+};
+
+const notificationAudience = (item) => {
+  if (item.targetType === "EVENT" && item.targetId) {
+    return "活動關注者";
+  }
+
+  return "全體會員";
 };
 
 // 時間格式化
@@ -479,11 +555,120 @@ const formatDate = (dateStr) => {
   background: #eadbd9;
 }
 
-@media (max-width: 768px) {
-  .notification-action-heading,
-  .notification-action-cell {
-    width: 440px;
-    min-width: 440px;
-  }
+/* 通知列表基本版面 */
+
+.notification-table {
+  min-width: 940px;
 }
+
+.notification-table thead th {
+  padding: 14px 12px;
+  border-bottom: 1px solid #deddd8;
+  color: #666660;
+  background: #f5f4f1;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.notification-table tbody td {
+  padding: 14px 12px;
+}
+
+/* 通知名稱 */
+
+.notification-title-cell strong {
+  display: block;
+  max-width: 280px;
+  overflow: hidden;
+  color: #222222;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-title-cell small,
+.notification-table td > small {
+  display: block;
+  margin-top: 4px;
+  color: #8a8a84;
+  font-size: 11px;
+}
+
+/* 通知類型 */
+
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #526168;
+  background: #dce3e6;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+/* 發送對象 */
+
+.audience-label {
+  display: block;
+  color: #444440;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+/* 通知狀態 */
+
+.notification-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.notification-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.status-unsent {
+  color: #666660;
+  background: #e8e8e5;
+}
+
+.status-unsent i {
+  background: #9b9b95;
+}
+
+.status-processing {
+  color: #526168;
+  background: #dce8f2;
+}
+
+.status-processing i {
+  background: #6693bf;
+}
+
+.status-sent {
+  color: #52604e;
+  background: #dce8d9;
+}
+
+.status-sent i {
+  background: #7f9f79;
+}
+
+.notification-manager {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #deddd8;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
 </style>

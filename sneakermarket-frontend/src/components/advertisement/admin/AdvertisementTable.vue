@@ -22,9 +22,9 @@ const emit = defineEmits(["edit", "toggle", "delete"]);
         <col class="column-placement" />
         <col class="column-period" />
         <col class="column-status" />
-        <!-- <col class="column-number" />
-                <col class="column-number" />
-                <col class="column-ctr" /> -->
+        <col class="column-number" />
+        <col class="column-number" />
+        <col class="column-ctr" />
         <col class="column-actions" />
       </colgroup>
       <thead>
@@ -33,9 +33,9 @@ const emit = defineEmits(["edit", "toggle", "delete"]);
           <th>版位／類型</th>
           <th>投放期間</th>
           <th>狀態</th>
-          <!-- <th class="number">曝光</th> -->
-          <!-- <th class="number">點擊</th> -->
-          <!-- <th class="number">CTR</th> -->
+          <th class="number">曝光</th>
+          <th class="number">點擊</th>
+          <th class="number">CTR</th>
           <th class="actions-column">操作</th>
         </tr>
       </thead>
@@ -76,11 +76,11 @@ const emit = defineEmits(["edit", "toggle", "delete"]);
               >● {{ ad.status }}</span
             >
           </td>
-          <!-- <td class="number">{{ ad.views }}</td>
-                  <td class="number">{{ ad.clicks }}</td>
-                  <td class="number">
-                    <strong>{{ ad.ctr }}</strong>
-                  </td> -->
+          <td class="number">{{ ad.views }}</td>
+          <td class="number">{{ ad.clicks }}</td>
+          <td class="number">
+            <strong>{{ ad.ctr }}</strong>
+          </td>
           <td class="actions-column">
             <div class="row-actions">
               <button
@@ -110,7 +110,7 @@ const emit = defineEmits(["edit", "toggle", "delete"]);
           </td>
         </tr>
         <tr v-if="!ads.length">
-          <td colspan="5" class="empty-state">
+          <td colspan="8" class="empty-state">
             找不到符合條件的廣告，請調整搜尋或篩選條件。
           </td>
         </tr>
@@ -120,6 +120,11 @@ const emit = defineEmits(["edit", "toggle", "delete"]);
 </template>
 
 <style scoped>
+.number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .table-wrap {
   flex: 1;
   overflow-x: auto;
@@ -127,29 +132,37 @@ const emit = defineEmits(["edit", "toggle", "delete"]);
 
 table {
   width: 100%;
-  min-width: 1100px;
+  min-width: 1380px;
   table-layout: fixed;
   border-collapse: collapse;
 }
 
 .column-ad {
-  width: 34%;
+  width: 28%;
 }
 
 .column-placement {
-  width: 16%;
+  width: 12%;
 }
 
 .column-period {
-  width: 22%;
+  width: 17%;
 }
 
 .column-status {
-  width: 14%;
+  width: 10%;
+}
+
+.column-number {
+  width: 7%;
+}
+
+.column-ctr {
+  width: 7%;
 }
 
 .column-actions {
-  width: 14%;
+  width: 12%;
 }
 
 th {
