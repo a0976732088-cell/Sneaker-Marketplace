@@ -48,9 +48,7 @@ const couponId = ref('')
 
 
 const submitting = ref(false)
-const paymentSuccess = ref(false)
 const formError = ref('')
-const completedOrderId = ref(null)
 
 const selectedItems = computed(() => cartItems.value.filter(item => item.selected))
 
@@ -155,21 +153,7 @@ async function checkout() {
 </script>
 
 <template>
-  <div v-if="paymentSuccess" class="text-center d-flex flex-column align-items-center justify-content-center" style="min-height: 70vh;">
-    <CheckoutSteps :current-step="3" />
-
-    <div class="mx-auto mb-3 rounded-circle border border-dark d-flex align-items-center justify-content-center" style="width:64px;height:64px; font-size:2rem;">
-      ✓
-    </div>
-    <h2 class="fw-bold mb-2">感謝您的購買</h2>
-    <p class="text-secondary mb-4">已收到您的訂單，請您檢視訂單，確認您的付款狀態</p>
-    <div class="d-flex justify-content-center gap-2">
-      <button class="btn btn-dark px-4" @click="router.push('/')">返回首頁</button>
-      <button class="btn btn-outline-dark px-4" @click="router.push(`/orders/${completedOrderId}`)">查詢訂單</button>
-    </div>
-  </div>
-
-  <div v-else-if="submitting" class="text-center py-5 text-secondary">
+  <div v-if="submitting" class="text-center py-5 text-secondary">
     信用卡付款中...
   </div>
 
