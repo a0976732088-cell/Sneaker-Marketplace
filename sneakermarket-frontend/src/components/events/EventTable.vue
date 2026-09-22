@@ -141,8 +141,8 @@ const formatDate = (dateStr) => {
 .event-action-cell {
   position: sticky;
   right: 0;
-  width: 260px;
-  min-width: 260px;
+  width: 190px;
+  min-width: 190px;
 }
 
 .event-action-heading {
@@ -166,19 +166,14 @@ const formatDate = (dateStr) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 60px;
-  height: 36px;
-  padding: 0 14px;
+  min-width: 48px;
+  height: 28px;
+  padding: 0 9px;
   border: 0;
-  border-radius: 999px;
-  font-size: 13px;
+  border-radius: 4px;
+  font-size: 11px;
   font-weight: 650;
-  line-height: 1;
   white-space: nowrap;
-  cursor: pointer;
-  transition:
-    transform 140ms ease,
-    filter 140ms ease;
 }
 
 .event-action:hover:not(:disabled) {

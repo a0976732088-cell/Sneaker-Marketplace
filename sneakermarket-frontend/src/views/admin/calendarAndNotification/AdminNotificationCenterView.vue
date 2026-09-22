@@ -96,22 +96,17 @@ function selectStatus(status) {
 
 .create-button {
   display: inline-flex;
-  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 0 22px;
-  border: 1px solid #111111;
-  border-radius: 4px;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 5px;
   color: #ffffff;
-  background: #111111;
-  font-size: 14px;
+  background: #222320;
+  font-size: 12px;
   font-weight: 650;
-  cursor: pointer;
-  transition:
-    background-color 150ms ease,
-    transform 150ms ease;
 }
 
 .create-button:hover {
@@ -197,6 +192,20 @@ function selectStatus(status) {
 
 .status-tab.active::after {
   background: #111111;
+}
+
+.notification-center :deep(.admin-header) {
+  margin-bottom: 14px;
+  padding-top: 0;
+}
+
+.notification-center :deep(.admin-title) {
+  margin-bottom: 4px;
+  font-size: 28px;
+}
+
+.notification-center :deep(.admin-description) {
+  font-size: 12px;
 }
 
 @media (max-width: 768px) {

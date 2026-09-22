@@ -1,21 +1,18 @@
 <!-- components/notification/NotificationManager.vue -->
 <template>
   <div class="notification-manager">
-
     <!-- 頂部搜尋與篩選區域 -->
-    <div class="row g-3 mb-4">
-      <div class="col-md-3">
-        <label class="form-label small text-muted">通知標題</label>
+    <div class="notification-filter">
+      <div>
         <input
           v-model="searchParams.title"
           type="text"
           class="form-control"
-          placeholder="搜尋標題關鍵字..."
+          placeholder="搜尋通知名稱"
         />
       </div>
 
-      <div class="col-md-3">
-        <label class="form-label small text-muted">通知類型</label>
+      <div>
         <select v-model="searchParams.notificationType" class="form-select">
           <option value="">全部類型</option>
           <option value="EVENT_REMINDER">活動提醒 (EVENT_REMINDER)</option>
@@ -25,29 +22,32 @@
         </select>
       </div>
 
-      <div class="col-md-3">
-        <label class="form-label small text-muted">開始時間起</label>
+      <div>
         <input
           v-model="searchParams.startDate"
           type="datetime-local"
           class="form-control"
+          placeholder="開始日期"
         />
       </div>
 
-      <div class="col-md-3">
-        <label class="form-label small text-muted">結束時間止</label>
+      <div>
         <input
           v-model="searchParams.endDate"
           type="datetime-local"
           class="form-control"
+          placeholder="結束日期"
         />
       </div>
 
-      <div class="col-12 text-end">
-        <button class="btn btn-outline-secondary me-2" @click="handleReset">
+      <div class="filter-actions">
+        <button class="filter-button reset-filter" @click="handleReset">
           重設
         </button>
-        <button class="btn btn-primary px-4" @click="fetchNotifications(1)">
+        <button
+          class="filter-button search-filter"
+          @click="fetchNotifications(1)"
+        >
           查詢
         </button>
       </div>
@@ -461,8 +461,8 @@ const formatDate = (dateStr) => {
 .notification-action-cell {
   position: sticky;
   right: 0;
-  width: 310px;
-  min-width: 310px;
+  width: 220px;
+  min-width: 220px;
 }
 
 .notification-action-heading {
@@ -482,23 +482,19 @@ const formatDate = (dateStr) => {
   justify-content: start;
   gap: 8px;
 }
+
 .notification-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 60px;
-  height: 36px;
-  padding: 0 14px;
+  min-width: 44px;
+  height: 28px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 999px;
-  font-size: 13px;
+  border-radius: 4px;
+  font-size: 10px;
   font-weight: 650;
-  line-height: 1;
   white-space: nowrap;
-  cursor: pointer;
-  transition:
-    transform 140ms ease,
-    filter 140ms ease;
 }
 
 .action-view,
@@ -665,10 +661,61 @@ const formatDate = (dateStr) => {
 
 .notification-manager {
   min-width: 0;
-  padding: 20px;
-  border: 1px solid #deddd8;
-  border-radius: 6px;
+  padding: 0;
+  border: 0;
   background: #ffffff;
 }
 
+.notification-filter {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 1.3fr)
+    minmax(140px, 0.9fr)
+    minmax(170px, 1fr)
+    minmax(170px, 1fr)
+    auto;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.notification-filter .form-control,
+.notification-filter .form-select {
+  height: 38px;
+  min-height: 38px;
+  border: 1px solid #dfe0dc;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-button {
+  height: 38px;
+  padding: 0 13px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.reset-filter {
+  border: 1px solid #dfe0dc;
+  color: #555852;
+  background: #ffffff;
+}
+
+.search-filter {
+  border: 1px solid #222320;
+  color: #ffffff;
+  background: #222320;
+}
 </style>

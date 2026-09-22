@@ -1,11 +1,7 @@
 package com.project.sneakermarket.calendar.dto;
 
+import jakarta.validation.constraints.*;
 import lombok.Data;
-
-import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
@@ -15,7 +11,19 @@ public class CalendarEventDTO {
     private Long brandId;
     private Long createdBy;
     private String eventType;
+
+    @NotBlank(message = "活動標題不可為空")
+    @Size(max = 150, message = "活動標題最多 150 個字")
+    @Pattern(
+            regexp = "^[^\\uFFFD]*$",
+            message = "活動標題包含無法辨識的字元"
+    )
     private String title;
+
+    @Pattern(
+            regexp = "^[^\\uFFFD]*$",
+            message = "活動說明包含無法辨識的字元"
+    )
     private String description;
     @Size(
             max = 150,

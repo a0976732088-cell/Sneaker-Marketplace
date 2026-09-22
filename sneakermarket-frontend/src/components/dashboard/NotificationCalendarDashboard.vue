@@ -925,37 +925,37 @@ onBeforeUnmount(() => {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .metric-card {
   position: relative;
   min-width: 0;
-  min-height: 150px;
+  min-height: 108px;
   overflow: hidden;
-  padding: 18px;
-  border: 1px solid var(--dashboard-line);
-  border-radius: 6px;
+  padding: 13px;
+  border: 1px solid #e1e2de;
+  border-radius: 5px;
   background: #ffffff;
 }
 
 .metric-heading {
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: #50514d;
-  font-size: 13px;
+  gap: 8px;
+  color: #50534e;
+  font-size: 11px;
   font-weight: 700;
 }
 
 .metric-icon {
   display: inline-grid;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   place-items: center;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .metric-blue .metric-icon {
@@ -980,17 +980,17 @@ onBeforeUnmount(() => {
 
 .metric-value {
   display: block;
-  margin: 10px 0 4px 46px;
-  font-size: 28px;
+  margin: 6px 0 0 38px;
+  font-size: 23px;
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1;
 }
 
 .metric-card p {
-  margin: 0 0 0 46px;
-  color: var(--dashboard-muted);
-  font-size: 11px;
+  margin: 4px 0 0 38px;
+  color: #858881;
+  font-size: 9px;
 }
 
 .metric-sparkline {
@@ -1062,24 +1062,24 @@ onBeforeUnmount(() => {
 
 .dashboard-grid {
   display: grid;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .dashboard-grid-main {
-  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr);
 }
 
 .dashboard-grid-bottom {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .dashboard-panel {
   min-width: 0;
-  padding: 18px;
-  border: 1px solid var(--dashboard-line);
-  border-radius: 6px;
-  background: var(--dashboard-paper);
+  padding: 13px;
+  border: 1px solid #e1e2de;
+  border-radius: 5px;
+  background: #ffffff;
 }
 
 .panel-header {
@@ -1117,11 +1117,11 @@ onBeforeUnmount(() => {
 }
 
 .chart-area-line {
-  height: 275px;
+  height: 210px;
 }
 
 .chart-area-delivery {
-  height: 225px;
+  height: 175px;
 }
 
 /* Doughnut */
@@ -1135,7 +1135,7 @@ onBeforeUnmount(() => {
 
 .doughnut-wrapper {
   position: relative;
-  height: 220px;
+  height: 175px;
 }
 
 .doughnut-center {
