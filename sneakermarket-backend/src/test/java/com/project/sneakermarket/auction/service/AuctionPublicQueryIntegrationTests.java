@@ -20,8 +20,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.sneakermarket.auction.dto.AuctionAdminSearchCriteria;
 import com.project.sneakermarket.auction.dto.AuctionSearchCriteria;
 import com.project.sneakermarket.auction.dto.AuctionSummaryResponse;
 import com.project.sneakermarket.auction.entity.Auction;
@@ -46,6 +48,9 @@ class AuctionPublicQueryIntegrationTests {
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 15, 12, 0);
 
     @Autowired private AuctionQueryService publicQueries;
+    @Autowired private AuctionMemberQueryService memberQueries;
+    @Autowired private AuctionAdminQueryService adminQueries;
+    @Autowired private AuctionTime auctionTime;
     @Autowired private AuctionRepository auctions;
     @Autowired private AuctionProductRepository products;
     @Autowired private MemberRepository members;
@@ -91,16 +96,16 @@ class AuctionPublicQueryIntegrationTests {
     }
 
     @Test
-    void publicStatusesRemainVisibleWhileRemovedDeletedAndLegacyRemovedStayHidden() {
+    void publicStatusesExcludeCancelledRemovedDraftAndDeletedAuctions() {
         Map<Long, AuctionStatus> visible = new LinkedHashMap<>();
         for (AuctionStatus status : EnumSet.of(
                 AuctionStatus.SCHEDULED,
                 AuctionStatus.ACTIVE,
                 AuctionStatus.SOLD,
-                AuctionStatus.UNSOLD,
-                AuctionStatus.CANCELLED)) {
+                AuctionStatus.UNSOLD)) {
             visible.put(fixture(status, null, null), status);
         }
+        Long cancelledId = fixture(AuctionStatus.CANCELLED, null, null);
 
         Long removedAtId = fixture(AuctionStatus.ACTIVE, NOW.minusMinutes(5), null);
         Long deletedAtId = fixture(AuctionStatus.ACTIVE, null, NOW.minusMinutes(5));
@@ -120,12 +125,109 @@ class AuctionPublicQueryIntegrationTests {
         for (Long visibleId : visible.keySet()) {
             assertTrue(auctions.findPublicById(visibleId).isPresent());
         }
-        for (Long hiddenId : Set.of(removedAtId, deletedAtId, removedStatusId)) {
+        for (Long hiddenId : Set.of(cancelledId, removedAtId, deletedAtId, removedStatusId)) {
             assertTrue(auctions.findPublicById(hiddenId).isEmpty());
             assertFalse(specificationIds.contains(hiddenId));
             assertFalse(serviceSearchIds.contains(hiddenId));
             assertFalse(allPublicIds.contains(hiddenId));
         }
+
+        criteria.setStatus(AuctionStatus.CANCELLED);
+        assertTrue(publicQueries.searchAuctions(criteria, PageRequest.of(0, 20)).items().isEmpty());
+        assertThrows(ResourceNotFoundException.class,
+                () -> publicQueries.getAuctionDetail(cancelledId, null));
+        assertThrows(ResourceNotFoundException.class,
+                () -> publicQueries.getAuctionStatus(cancelledId));
+        assertThrows(ResourceNotFoundException.class,
+                () -> publicQueries.getBidHistory(cancelledId));
+    }
+
+    @Test
+    void cancelledRemainsVisibleToSellerHistoryAndAdminStatusFilter() {
+        Long cancelledId = fixture(AuctionStatus.CANCELLED, null, null);
+
+        var sellerPage = memberQueries.getMyListings(sellerId, 0, 20);
+        assertEquals(1, sellerPage.totalElements());
+        assertEquals(cancelledId, sellerPage.items().get(0).auctionId());
+
+        AuctionAdminSearchCriteria adminCriteria = new AuctionAdminSearchCriteria();
+        adminCriteria.setStatus(AuctionStatus.CANCELLED);
+        var adminPage = adminQueries.search(adminCriteria, PageRequest.of(0, 100));
+        assertTrue(
+                adminPage.items().stream()
+                        .anyMatch(item -> cancelledId.equals(item.auctionId()))
+        );
+    }
+
+    @Test
+    void endingSoonOrdersValidActiveThenScheduledThenRecentHistory() {
+        LocalDateTime now = auctionTime.now();
+        Long activeFar = timedFixture(AuctionStatus.ACTIVE, now.minusHours(1), now.plusHours(2));
+        Long activeNear = timedFixture(AuctionStatus.ACTIVE, now.minusHours(1), now.plusMinutes(5));
+        Long activeMiddle = timedFixture(AuctionStatus.ACTIVE, now.minusHours(1), now.plusMinutes(30));
+        Long scheduledSoon = timedFixture(AuctionStatus.SCHEDULED, now.plusMinutes(5), now.plusHours(4));
+        Long scheduledLater = timedFixture(AuctionStatus.SCHEDULED, now.plusMinutes(30), now.plusMinutes(40));
+        Long sold = timedFixture(AuctionStatus.SOLD, now.minusDays(3), now.minusDays(2));
+        Long unsold = timedFixture(AuctionStatus.UNSOLD, now.minusDays(2), now.minusDays(1));
+        Long expiredActive = timedFixture(AuctionStatus.ACTIVE, now.minusHours(2), now.minusSeconds(10));
+        Long cancelled = timedFixture(AuctionStatus.CANCELLED, now.minusHours(1), now.plusMinutes(1));
+
+        List<Long> ids = publicIdList(
+                publicQueries.searchAuctions(
+                        criteriaForFixture(),
+                        PageRequest.of(0, 20, Sort.by(Sort.Order.asc("endAt")))
+                ).items());
+
+        assertEquals(List.of(
+                activeNear, activeMiddle, activeFar,
+                scheduledSoon, scheduledLater,
+                expiredActive, unsold, sold), ids);
+        assertFalse(ids.contains(cancelled));
+    }
+
+    @Test
+    void endingSoonSortRunsBeforePagination() {
+        LocalDateTime now = auctionTime.now();
+        for (int i = 0; i < 12; i++) {
+            AuctionStatus status = i % 2 == 0
+                    ? AuctionStatus.SOLD
+                    : AuctionStatus.UNSOLD;
+            timedFixture(
+                    status,
+                    now.minusDays(20 - i),
+                    now.minusDays(19 - i)
+            );
+        }
+        Long active = timedFixture(AuctionStatus.ACTIVE, now.minusHours(1), now.plusMinutes(1));
+
+        var firstPage = publicQueries.searchAuctions(
+                criteriaForFixture(),
+                PageRequest.of(
+                        0,
+                        9,
+                        Sort.by(Sort.Order.asc("endAt"))
+                )
+        );
+
+        assertEquals(active, firstPage.items().get(0).auctionId());
+        assertEquals(9, firstPage.items().size());
+    }
+
+    @Test
+    void nonEndingSoonSortsKeepTheirExistingFieldDirectionContracts() {
+        LocalDateTime now = auctionTime.now();
+        Long first = timedFixture(AuctionStatus.ACTIVE, now.minusHours(1), now.plusHours(1));
+        Long second = timedFixture(AuctionStatus.ACTIVE, now.minusHours(1), now.plusHours(2));
+        Long third = timedFixture(AuctionStatus.ACTIVE, now.minusHours(1), now.plusHours(3));
+
+        configureSortFields(first, "300", 2, now.minusMinutes(3));
+        configureSortFields(second, "100", 3, now.minusMinutes(2));
+        configureSortFields(third, "200", 1, now.minusMinutes(1));
+
+        assertEquals(List.of(third, second, first), sortedPublicIds(Sort.by("createdAt").descending()));
+        assertEquals(List.of(second, third, first), sortedPublicIds(Sort.by("currentPrice").ascending()));
+        assertEquals(List.of(first, third, second), sortedPublicIds(Sort.by("currentPrice").descending()));
+        assertEquals(List.of(second, first, third), sortedPublicIds(Sort.by("bidCount").descending()));
     }
 
     @Test
@@ -195,6 +297,45 @@ class AuctionPublicQueryIntegrationTests {
         AuctionSearchCriteria criteria = new AuctionSearchCriteria();
         criteria.setKeyword(fixtureToken);
         return criteria;
+    }
+
+    private Long timedFixture(
+            AuctionStatus status,
+            LocalDateTime startAt,
+            LocalDateTime endAt) {
+        Long auctionId = fixture(status, null, null);
+        Auction auction = auctions.findById(auctionId).orElseThrow();
+        auction.setStartAt(startAt);
+        auction.setEndAt(endAt);
+        auctions.saveAndFlush(auction);
+        return auctionId;
+    }
+
+    private void configureSortFields(
+            Long auctionId,
+            String currentPrice,
+            int bidCount,
+            LocalDateTime createdAt) {
+        Auction auction = auctions.findById(auctionId).orElseThrow();
+        auction.setCurrentPrice(new BigDecimal(currentPrice));
+        auction.setBidCount(bidCount);
+        auction.setCreatedAt(createdAt);
+        auctions.saveAndFlush(auction);
+    }
+
+    private List<Long> sortedPublicIds(Sort sort) {
+        return publicIdList(
+                publicQueries.searchAuctions(
+                        criteriaForFixture(),
+                        PageRequest.of(0, 20, sort)
+                ).items());
+    }
+
+    private List<Long> publicIdList(
+            java.util.Collection<AuctionSummaryResponse> rows) {
+        return rows.stream()
+                .map(AuctionSummaryResponse::auctionId)
+                .toList();
     }
 
     private Long fixture(

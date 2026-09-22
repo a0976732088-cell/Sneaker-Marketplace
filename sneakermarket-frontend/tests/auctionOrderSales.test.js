@@ -200,7 +200,7 @@ test("buyer public auction action is limited to visible records without affectin
   );
   assert.match(
     buyerTemplate,
-    /v-else class="record-action-notice"[\s\S]*?formatMemberPublicDetailNotice\(order\.managementState\)/,
+    /v-else[\s\S]*?class="record-action-notice record-action-notice--single-line"[\s\S]*?formatMemberPublicDetailNotice\(order\.managementState\)/,
   );
 });
 

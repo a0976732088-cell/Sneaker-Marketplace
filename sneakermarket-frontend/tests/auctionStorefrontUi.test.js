@@ -182,6 +182,22 @@ test("public auction list sends every supported filter through server-side pagin
   assert.equal(requests.at(-1).size, 9);
 });
 
+test("public status filter excludes CANCELLED and keeps the four public statuses", () => {
+  const statusFilter = section(
+    listSource,
+    "<!-- 狀態 -->",
+    "<!-- 商品狀況 -->",
+  );
+
+  for (const status of ["ACTIVE", "SCHEDULED", "SOLD", "UNSOLD"]) {
+    assert.match(statusFilter, new RegExp(`selectedStatuses\\.includes\\('${status}'\\)`));
+  }
+  assert.doesNotMatch(statusFilter, /CANCELLED/);
+  assert.doesNotMatch(statusFilter, /已取消/);
+  assert.match(listSource, /const\s+sort\s*=\s*ref\s*\(\s*["']endAt,asc["']\s*\)/);
+  assert.match(listSource, /CANCELLED\s*:\s*["']已取消["']/);
+});
+
 test("facet selections query immediately while price remains explicit and multi-value", async () => {
   const { requests, subject } = createListHarness();
 

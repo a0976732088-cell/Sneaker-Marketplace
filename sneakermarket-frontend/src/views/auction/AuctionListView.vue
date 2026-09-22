@@ -1,12 +1,12 @@
 <template>
   <section class="auction-storefront">
     <!-- 競標商城廣告：位置與一般商城一致 -->
-    <AdvertisementDisplay
+    <!-- <AdvertisementDisplay
       :placements="['BANNER', 'SMALL_BLOCK']"
       :banner-order="2"
       :static-banner="true"
       :small-block-order="2"
-    />
+    /> -->
 
     <!-- Hero -->
     <div class="auction-hero">
@@ -14,7 +14,9 @@
         <span class="hero-icon" aria-hidden="true">👟</span>
 
         <div class="hero-content">
-          <p class="hero-brand text-uppercase small text-white-50 mb-2 fw-semibold">
+          <p
+            class="hero-brand text-uppercase small text-white-50 mb-2 fw-semibold"
+          >
             SneakerMarket
           </p>
           <h1 class="display-5 fw-bold mb-2">競標商城</h1>
@@ -142,10 +144,7 @@
                 <summary class="filter-toggle">
                   <span>
                     品牌
-                    <span
-                      v-if="selectedBrandIds.length"
-                      class="filter-count"
-                    >
+                    <span v-if="selectedBrandIds.length" class="filter-count">
                       {{ selectedBrandIds.length }}
                     </span>
                   </span>
@@ -161,9 +160,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedBrandIds.includes(brand.id)"
-                      @change="
-                        toggleFacetSelection(selectedBrandIds, brand.id)
-                      "
+                      @change="toggleFacetSelection(selectedBrandIds, brand.id)"
                     />
                     <span>{{ brand.name }}</span>
                   </label>
@@ -175,10 +172,7 @@
                 <summary class="filter-toggle">
                   <span>
                     競標狀態
-                    <span
-                      v-if="selectedStatuses.length"
-                      class="filter-count"
-                    >
+                    <span v-if="selectedStatuses.length" class="filter-count">
                       {{ selectedStatuses.length }}
                     </span>
                   </span>
@@ -190,9 +184,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedStatuses.includes('ACTIVE')"
-                      @change="
-                        toggleFacetSelection(selectedStatuses, 'ACTIVE')
-                      "
+                      @change="toggleFacetSelection(selectedStatuses, 'ACTIVE')"
                     />
                     <span>競標中</span>
                   </label>
@@ -221,22 +213,9 @@
                     <input
                       type="checkbox"
                       :checked="selectedStatuses.includes('UNSOLD')"
-                      @change="
-                        toggleFacetSelection(selectedStatuses, 'UNSOLD')
-                      "
+                      @change="toggleFacetSelection(selectedStatuses, 'UNSOLD')"
                     />
                     <span>流標</span>
-                  </label>
-
-                  <label class="filter-option">
-                    <input
-                      type="checkbox"
-                      :checked="selectedStatuses.includes('CANCELLED')"
-                      @change="
-                        toggleFacetSelection(selectedStatuses, 'CANCELLED')
-                      "
-                    />
-                    <span>已取消</span>
                   </label>
                 </div>
               </details>
@@ -246,10 +225,7 @@
                 <summary class="filter-toggle">
                   <span>
                     商品狀況
-                    <span
-                      v-if="selectedConditions.length"
-                      class="filter-count"
-                    >
+                    <span v-if="selectedConditions.length" class="filter-count">
                       {{ selectedConditions.length }}
                     </span>
                   </span>
@@ -261,9 +237,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedConditions.includes('NEW')"
-                      @change="
-                        toggleFacetSelection(selectedConditions, 'NEW')
-                      "
+                      @change="toggleFacetSelection(selectedConditions, 'NEW')"
                     />
                     <span>全新</span>
                   </label>
@@ -283,9 +257,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedConditions.includes('USED')"
-                      @change="
-                        toggleFacetSelection(selectedConditions, 'USED')
-                      "
+                      @change="toggleFacetSelection(selectedConditions, 'USED')"
                     />
                     <span>二手</span>
                   </label>
@@ -309,9 +281,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedShoeSizes.includes('US 8')"
-                      @change="
-                        toggleFacetSelection(selectedShoeSizes, 'US 8')
-                      "
+                      @change="toggleFacetSelection(selectedShoeSizes, 'US 8')"
                     />
                     <span>US 8</span>
                   </label>
@@ -331,9 +301,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedShoeSizes.includes('US 9')"
-                      @change="
-                        toggleFacetSelection(selectedShoeSizes, 'US 9')
-                      "
+                      @change="toggleFacetSelection(selectedShoeSizes, 'US 9')"
                     />
                     <span>US 9</span>
                   </label>
@@ -353,9 +321,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedShoeSizes.includes('US 10')"
-                      @change="
-                        toggleFacetSelection(selectedShoeSizes, 'US 10')
-                      "
+                      @change="toggleFacetSelection(selectedShoeSizes, 'US 10')"
                     />
                     <span>US 10</span>
                   </label>
@@ -375,9 +341,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedShoeSizes.includes('US 11')"
-                      @change="
-                        toggleFacetSelection(selectedShoeSizes, 'US 11')
-                      "
+                      @change="toggleFacetSelection(selectedShoeSizes, 'US 11')"
                     />
                     <span>US 11</span>
                   </label>
@@ -462,7 +426,11 @@
 
         <!-- 右側商品列表 -->
         <main
-          :class="showFilters ? 'col-12 col-md-10 auction-results' : 'col-12 auction-results'"
+          :class="
+            showFilters
+              ? 'col-12 col-md-10 auction-results'
+              : 'col-12 auction-results'
+          "
           aria-live="polite"
         >
           <!-- Loading -->

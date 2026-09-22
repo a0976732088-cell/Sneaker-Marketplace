@@ -103,12 +103,22 @@ public class AuctionQueryService {
         validatePriceRange(criteria);
 
         // 過濾前端傳入的排序欄位
-        Pageable safePageable = createSafePageable(pageable);
+        List<Sort.Order> safeOrders = safeSortOrders(pageable);
+        boolean endingSoonOrder = isEndingSoonOrder(safeOrders);
+        Pageable safePageable = createSafePageable(
+                pageable,
+                safeOrders,
+                endingSoonOrder
+        );
 
         // 依搜尋條件查詢目前頁面的競標資料
         Page<Auction> auctionPage =
                 auctionRepository.findAll(
-                        AuctionSpecification.withCriteria(criteria),
+                        endingSoonOrder
+                                ? AuctionSpecification.withEndingSoonOrder(
+                                        criteria,
+                                        auctionTime.now())
+                                : AuctionSpecification.withCriteria(criteria),
                         safePageable
                 );
 
@@ -346,10 +356,10 @@ public class AuctionQueryService {
      * @param pageable 原始分頁與排序條件
      * @return 安全的分頁與排序條件
      */
-    private Pageable createSafePageable(Pageable pageable) {
+    private List<Sort.Order> safeSortOrders(Pageable pageable) {
 
         // 只保留允許的排序欄位
-        List<Sort.Order> safeOrders = pageable.getSort()
+        return pageable.getSort()
                 .stream()
                 .filter(order ->
                         ALLOWED_SORT_FIELDS.contains(
@@ -357,12 +367,24 @@ public class AuctionQueryService {
                         )
                 )
                 .toList();
+    }
 
-        // 沒有合法排序條件時，預設依結束時間由近到遠排列
-        Sort safeSort = safeOrders.isEmpty()
-                ? Sort.by(
-                Sort.Order.asc("endAt")
-        )
+    /** No valid sort still uses the existing endAt ASC default business order. */
+    private boolean isEndingSoonOrder(List<Sort.Order> safeOrders) {
+        return safeOrders.isEmpty()
+                || (safeOrders.size() == 1
+                        && safeOrders.get(0).isAscending()
+                        && "endAt".equals(safeOrders.get(0).getProperty()));
+    }
+
+    private Pageable createSafePageable(
+            Pageable pageable,
+            List<Sort.Order> safeOrders,
+            boolean endingSoonOrder) {
+
+        // The Specification owns CASE ordering; Pageable must not overwrite it.
+        Sort safeSort = endingSoonOrder
+                ? Sort.unsorted()
                 : Sort.by(safeOrders);
 
         return PageRequest.of(

@@ -5,6 +5,8 @@ import vm from "node:vm";
 import { computed, nextTick, reactive, ref } from "vue";
 
 import {
+  AUCTION_DESCRIPTION_OPTIONS,
+  AUCTION_MODEL_OPTIONS_BY_BRAND,
   AUCTION_SHOE_SIZES,
   CUSTOM_OPTION_VALUE,
   DELIVERY_OPTION_VALUES,
@@ -71,6 +73,8 @@ function createValidationHarness() {
     computed,
     nextTick,
     console,
+    AUCTION_DESCRIPTION_OPTIONS,
+    AUCTION_MODEL_OPTIONS_BY_BRAND,
     AUCTION_SHOE_SIZES,
     CUSTOM_OPTION_VALUE,
     DELIVERY_OPTION_VALUES,
@@ -94,21 +98,28 @@ function createValidationHarness() {
   vm.runInNewContext(
     scriptSetup(createSource) +
       "globalThis.subject = {" +
-      " form, selectedFormOptions, deliveryOption," +
+      " form, brands, selectedFormOptions, deliveryOption," +
+      " selectedModelOption, availableModelOptions," +
+      " selectedDescriptionOption, AUCTION_DESCRIPTION_OPTIONS," +
       " images, ready, fieldErrors, validationOrder," +
       " handleImageChange, validateForm, submitAuction," +
       " setFieldElement, revalidateErroredField, revalidateTimeFields," +
-      " handleFormOptionChange, normalizeLocation," +
-      " locationMenuOpen, activeLocationIndex, activeLocationOptionId," +
-      " filteredTaiwanCities," +
-      " openLocationMenu, closeLocationMenu, handleLocationInput," +
-      " moveLocationOption, selectLocation, handleLocationEnter" +
+      " handleFormOptionChange, handleBrandChange, handleModelOptionChange," +
+      " applyDescriptionTemplate, startCustomDescription," +
+      " handleDescriptionInput, normalizeLocation" +
       " };",
     context,
   );
 
   const subject = context.subject;
   subject.ready.value = true;
+  subject.brands.value = [
+    { id: 1, name: "Nike" },
+    { id: 2, name: "Jordan" },
+    { id: 3, name: "adidas" },
+    { id: 4, name: "New Balance" },
+    { id: 5, name: "Vans" },
+  ];
   Object.assign(subject.form, {
     brandId: 1,
     categoryId: 2,
@@ -255,8 +266,6 @@ test("auction create retains every form binding and does not add draft or identi
     "defectNote",
     "authenticityNote",
     "location",
-    "shippingMethod",
-    "paymentMethod",
     "warrantyNote",
   ]) {
     assertModelBinding(field, "trim");
@@ -311,33 +320,97 @@ test("auction create size select exposes only the supported sizes in order", () 
   );
 });
 
-test("auction create location is a select-style searchable combobox with inline errors", () => {
-  const locationInput =
-    templateSource.match(
-      /<input\b(?=[^>]*\bid\s*=\s*["']auction-location["'])(?=[^>]*v-model\.trim\s*=\s*["']form\.location["'])[^>]*>/,
-    )?.[0] ?? "";
-  assert.ok(locationInput, "location must remain bound to form.location");
-  assert.match(
-    locationInput,
-    /class\s*=\s*["']form-select location-combobox-input["']/,
+test("auction create model options follow the brand and description uses editable template cards", async () => {
+  const modelSelect = templateSource.match(
+    /<select\b(?=[^>]*id\s*=\s*["']auction-model-option["'])(?=[^>]*v-model\s*=\s*["']selectedModelOption["'])[^>]*>([\s\S]*?)<\/select\s*>/,
   );
-  assert.match(locationInput, /setFieldElement\('location'\)/);
-  assert.match(locationInput, /role\s*=\s*["']combobox["']/);
-  assert.match(locationInput, /aria-autocomplete\s*=\s*["']list["']/);
+  assert.ok(modelSelect, "model must use a brand-aware selection controller");
+  assert.match(modelSelect[1], /v-for\s*=\s*["']option in availableModelOptions["']/);
+  assert.match(modelSelect[1], /:value\s*=\s*["']CUSTOM_OPTION_VALUE["']/);
   assert.match(
-    locationInput,
-    /aria-controls\s*=\s*["']auction-create-location-options["']/,
+    templateSource,
+    /<input\b(?=[^>]*id\s*=\s*["']auction-model-custom["'])(?=[^>]*v-model\.trim\s*=\s*["']form\.model["'])[^>]*>/,
+  );
+
+  const descriptionGrid = templateSource.match(
+    /<div\b(?=[^>]*class\s*=\s*["']description-template-grid["'])[^>]*>([\s\S]*?)<\/div>/,
+  );
+  assert.ok(descriptionGrid, "description must expose canned copy cards");
+  assert.match(
+    descriptionGrid[1],
+    /v-for\s*=\s*["']\(option, index\) in AUCTION_DESCRIPTION_OPTIONS["']/,
+  );
+  assert.match(descriptionGrid[1], /@click\s*=\s*["']applyDescriptionTemplate\(option\)["']/);
+  assert.match(
+    templateSource,
+    /<button\b(?=[^>]*class\s*=\s*["']description-custom-button["'])(?=[^>]*@click\s*=\s*["']startCustomDescription["'])[^>]*>/,
   );
   assert.match(
-    locationInput,
-    /:aria-expanded\s*=\s*["']locationMenuOpen["']/,
+    templateSource,
+    /<textarea\b(?=[^>]*v-model\.trim\s*=\s*["']form\.description["'])(?=[^>]*class\s*=\s*["']form-control description-editor["'])[^>]*>/,
   );
-  assert.match(locationInput, /:aria-activedescendant/);
-  assert.match(locationInput, /autocomplete\s*=\s*["']off["']/);
-  assert.match(locationInput, /:aria-invalid\s*=\s*["']Boolean\(fieldErrors\.location\)["']/);
-  assert.match(locationInput, /auction-location-error/);
-  assert.doesNotMatch(locationInput, /\slist\s*=/);
-  assert.doesNotMatch(locationInput, /\brequired\b/);
+
+  const { subject } = createValidationHarness();
+  assert.ok(subject.availableModelOptions.value.includes("Dunk Low"));
+
+  subject.selectedModelOption.value = "Air Max 90";
+  subject.handleModelOptionChange();
+  assert.equal(subject.form.model, "Air Max 90");
+
+  subject.form.brandId = 2;
+  subject.handleBrandChange();
+  assert.equal(subject.selectedModelOption.value, "");
+  assert.equal(subject.form.model, "");
+  assert.ok(subject.availableModelOptions.value.includes("Air Jordan 4"));
+
+  subject.selectedModelOption.value = CUSTOM_OPTION_VALUE;
+  subject.handleModelOptionChange();
+  assert.equal(subject.form.model, "");
+  subject.form.model = "聯名限定型號";
+  assert.equal(subject.form.model, "聯名限定型號");
+
+  assert.equal(subject.AUCTION_DESCRIPTION_OPTIONS.length, 4);
+  subject.applyDescriptionTemplate(subject.AUCTION_DESCRIPTION_OPTIONS[0]);
+  assert.equal(subject.form.description, subject.AUCTION_DESCRIPTION_OPTIONS[0]);
+  assert.equal(
+    subject.selectedDescriptionOption.value,
+    subject.AUCTION_DESCRIPTION_OPTIONS[0],
+  );
+
+  subject.form.description += " 含原鞋盒。";
+  subject.handleDescriptionInput();
+  assert.equal(subject.selectedDescriptionOption.value, CUSTOM_OPTION_VALUE);
+
+  const descriptionTarget = createValidationHarness();
+  const target = descriptionTarget.registerTarget("description");
+  await descriptionTarget.subject.startCustomDescription();
+  assert.equal(
+    descriptionTarget.subject.selectedDescriptionOption.value,
+    CUSTOM_OPTION_VALUE,
+  );
+  assert.equal(target.focusCalls.length, 1);
+});
+
+test("auction create location is a pure optional Taiwan city select", () => {
+  const locationSelect = templateSource.match(
+    /<select\b(?=[^>]*\bid\s*=\s*["']auction-location["'])(?=[^>]*v-model\.trim\s*=\s*["']form\.location["'])[^>]*>([\s\S]*?)<\/select\s*>/,
+  );
+  assert.ok(locationSelect, "location must be a native select bound to form.location");
+  assert.match(locationSelect[0], /class\s*=\s*["']form-select["']/);
+  assert.match(locationSelect[0], /setFieldElement\('location'\)/);
+  assert.match(
+    locationSelect[0],
+    /:aria-invalid\s*=\s*["']Boolean\(fieldErrors\.location\)["']/,
+  );
+  assert.match(locationSelect[0], /auction-location-error/);
+  assert.doesNotMatch(locationSelect[0], /\brequired\b/);
+  assert.match(locationSelect[1], />請選擇縣市（可不填）<\/option>/);
+  assert.match(locationSelect[1], /v-for\s*=\s*["']city in TAIWAN_CITIES["']/);
+  assert.match(locationSelect[1], /:value\s*=\s*["']city["']/);
+  assert.match(
+    locationSelect[0],
+    /@change\s*=\s*["']revalidateErroredField\('location'\)["']/,
+  );
 
   const locationLabel = templateSource.match(
     /<label\b[^>]*for\s*=\s*["']auction-location["'][^>]*>([\s\S]*?)<\/label>/,
@@ -345,40 +418,14 @@ test("auction create location is a select-style searchable combobox with inline 
   assert.ok(locationLabel);
   assert.doesNotMatch(locationLabel[1], /required-mark/);
 
-  const listbox = templateSource.match(
-    /<ul\b(?=[^>]*id\s*=\s*["']auction-create-location-options["'])(?=[^>]*role\s*=\s*["']listbox["'])[^>]*>([\s\S]*?)<\/ul>/,
-  );
-  assert.ok(listbox, "location must render a dropdown listbox");
-  assert.match(
-    listbox[1],
-    /v-for\s*=\s*["']\(city, index\) in filteredTaiwanCities["']/,
-  );
-  assert.match(listbox[1], /role\s*=\s*["']option["']/);
-  assert.match(
-    listbox[1],
-    /@pointerdown\.prevent\s*=\s*["']selectLocation\(city\)["']/,
-  );
-  assert.doesNotMatch(templateSource, /<datalist\b/);
-  assert.doesNotMatch(templateSource, /location-combobox-arrow/);
-  assert.match(locationInput, /@keydown\.down\.prevent/);
-  assert.match(locationInput, /@keydown\.up\.prevent/);
-  assert.match(locationInput, /@keydown\.enter\s*=\s*["']handleLocationEnter["']/);
-  assert.match(locationInput, /@keydown\.esc\.prevent/);
+  assert.doesNotMatch(templateSource, /location-combobox|role\s*=\s*["']combobox["']/);
   assert.match(
     templateSource,
     /<p\b(?=[^>]*v-if\s*=\s*["']fieldErrors\.location["'])(?=[^>]*id\s*=\s*["']auction-location-error["'])[^>]*\brole\s*=\s*["']alert["']/,
   );
-  assert.match(
-    createSource,
-    /\.location-combobox\s*\{[\s\S]*?position:\s*relative/,
-  );
-  assert.match(
-    createSource,
-    /\.location-combobox-menu\s*\{[\s\S]*?max-height:\s*15rem;[\s\S]*?overflow-y:\s*auto/,
-  );
 });
 
-test("auction create uses UI-only preset controllers and inline custom fields", () => {
+test("auction create keeps optional custom fields but removes shipping and payment custom choices", () => {
   const fields = [
     ["defectNote", "AUCTION_DEFECT_NOTE_OPTIONS", "textarea", "1000", false],
     [
@@ -388,14 +435,6 @@ test("auction create uses UI-only preset controllers and inline custom fields", 
       "1000",
       false,
     ],
-    [
-      "shippingMethod",
-      "AUCTION_SHIPPING_METHOD_OPTIONS",
-      "input",
-      "50",
-      true,
-    ],
-    ["paymentMethod", "AUCTION_PAYMENT_METHOD_OPTIONS", "input", "50", true],
     ["warrantyNote", "AUCTION_WARRANTY_NOTE_OPTIONS", "textarea", "500", false],
   ];
 
@@ -431,6 +470,24 @@ test("auction create uses UI-only preset controllers and inline custom fields", 
     } else {
       assert.doesNotMatch(customControl, /\brequired\b/);
     }
+  }
+
+  for (const [field, optionsName] of [
+    ["shippingMethod", "AUCTION_SHIPPING_METHOD_OPTIONS"],
+    ["paymentMethod", "AUCTION_PAYMENT_METHOD_OPTIONS"],
+  ]) {
+    const selection = templateSource.match(
+      new RegExp(
+        `<select\\b(?=[^>]*v-model=["']selectedFormOptions\\.${field}["'])[^>]*>([\\s\\S]*?)<\\/select\\s*>`,
+      ),
+    );
+    assert.ok(selection, `${field} must retain its preset selection controller`);
+    assert.match(selection[1], new RegExp(`v-for=["']option in ${optionsName}["']`));
+    assert.doesNotMatch(selection[1], /CUSTOM_OPTION_VALUE|其他（自行填寫）/);
+    assert.doesNotMatch(
+      templateSource,
+      new RegExp(`id=["']auction-${field === "shippingMethod" ? "shipping-method" : "payment-method"}-custom["']`),
+    );
   }
 
   assert.doesNotMatch(
@@ -668,49 +725,15 @@ test("auction create normalizes exact 台 aliases and rejects unsupported locati
   assert.equal(focusHarness.subject.fieldErrors.location, "");
 });
 
-test("auction create combobox filters aliases and writes only the selected official city", () => {
-  const harness = createValidationHarness();
-  const { subject } = harness;
+test("auction create location select accepts every official city and clears its error", () => {
+  const { subject } = createValidationHarness();
 
-  subject.openLocationMenu();
-  assert.equal(subject.locationMenuOpen.value, true);
-  assert.equal(subject.filteredTaiwanCities.value.length, 22);
-
-  subject.form.location = "台北";
-  subject.fieldErrors.location =
-    "請從台灣縣市選項中選擇商品所在地";
-  subject.handleLocationInput();
-
-  assert.deepEqual(
-    Array.from(subject.filteredTaiwanCities.value),
-    ["臺北市"],
-  );
-  assert.equal(subject.activeLocationIndex.value, 0);
-
-  let preventCount = 0;
-  subject.handleLocationEnter({
-    preventDefault() {
-      preventCount += 1;
-    },
-  });
-
-  assert.equal(preventCount, 1);
-  assert.equal(subject.form.location, "臺北市");
-  assert.equal(subject.fieldErrors.location, "");
-  assert.equal(subject.locationMenuOpen.value, false);
-
-  subject.form.location = "左營";
-  subject.handleLocationInput();
-  assert.equal(subject.filteredTaiwanCities.value.length, 0);
-
-  subject.handleLocationEnter({
-    preventDefault() {
-      preventCount += 1;
-    },
-  });
-
-  assert.equal(preventCount, 1, "no-result Enter must not block form submit");
-  assert.equal(subject.form.location, "左營");
+  assert.equal(TAIWAN_CITIES.length, 22);
+  for (const city of TAIWAN_CITIES) {
+    subject.form.location = city;
+    subject.revalidateErroredField("location");
+    assert.equal(subject.fieldErrors.location, "");
+  }
 });
 
 test("auction create shows every error but navigates only to the first visual field", async () => {
@@ -771,7 +794,9 @@ test("auction create preset controllers write values without leaking the custom 
     subject.selectedFormOptions[field] = value;
     subject.handleFormOptionChange(field);
     assert.equal(subject.form[field], value);
+  }
 
+  for (const field of ["defectNote", "authenticityNote", "warrantyNote"]) {
     subject.selectedFormOptions[field] = CUSTOM_OPTION_VALUE;
     subject.handleFormOptionChange(field);
     assert.equal(subject.form[field], "", `${field} must not receive the sentinel`);
@@ -815,32 +840,29 @@ test("auction create scrubs a manually entered UI sentinel before validation or 
   assert.equal(requiredHarness.subject.form.paymentMethod, "");
   assert.equal(
     requiredHarness.subject.fieldErrors.shippingMethod,
-    "請輸入自訂運送方式",
+    "請選擇運送方式",
   );
   assert.equal(
     requiredHarness.subject.fieldErrors.paymentMethod,
-    "請輸入自訂付款方式",
+    "請選擇付款方式",
   );
 });
 
-test("auction create custom shipping and payment errors focus their expanded inputs and clear on preset", async () => {
+test("auction create shipping and payment require fixed preset choices", async () => {
   const shippingHarness = createValidationHarness();
-  const shippingCustomTarget = shippingHarness.registerTarget(
-    "shippingMethodCustom",
-  );
-  shippingHarness.subject.selectedFormOptions.shippingMethod =
-    CUSTOM_OPTION_VALUE;
+  const shippingTarget = shippingHarness.registerTarget("shippingMethod");
+  shippingHarness.subject.selectedFormOptions.shippingMethod = "";
   shippingHarness.subject.handleFormOptionChange("shippingMethod");
 
   await shippingHarness.subject.submitAuction();
 
   assert.equal(
     shippingHarness.subject.fieldErrors.shippingMethod,
-    "請輸入自訂運送方式",
+    "請選擇運送方式",
   );
   assert.equal(shippingHarness.createCalls.length, 0);
-  assert.equal(shippingCustomTarget.scrollCalls.length, 1);
-  assert.equal(shippingCustomTarget.focusCalls.length, 1);
+  assert.equal(shippingTarget.scrollCalls.length, 1);
+  assert.equal(shippingTarget.focusCalls.length, 1);
 
   shippingHarness.subject.selectedFormOptions.shippingMethod = "宅配";
   shippingHarness.subject.handleFormOptionChange("shippingMethod");
@@ -848,30 +870,20 @@ test("auction create custom shipping and payment errors focus their expanded inp
   assert.equal(shippingHarness.subject.fieldErrors.shippingMethod, "");
 
   const paymentHarness = createValidationHarness();
-  const paymentCustomTarget = paymentHarness.registerTarget("paymentMethodCustom");
-  paymentHarness.subject.selectedFormOptions.paymentMethod = CUSTOM_OPTION_VALUE;
+  const paymentTarget = paymentHarness.registerTarget("paymentMethod");
+  paymentHarness.subject.selectedFormOptions.paymentMethod = "";
   paymentHarness.subject.handleFormOptionChange("paymentMethod");
 
   await paymentHarness.subject.submitAuction();
 
   assert.equal(
     paymentHarness.subject.fieldErrors.paymentMethod,
-    "請輸入自訂付款方式",
+    "請選擇付款方式",
   );
   assert.equal(paymentHarness.createCalls.length, 0);
-  assert.equal(paymentCustomTarget.scrollCalls.length, 1);
-  assert.equal(paymentCustomTarget.focusCalls.length, 1);
+  assert.equal(paymentTarget.scrollCalls.length, 1);
+  assert.equal(paymentTarget.focusCalls.length, 1);
 
-  paymentHarness.subject.form.paymentMethod = "到店付款";
-  paymentHarness.subject.revalidateErroredField("paymentMethod");
-  assert.equal(paymentHarness.subject.fieldErrors.paymentMethod, "");
-
-  paymentHarness.subject.form.paymentMethod = "";
-  assert.equal(paymentHarness.subject.validateForm(), false);
-  assert.equal(
-    paymentHarness.subject.fieldErrors.paymentMethod,
-    "請輸入自訂付款方式",
-  );
   paymentHarness.subject.selectedFormOptions.paymentMethod = "信用卡";
   paymentHarness.subject.handleFormOptionChange("paymentMethod");
   assert.equal(paymentHarness.subject.form.paymentMethod, "信用卡");
@@ -893,7 +905,7 @@ test("auction create delivery option maps allowMeetup and UI-only state stays ou
   Object.assign(subject.selectedFormOptions, {
     defectNote: CUSTOM_OPTION_VALUE,
     authenticityNote: "品牌官方門市／專櫃購入",
-    shippingMethod: CUSTOM_OPTION_VALUE,
+    shippingMethod: "超商寄送",
     paymentMethod: "信用卡",
     warrantyNote: "依原購買通路／品牌規範",
   });
@@ -901,7 +913,6 @@ test("auction create delivery option maps allowMeetup and UI-only state stays ou
     subject.handleFormOptionChange(field);
   }
   subject.form.defectNote = "鞋側有輕微摺痕";
-  subject.form.shippingMethod = "黑貓宅配";
 
   await subject.submitAuction();
 
@@ -909,7 +920,7 @@ test("auction create delivery option maps allowMeetup and UI-only state stays ou
   const request = createCalls[0][0];
   assert.equal(request.defectNote, "鞋側有輕微摺痕");
   assert.equal(request.authenticityNote, "品牌官方門市／專櫃購入");
-  assert.equal(request.shippingMethod, "黑貓宅配");
+  assert.equal(request.shippingMethod, "超商寄送");
   assert.equal(request.paymentMethod, "信用卡");
   assert.equal(request.warrantyNote, "依原購買通路／品牌規範");
   assert.equal(request.allowMeetup, true);

@@ -176,6 +176,19 @@ test("AuctionRecordItem provides one reusable commerce row with resilient image 
   assert.equal(context.subject.imageFailed.value, false);
 });
 
+test("all auction record removal notices stay on one line", () => {
+  for (const source of [bidsSource, listingsSource, ordersSource]) {
+    assert.match(
+      source,
+      /class="record-action-notice record-action-notice--single-line"/,
+    );
+  }
+  assert.match(
+    recordSource,
+    /\.record-actions :deep\(\.record-action-notice--single-line\)\s*\{[\s\S]*?max-width:\s*none;[\s\S]*?white-space:\s*nowrap;/,
+  );
+});
+
 test("record list stays single-column and reflows at tablet and mobile widths", () => {
   const listRule = memberPageSource.match(/\.auction-member-page :deep\(\.auction-record-list\)\s*\{([^}]*)\}/)?.[1] ?? "";
   assert.match(listRule, /display:\s*grid/);
