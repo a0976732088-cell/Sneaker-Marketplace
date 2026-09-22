@@ -1,7 +1,8 @@
 <script setup>
 import { getCurrentMember } from '@/service/authService'
 import { useRoute } from 'vue-router'
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted,computed } from 'vue'
+import { cartCount, refreshCartCount, cartIconPosition } from '@/service/cartState'
 import httpClient from '@/service/httpClient'
 import { useRouter } from 'vue-router'
 
@@ -15,6 +16,8 @@ const router = useRouter()
 const shippingInfoOpen = ref(false)
 const showCartPopup = ref(false)
 const addedItem = ref(null)
+let popupTimer = null                    
+const POPUP_AUTO_CLOSE_MS = 5000  
 
 onMounted(async () => {
   try {
@@ -64,6 +67,8 @@ async function addToCart() {
       quantity: 1,
     })
 
+    await refreshCartCount()        // 新增：更新共用的購物車總數
+
     addedItem.value = {
       image: product.value.images && product.value.images.length > 0 ? product.value.images[0] : null,
       productName: product.value.productName,
@@ -72,12 +77,18 @@ async function addToCart() {
       price: selectedVariant.value.price,
     }
     showCartPopup.value = true
+
+    clearTimeout(popupTimer)                              
+    popupTimer = setTimeout(() => {                      
+      showCartPopup.value = false                         
+    }, POPUP_AUTO_CLOSE_MS)             
   } catch (error) {
     alert('加入購物車失敗')
   }
 }
 
 function closeCartPopup() {
+  clearTimeout(popupTimer)
   showCartPopup.value = false
 }
 
@@ -91,6 +102,10 @@ function goToCheckout() {
   router.push('/checkout')
 }
 
+//元件卸載時也要清理
+onUnmounted(() => {
+  clearTimeout(popupTimer)
+})
 </script>
 <template>
   <section class="detail-container py-5">
@@ -177,7 +192,11 @@ function goToCheckout() {
     </div>
   </section>
 
-  <div v-if="showCartPopup" class="cart-popup">
+  <div 
+    v-if="showCartPopup" 
+    class="cart-popup"
+    :style="{ left: cartIconPosition.left + 'px', top: cartIconPosition.top + 8 + 'px' }"
+    >
     <div class="cart-popup-header">
       <span class="cart-popup-check">✓</span>
       <span class="cart-popup-title">已加入購物車</span>
@@ -194,10 +213,14 @@ function goToCheckout() {
         <p class="cart-popup-meta">尺寸 {{ addedItem.size }}</p>
         <p class="cart-popup-price">{{ formatPrice(addedItem.price) }}</p>
       </div>
+
+      <div class="cart-popup-timer-bar" :style="{ animationDuration: POPUP_AUTO_CLOSE_MS / 1000 + 's' }"></div>
     </div>
 
     <div class="cart-popup-actions">
-      <button type="button" class="btn-view-cart" @click="goToCart">查看購物車</button>
+      <button type="button" class="btn-view-cart" @click="goToCart">
+        查看購物車 ({{ cartCount }})
+      </button>
       <button type="button" class="btn-checkout" @click="goToCheckout">結帳</button>
     </div>
   </div>
@@ -361,8 +384,6 @@ function goToCheckout() {
 
 .cart-popup {
   position: fixed;
-  top: 80px;
-  right: 24px;
   width: 360px;
   max-width: calc(100vw - 32px);
   background-color: #fff;
@@ -370,6 +391,7 @@ function goToCheckout() {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
   padding: 1.25rem;
   z-index: 1000;
+  overflow: hidden;
 }
 
 .cart-popup-header {
@@ -443,6 +465,23 @@ function goToCheckout() {
 .cart-popup-actions {
   display: flex;
   gap: 0.75rem;
+  
+}
+
+.cart-popup-timer-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background-color: #111111;
+  animation-name: cart-popup-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes cart-popup-countdown {
+  from { width: 100%; }
+  to { width: 0%; }
 }
 
 .btn-view-cart {

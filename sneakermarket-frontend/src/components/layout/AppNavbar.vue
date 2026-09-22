@@ -37,8 +37,16 @@
         </ul>
 
         <ul class="navbar-nav ms-auto align-items-lg-center right-links">
-          <li class="nav-item">
-            <RouterLink class="nav-link" to="/cart">購物車</RouterLink>
+          <li class="nav-item" ref="cartLinkWrapper">
+            <RouterLink class="nav-link cart-link" to="/cart" aria-label="購物車">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6h15l-1.5 9h-13z" />
+                <path d="M6 6 5 3H2" />
+                <circle cx="9" cy="20" r="1.5" />
+                <circle cx="18" cy="20" r="1.5" />
+              </svg>
+              <span v-if="cartCount > 0" class="cart-count">{{ cartCount }}</span>
+            </RouterLink>
           </li>
 
           <li class="nav-item notification-menu">
@@ -135,7 +143,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted } from "vue";
+import { ref, computed, onMounted, watch, onUnmounted , nextTick} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   getMemberNotifications,
@@ -143,7 +151,7 @@ import {
   markAllNotificationsAsRead,
 } from "@/service/notificationService";
 import NotificationDrawer from "@/components/notification/NotificationDrawer.vue";
-
+import { cartCount, refreshCartCount, setCartIconPosition  } from "@/service/cartState";
 /* ================================
    Session / 會員資料
 ================================ */
@@ -231,6 +239,14 @@ const isAuctionPage = computed(() => {
 
 const isNoticeOpen = ref(false);
 
+const cartLinkWrapper = ref(null);
+
+function updateCartIconPosition() {
+  if (!cartLinkWrapper.value) return;
+  const rect = cartLinkWrapper.value.getBoundingClientRect();
+  setCartIconPosition(rect.left, rect.bottom);
+}
+
 const notifications = ref([]);
 const markAllLoading = ref(false);
 const notificationError = ref("");
@@ -317,11 +333,14 @@ watch(currentMember, (member) => {
   if (member) {
     fetchNotifications();
     ensureAuctionPrivateSocketConnected();
+    refreshCartCount();
   } else {
     void disconnectAuctionPrivateSocket();
     notifications.value = [];
     isNoticeOpen.value = false;
+    cartCount.value = 0;
   }
+  nextTick(() => updateCartIconPosition()); 
 });
 
 const handleMarkAsRead = async (id) => {
@@ -373,12 +392,15 @@ onMounted(() => {
 
   // 當使用者切回這個頁面時，立即重新整理通知
   window.addEventListener("focus", fetchNotifications);
+
+  updateCartIconPosition();                              
+  window.addEventListener("resize", updateCartIconPosition); 
 });
 
 onUnmounted(() => {
-  // 元件銷毀時清除定時器
   if (timer) clearInterval(timer);
   window.removeEventListener("focus", fetchNotifications);
+  window.removeEventListener("resize", updateCartIconPosition); 
   void disconnectAuctionPrivateSocket();
 });
 </script>
@@ -446,6 +468,39 @@ onUnmounted(() => {
 }
 
 .notification-count {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  place-items: center;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #e7664e;
+  color: #fff;
+  font-size: 10px;
+}
+
+.cart-link {
+  position: relative;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+}
+
+.cart-link svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.cart-count {
   position: absolute;
   top: 1px;
   right: 0;
