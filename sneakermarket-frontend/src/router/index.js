@@ -97,6 +97,17 @@ const routes = [
     component: () => import("@/views/commerce/CheckoutView.vue"),
   },
 
+  // =====================================================
+  // 商城模組自己的「我的訂單」列表頁，呼叫商城模組自己的 GET /orders/me
+  {
+  path: "/orders",
+
+  name: "order-list",
+
+  component: () => import("@/views/commerce/OrderListView.vue"),
+  },
+  // =====================================================
+  
   {
     path: "/orders/:id",
 

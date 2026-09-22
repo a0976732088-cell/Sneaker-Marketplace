@@ -15,4 +15,7 @@ public class OrderListItemResponse {
     private String status;
     private BigDecimal totalAmount;
     private LocalDateTime createdAt;
+    private String firstProductName;   // 第一件商品名稱
+    private String firstImageUrl;      // 第一件商品主圖（可能是 null）
+    private Integer itemCount;         // 總件數
 }

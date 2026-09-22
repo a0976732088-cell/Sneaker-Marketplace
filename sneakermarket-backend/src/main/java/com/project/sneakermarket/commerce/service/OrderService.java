@@ -1,24 +1,24 @@
 package com.project.sneakermarket.commerce.service;
-import com.project.sneakermarket.commerce.email.OrderCreatedEvent;
+
 import com.project.sneakermarket.commerce.dto.OrderDetailResponse;
 import com.project.sneakermarket.commerce.dto.OrderItemResponse;
 import com.project.sneakermarket.commerce.dto.OrderListItemResponse;
-
+import com.project.sneakermarket.commerce.email.OrderCreatedEvent;
 import com.project.sneakermarket.commerce.email.PaymentSuccessEvent;
 import com.project.sneakermarket.commerce.entity.Cart;
 import com.project.sneakermarket.commerce.entity.CartItem;
 import com.project.sneakermarket.commerce.entity.Order;
 import com.project.sneakermarket.commerce.entity.OrderItem;
+import com.project.sneakermarket.commerce.entity.ProductImage;
 import com.project.sneakermarket.commerce.repository.*;
 import com.project.sneakermarket.common.exception.ForbiddenException;
 import com.project.sneakermarket.coupon.service.CouponService;
 import com.project.sneakermarket.member.service.MemberService;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import com.project.sneakermarket.commerce.entity.ProductImage;
-import com.project.sneakermarket.commerce.repository.ProductImageRepository;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -40,24 +40,53 @@ public class OrderService {
     private final CouponService couponService;
     private final ApplicationEventPublisher eventPublisher;
 
-    // 查看「我的訂單列表」：一次列出這個會員的所有訂單摘要
     public List<OrderListItemResponse> getMyOrders(Long memberId) {
 
         List<Order> orders = orderRepository.findByMemberId(memberId);
 
         return orders.stream()
-                .map(order -> new OrderListItemResponse(
-                        order.getOrderId(),
-                        order.getOrderNumber(),
-                        order.getStatus(),
-                        order.getTotalAmount(),
-                        order.getCreatedAt()
-                ))
+                .map(order -> {
+                    // ① 查這筆訂單的所有明細
+                    List<OrderItem> orderItems = orderItemRepository.findByOrderOrderId(order.getOrderId());
+
+                    String firstProductName = null;
+                    String firstImageUrl = null;
+
+                    // ② 有明細才取第一筆（防呆：避免空清單 get(0) 爆錯）
+                    if (!orderItems.isEmpty()) {
+                        OrderItem firstItem = orderItems.get(0);
+                        firstProductName = firstItem.getProductName();
+
+                        // ③ variant 可能是 null（規格被刪除），有的話才查主圖
+                        if (firstItem.getVariant() != null) {
+                            Long productId = firstItem.getVariant().getProduct().getProductId();
+                            List<ProductImage> images =
+                                    productImageRepository.findByProductProductIdAndIsPrimaryTrue(productId);
+                            firstImageUrl = images.isEmpty() ? null : images.get(0).getImageUrl();
+                        }
+                    }
+
+                    // ④ 總件數：把每筆明細的數量加起來
+                    int itemCount = orderItems.stream()
+                            .mapToInt(OrderItem::getQuantity)
+                            .sum();
+
+                    return new OrderListItemResponse(
+                            order.getOrderId(),
+                            order.getOrderNumber(),
+                            order.getStatus(),
+                            order.getTotalAmount(),
+                            order.getCreatedAt(),
+                            firstProductName,
+                            firstImageUrl,
+                            itemCount
+                    );
+                })
                 .collect(Collectors.toList());
     }
 
     // 查看「單一訂單」的完整內容：訂單本身資料 + 買了哪些商品
-    public OrderDetailResponse getOrderDetail(Long memberId,Long orderId) {
+    public OrderDetailResponse getOrderDetail(Long memberId, Long orderId) {
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("找不到這張訂單"));
@@ -123,7 +152,7 @@ public class OrderService {
 
         List<CartItem> cartItems = cartItemRepository.findByCartCartId(cart.getCartId());
         List<CartItem> selectedItems = cartItems.stream()
-                .filter(item -> item.getSelected())
+                .filter(CartItem::getSelected)
                 .collect(Collectors.toList());
 
         if (selectedItems.isEmpty()) {
@@ -200,9 +229,9 @@ public class OrderService {
         eventPublisher.publishEvent(new OrderCreatedEvent(order.getOrderId(), memberId));
 
         // 全部存完才組回傳值（借用 getOrderDetail 邏輯）
-        return getOrderDetail(memberId,order.getOrderId());
-
+        return getOrderDetail(memberId, order.getOrderId());
     }
+
     // 綠界確認付款成功後呼叫，把訂單狀態改成已付款
     @Transactional
     public void confirmPayment(Long orderId) {
@@ -221,5 +250,24 @@ public class OrderService {
                         order.getMemberId()
                 )
         );
+    }
+
+    //綠界回報付款失敗時呼叫，取消訂單並還原庫存
+    @Transactional
+    public void cancelOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("找不到這張訂單"));
+
+        if (!"PENDING".equals(order.getStatus())) return;
+
+        for (OrderItem item : orderItemRepository.findByOrderOrderId(orderId)) {
+            if (item.getVariant() != null) {
+                item.getVariant().setStock(item.getVariant().getStock() + item.getQuantity());
+                productVariantRepository.save(item.getVariant());
+            }
+        }
+
+        order.setStatus("CANCELLED");
+        orderRepository.save(order);
     }
 }
