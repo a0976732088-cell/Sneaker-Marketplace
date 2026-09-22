@@ -620,41 +620,41 @@ const formatDate = (dateStr) => {
   min-width: 0;
 }
 
-.log-search-card,
-.email-job-card {
-  border: 1px solid #deddd8 !important;
-  border-radius: 6px !important;
+.log-search-card {
+  margin-bottom: 12px !important;
+  border: 1px solid #dedfdb !important;
+  border-radius: 5px !important;
   background: #ffffff;
   box-shadow: none !important;
+}
+
+.log-search-card .card-body {
+  padding: 12px;
 }
 
 .log-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .log-kpi-card {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  padding: 16px;
-  border: 1px solid #deddd8;
-  border-radius: 6px;
+  min-height: 76px;
+  padding: 12px 14px;
+  border: 1px solid #e0e1dd;
+  border-radius: 5px;
   background: #ffffff;
 }
 
 .log-kpi-icon {
-  display: inline-grid;
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border-radius: 50%;
-  font-size: 12px;
-  font-weight: 800;
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
 }
 
 .log-kpi-card span:not(.log-kpi-icon) {
@@ -665,10 +665,7 @@ const formatDate = (dateStr) => {
 }
 
 .log-kpi-card strong {
-  display: block;
-  color: #181916;
-  font-size: 22px;
-  line-height: 1;
+  font-size: 20px;
 }
 
 .kpi-total .log-kpi-icon {
@@ -703,16 +700,17 @@ const formatDate = (dateStr) => {
 }
 
 .log-table thead th {
-  padding: 14px 12px;
+  padding: 10px;
   border-bottom: 1px solid #deddd8;
   color: #666660;
-  background: #f5f4f1;
-  font-size: 12px;
+  background: #f7f7f5;
+  font-size: 11px;
   white-space: nowrap;
 }
 
 .log-table tbody td {
-  padding: 14px 12px;
+  padding: 10px;
+  font-size: 11px;
 }
 
 .log-row {
@@ -800,31 +798,23 @@ const formatDate = (dateStr) => {
   position: fixed;
   z-index: 1050;
   inset: 0;
-  background: rgb(17 17 17 / 24%);
+  background: rgb(17 17 17 / 5%);
 }
 
 .log-drawer {
   position: absolute;
   top: 0;
   right: 0;
-  width: min(430px, 100%);
+  width: min(360px, 100%);
   height: 100%;
   overflow-y: auto;
   border-left: 1px solid #deddd8;
   background: #ffffff;
-  box-shadow: -16px 0 40px rgb(17 17 17 / 12%);
+  box-shadow: -8px 0 24px rgb(17 17 17 / 8%);
 }
 
 .drawer-header {
-  position: sticky;
-  z-index: 2;
-  top: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 24px;
-  border-bottom: 1px solid #deddd8;
-  background: #ffffff;
+  padding: 17px 18px;
 }
 
 .drawer-header h2 {
@@ -844,7 +834,7 @@ const formatDate = (dateStr) => {
 }
 
 .drawer-content {
-  padding: 24px;
+  padding: 18px;
 }
 
 .readonly-notice {

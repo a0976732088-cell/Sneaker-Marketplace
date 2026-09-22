@@ -286,19 +286,16 @@ onMounted(() => {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: 0 22px;
-  border: 1px solid #111111;
-  border-radius: 4px;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 5px;
   color: #ffffff;
-  background: #111111;
-  font-size: 14px;
+  background: #222320;
+  font-size: 12px;
   font-weight: 650;
   cursor: pointer;
-  transition:
-    background-color 150ms ease,
-    transform 150ms ease;
 }
 
 .create-button:hover {
@@ -307,8 +304,7 @@ onMounted(() => {
 }
 
 .create-button span {
-  font-size: 22px;
-  font-weight: 400;
+  font-size: 18px;
   line-height: 1;
 }
 
@@ -356,9 +352,8 @@ onMounted(() => {
 
 .management-card {
   min-width: 0;
-  padding: 24px;
-  border: 1px solid #d8d7d2;
-  border-radius: 6px;
+  padding: 0;
+  border: 0;
   background: #ffffff;
 }
 
@@ -395,6 +390,20 @@ onMounted(() => {
   border-radius: 6px !important;
   background: #ffffff !important;
   box-shadow: none !important;
+}
+
+.activity-management :deep(.admin-header) {
+  margin-bottom: 14px;
+  padding-top: 0;
+}
+
+.activity-management :deep(.admin-title) {
+  margin-bottom: 4px;
+  font-size: 28px;
+}
+
+.activity-management :deep(.admin-description) {
+  font-size: 12px;
 }
 
 @media (max-width: 768px) {

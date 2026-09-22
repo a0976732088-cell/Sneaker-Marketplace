@@ -1,21 +1,21 @@
-<script setup>
-import NotificationLog
-  from "@/components/notification/NotificationLog.vue";
-</script>
-
 <template>
   <section class="operation-page">
     <header class="log-page-header">
       <div>
-        <p class="eyebrow">SNEAKERMARKET ADMIN</p>
         <h1>發送紀錄</h1>
         <p>查詢通知發送結果與投遞狀態。</p>
       </div>
+
+      <button type="button" class="export-button">↓ 匯出紀錄</button>
     </header>
 
     <NotificationLog />
   </section>
 </template>
+
+<script setup>
+import NotificationLog from "@/components/notification/NotificationLog.vue";
+</script>
 
 <style scoped>
 .operation-page {
@@ -23,24 +23,34 @@ import NotificationLog
 }
 
 .log-page-header {
-  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 14px;
 }
 
 .log-page-header h1 {
   margin: 0;
-  font-size: 40px;
+  font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.04em;
 }
 
 .log-page-header p {
-  margin: 8px 0 0;
+  margin: 5px 0 0;
   color: #73766f;
+  font-size: 12px;
 }
 
-.eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+.export-button {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid #373936;
+  border-radius: 5px;
+  color: #30322f;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 650;
 }
 </style>

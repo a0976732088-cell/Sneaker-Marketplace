@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Nationalized;
 import org.hibernate.annotations.UpdateTimestamp;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -31,9 +32,11 @@ public class CalendarEvent {
     @Column(name = "event_type", nullable = false, length = 30)
     private String eventType;
 
+    @Nationalized
     @Column(name = "title", nullable = false, length = 150)
     private String title;
 
+    @Nationalized
     @Column(name = "description", columnDefinition = "NVARCHAR(MAX)")
     private String description;
 
@@ -41,8 +44,11 @@ public class CalendarEvent {
             name = "venue_name",
             length = 150
     )
+
+    @Nationalized
     private String venueName;
 
+    @Nationalized
     @Column(
             name = "address",
             length = 300
