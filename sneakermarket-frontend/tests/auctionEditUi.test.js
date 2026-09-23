@@ -25,6 +25,21 @@ async function readSource(url) {
 const editSource = await readSource(
   new URL("../src/views/auction/AuctionEditView.vue", import.meta.url),
 );
+const productSource = await readSource(
+  new URL("../src/components/auction/edit/AuctionEditProductSection.vue", import.meta.url),
+);
+const descriptionSource = await readSource(
+  new URL("../src/components/auction/edit/AuctionEditDescriptionSection.vue", import.meta.url),
+);
+const imageSource = await readSource(
+  new URL("../src/components/auction/edit/AuctionEditImageSection.vue", import.meta.url),
+);
+const transactionSource = await readSource(
+  new URL("../src/components/auction/edit/AuctionEditTransactionSection.vue", import.meta.url),
+);
+const settingsSource = await readSource(
+  new URL("../src/components/auction/edit/AuctionEditSettingsSection.vue", import.meta.url),
+);
 
 function section(source, startMarker, endMarker) {
   const start =
@@ -58,9 +73,26 @@ const styleSource = section(
   /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
   "</style>",
 );
+const productTemplate = section(productSource, "<template>", "</template>");
+const descriptionTemplate = section(descriptionSource, "<template>", "</template>");
+const imageTemplate = section(imageSource, "<template>", "</template>");
+const transactionTemplate = section(transactionSource, "<template>", "</template>");
+const settingsTemplate = section(settingsSource, "<template>", "</template>");
+const fieldTemplates = [
+  productTemplate,
+  descriptionTemplate,
+  transactionTemplate,
+  settingsTemplate,
+];
+
+function componentTag(name) {
+  const tag = templateSource.match(new RegExp("<" + name + "\\b[\\s\\S]*?\\/>"))?.[0];
+  assert.ok(tag, "missing " + name + " in Edit Parent");
+  return tag;
+}
 
 test("Auction Edit renders the shared required shoe-size selector", () => {
-  const sizeSelect = templateSource.match(
+  const sizeSelect = productTemplate.match(
     /<select\b(?=[^>]*\bv-model\.trim\s*=\s*["']form\.size["'])[^>]*>[\s\S]*?<\/select>/,
   )?.[0];
 
@@ -72,7 +104,7 @@ test("Auction Edit renders the shared required shoe-size selector", () => {
   assert.match(sizeSelect, /:value\s*=\s*["']sizeOption["']/);
   assert.match(sizeSelect, /<option\b(?=[^>]*\bdisabled\b)[^>]*\bvalue=["']["']/);
   assert.doesNotMatch(
-    templateSource,
+    productTemplate,
     /<input\b(?=[^>]*\bv-model\.trim\s*=\s*["']form\.size["'])[^>]*>/,
   );
   assert.deepEqual(AUCTION_SHOE_SIZES, [
@@ -87,12 +119,14 @@ test("Auction Edit renders the shared required shoe-size selector", () => {
 });
 
 test("Auction Edit marks only its thirteen required controls and renders red errors", () => {
+  const controls = fieldTemplates.join("\n");
   const requiredControls =
-    templateSource.match(
+    controls.match(
       /<(?:input|select|textarea)\b(?=[^>]*\brequired\b)[^>]*>/g,
     ) ?? [];
   const requiredMarks =
-    templateSource.match(/class\s*=\s*["']required-mark["']/g) ?? [];
+    [templateSource, ...fieldTemplates].join("\n")
+      .match(/class\s*=\s*["']required-mark["']/g) ?? [];
 
   assert.match(
     templateSource,
@@ -104,14 +138,20 @@ test("Auction Edit marks only its thirteen required controls and renders red err
     15,
     "one form note, thirteen required fields and the required delivery legend",
   );
-  assert.match(
-    styleSource,
-    /\.required-mark\s*\{[^}]*color\s*:\s*#dc3545\b/i,
-  );
-  assert.match(
-    styleSource,
-    /\.field-error\s*\{[^}]*color\s*:\s*#dc3545\b/i,
-  );
+  for (const childSource of [
+    productSource,
+    descriptionSource,
+    transactionSource,
+    settingsSource,
+  ]) {
+    const childStyle = section(
+      childSource,
+      /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
+      "</style>",
+    );
+    assert.match(childStyle, /\.required-mark\s*\{[^}]*color\s*:\s*#dc3545\b/i);
+    assert.match(childStyle, /\.field-error\s*\{[^}]*color\s*:\s*#dc3545\b/i);
+  }
   assert.match(
     styleSource,
     /\.global-error-alert\s*\{[^}]*background\s*:\s*#f8d7da\b/i,
@@ -123,7 +163,7 @@ test("Auction Edit mirrors Create model choices and editable description templat
   assert.ok(AUCTION_MODEL_OPTIONS_BY_BRAND.Jordan.includes("Air Jordan 4"));
   assert.equal(AUCTION_DESCRIPTION_OPTIONS.length, 4);
 
-  const modelSelect = templateSource.match(
+  const modelSelect = productTemplate.match(
     /<select\b(?=[^>]*id=["']auction-edit-model-option["'])(?=[^>]*v-model=["']selectedModelOption["'])[^>]*>([\s\S]*?)<\/select>/,
   );
   assert.ok(modelSelect);
@@ -131,20 +171,29 @@ test("Auction Edit mirrors Create model choices and editable description templat
   assert.match(modelSelect[1], /option in availableModelOptions/);
   assert.match(modelSelect[1], /CUSTOM_OPTION_VALUE/);
   assert.match(
-    templateSource,
+    productTemplate,
     /id=["']auction-edit-model-custom["'][\s\S]*?v-model\.trim=["']form\.model["']/,
+  );
+  assert.match(
+    productSource,
+    /set:\s*\(value\)\s*=>\s*emit\("update:selectedModelOption", value\)/,
+  );
+  assert.match(
+    modelSelect[0],
+    /@change=["']emit\('model-option-change'\)["']/,
   );
 
   assert.match(
-    templateSource,
+    descriptionTemplate,
     /v-for=["']\(option, index\) in AUCTION_DESCRIPTION_OPTIONS["']/,
   );
-  assert.match(templateSource, /@click=["']applyDescriptionTemplate\(option\)["']/);
-  assert.match(templateSource, /@click=["']startCustomDescription["']/);
+  assert.match(descriptionTemplate, /@click=["']emit\('apply-description-template', option\)["']/);
+  assert.match(descriptionTemplate, /@click=["']emit\('start-custom-description'\)["']/);
   assert.match(
-    templateSource,
-    /v-model\.trim=["']form\.description["'][\s\S]*?@input=["']handleDescriptionInput["']/,
+    descriptionTemplate,
+    /v-model\.trim=["']form\.description["'][\s\S]*?@input=["']emit\('description-input'\)["']/,
   );
+  assert.match(descriptionTemplate, /id=["']auction-edit-description["']/);
 });
 
 test("Auction Edit keeps optional custom fields but fixes shipping and payment choices", () => {
@@ -170,11 +219,13 @@ test("Auction Edit keeps optional custom fields but fixes shipping and payment c
   ]);
 
   for (const fieldName of ["defectNote", "authenticityNote", "warrantyNote"]) {
+    const ownerTemplate =
+      fieldName === "warrantyNote" ? transactionTemplate : descriptionTemplate;
     assert.match(
-      templateSource,
+      ownerTemplate,
       new RegExp(
-        `v-model=["']selectedFormOptions\\.${fieldName}["'][\\s\\S]*?` +
-          `CUSTOM_OPTION_VALUE`,
+        "v-model=[\"']selectedFormOptions\\." + fieldName + "[\"'][\\s\\S]*?" +
+          "CUSTOM_OPTION_VALUE",
       ),
     );
   }
@@ -183,9 +234,9 @@ test("Auction Edit keeps optional custom fields but fixes shipping and payment c
     ["shippingMethod", "legacyShippingMethodOption"],
     ["paymentMethod", "legacyPaymentMethodOption"],
   ]) {
-    const select = templateSource.match(
+    const select = transactionTemplate.match(
       new RegExp(
-        `<select\\b(?=[^>]*v-model=["']selectedFormOptions\\.${fieldName}["'])[^>]*>([\\s\\S]*?)<\\/select>`,
+        "<select\\b(?=[^>]*v-model=[\"']selectedFormOptions\\." + fieldName + "[\"'])[^>]*>([\\s\\S]*?)<\\/select>",
       ),
     )?.[0] ?? "";
     assert.ok(select);
@@ -193,39 +244,37 @@ test("Auction Edit keeps optional custom fields but fixes shipping and payment c
     assert.match(select, new RegExp(legacyOption));
   }
 
-  assert.doesNotMatch(templateSource, /auction-edit-shipping-method-custom/);
-  assert.doesNotMatch(templateSource, /auction-edit-payment-method-custom/);
+  assert.doesNotMatch(transactionTemplate, /auction-edit-shipping-method-custom/);
+  assert.doesNotMatch(transactionTemplate, /auction-edit-payment-method-custom/);
 });
 
 test("Auction Edit uses the existing read-only gallery without image upload controls", () => {
   assert.match(
-    editSource,
+    imageSource,
     /import\s+AuctionImageGallery\s+from\s+["']@\/components\/auction\/AuctionImageGallery\.vue["']/,
   );
 
-  const imageSection = section(
-    templateSource,
-    "<!-- 圖片 -->",
-    "<!-- 交易資訊 -->",
-  );
-  const galleryTag = imageSection.match(/<AuctionImageGallery\b[\s\S]*?\/>/)?.[0] ?? "";
+  const galleryTag = imageTemplate.match(/<AuctionImageGallery\b[\s\S]*?\/>/)?.[0] ?? "";
+  const imageTag = componentTag("AuctionEditImageSection");
 
-  assert.match(galleryTag, /:image-urls\s*=\s*["']currentImageUrls["']/);
+  assert.match(imageTag, /:image-urls\s*=\s*["']currentImageUrls["']/);
+  assert.match(imageTag, /:product-name\s*=\s*["']form\.productName["']/);
+  assert.match(galleryTag, /:image-urls\s*=\s*["']imageUrls["']/);
   assert.match(
     galleryTag,
-    /:product-name\s*=\s*["']form\.productName \|\| '競標商品'["']/,
+    /:product-name\s*=\s*["']productName \|\| '競標商品'["']/,
   );
-  assert.match(imageSection, /目前刊登圖片/);
-  assert.match(imageSection, /商品圖片會沿用目前刊登內容/);
-  assert.doesNotMatch(imageSection, /type\s*=\s*["']file["']/);
-  assert.doesNotMatch(imageSection, /功能 4|尚未實作|API 尚未完成/);
+  assert.match(imageTemplate, /目前刊登圖片/);
+  assert.match(imageTemplate, /商品圖片會沿用目前刊登內容/);
+  assert.doesNotMatch(imageTemplate, /type\s*=\s*["']file["']/);
+  assert.doesNotMatch(imageTemplate, /功能 4|尚未實作|API 尚未完成/);
 });
 
 test("Auction Edit uses the shared 22-city select and renders a legacy option", () => {
   const locationArea = section(
-    templateSource,
+    descriptionSource,
     '<!-- 商品所在地 -->',
-    '<!-- 圖片 -->',
+    '</template>',
   );
   const locationSelect = locationArea.match(
     /<select\b(?=[^>]*id=["']auction-edit-location["'])(?=[^>]*v-model\.trim=["']form\.location["'])[^>]*>([\s\S]*?)<\/select>/,
@@ -242,7 +291,7 @@ test("Auction Edit uses the shared 22-city select and renders a legacy option", 
   assert.doesNotMatch(locationArea, /role=["']combobox["']|location-combobox/);
   assert.doesNotMatch(
     locationArea,
-    /<input\b(?=[^>]*v-model\.trim=["']form\.location["'])/,
+    /<input\b(?=[^>]*v-model\.trim\s*=\s*["']form\.location["'])/,
   );
   assert.match(
     locationArea,
@@ -252,9 +301,9 @@ test("Auction Edit uses the shared 22-city select and renders a legacy option", 
 
 test("Auction Edit endAt owns the relationship error and accessible invalid state", () => {
   const endAtArea = section(
-    templateSource,
+    settingsSource,
     'data-validation-field="endAt"',
-    "<!-- 操作 -->",
+    "</template>",
   );
 
   assert.match(endAtArea, /fieldErrors\.endAt/);
@@ -268,6 +317,82 @@ test("Auction Edit endAt owns the relationship error and accessible invalid stat
     scriptSetup(editSource),
     /if\s*\(\s*endAt\s*<=\s*startAt\s*\)\s*\{\s*return\s*["']競標結束時間必須晚於開始時間["']/,
   );
+});
+
+test("Auction Edit wires five UI sections and preserves every validation field container", () => {
+  const components = [
+    "AuctionEditProductSection",
+    "AuctionEditDescriptionSection",
+    "AuctionEditImageSection",
+    "AuctionEditTransactionSection",
+    "AuctionEditSettingsSection",
+  ];
+  for (const component of components) {
+    assert.match(
+      editSource,
+      new RegExp("import\\s+" + component + "\\s+from\\s+[\"']@/components/auction/edit/" + component + "\\.vue[\"']"),
+    );
+  }
+
+  const wiring = [
+    ["AuctionEditProductSection", [
+      'v-model:selected-model-option="selectedModelOption"',
+      ':form="form"', ':brands="brands"', ':categories="categories"',
+      ':editable="editable"', ':auction-status="auctionStatus"',
+      ':available-model-options="availableModelOptions"',
+      ':field-errors="fieldErrors"', '@brand-change="handleBrandChange"',
+      '@model-option-change="handleModelOptionChange"',
+      '@revalidate-field="revalidateField"',
+    ]],
+    ["AuctionEditDescriptionSection", [
+      ':form="form"', ':editable="editable"', ':field-errors="fieldErrors"',
+      ':selected-description-option="selectedDescriptionOption"',
+      ':selected-form-options="selectedFormOptions"',
+      ':legacy-location-option="legacyLocationOption"',
+      '@apply-description-template="applyDescriptionTemplate"',
+      '@start-custom-description="startCustomDescription"',
+      '@description-input="handleDescriptionInput"',
+      '@form-option-change="handleFormOptionChange"',
+      '@revalidate-field="revalidateField"',
+    ]],
+    ["AuctionEditImageSection", [
+      ':image-urls="currentImageUrls"', ':product-name="form.productName"',
+    ]],
+    ["AuctionEditTransactionSection", [
+      'v-model:delivery-option="deliveryOption"', ':form="form"',
+      ':editable="editable"', ':field-errors="fieldErrors"',
+      ':selected-form-options="selectedFormOptions"',
+      ':legacy-shipping-method-option="legacyShippingMethodOption"',
+      ':legacy-payment-method-option="legacyPaymentMethodOption"',
+      '@form-option-change="handleFormOptionChange"',
+      '@revalidate-field="revalidateField"',
+    ]],
+    ["AuctionEditSettingsSection", [
+      ':form="form"', ':editable="editable"',
+      ':auction-status="auctionStatus"', ':field-errors="fieldErrors"',
+      '@revalidate-field="revalidateField"',
+    ]],
+  ];
+  for (const [name, attributes] of wiring) {
+    const tag = componentTag(name);
+    for (const attribute of attributes) {
+      assert.ok(tag.includes(attribute), name + " missing " + attribute);
+    }
+  }
+
+  const fieldGroups = [
+    [productTemplate, ["brandId", "categoryId", "productName", "size", "condition"]],
+    [descriptionTemplate, ["description", "location"]],
+    [transactionTemplate, ["shippingMethod", "shippingFee", "paymentMethod"]],
+    [settingsTemplate, ["startPrice", "minIncrement", "startAt", "endAt"]],
+  ];
+  for (const [childTemplate, expectedFields] of fieldGroups) {
+    const actualFields = Array.from(
+      childTemplate.matchAll(/data-validation-field="([^"]+)"/g),
+      (match) => match[1],
+    );
+    assert.deepEqual(actualFields, expectedFields);
+  }
 });
 
 function editableAuction(overrides = {}) {
@@ -664,10 +789,15 @@ test("Edit scrubs a manually entered UI sentinel before validation or request", 
 });
 
 test("Edit delivery option maps only to allowMeetup and never offers meetup-only", async () => {
-  assert.doesNotMatch(templateSource, /v-model\s*=\s*["']form\.allowMeetup["']/);
-  assert.match(templateSource, /僅提供寄送/);
-  assert.match(templateSource, /提供寄送，也可協調面交/);
-  assert.doesNotMatch(templateSource, /MEETUP_ONLY/);
+  assert.doesNotMatch(transactionTemplate, /v-model\s*=\s*["']form\.allowMeetup["']/);
+  assert.match(transactionTemplate, /僅提供寄送/);
+  assert.match(transactionTemplate, /提供寄送，也可協調面交/);
+  assert.doesNotMatch(transactionTemplate, /MEETUP_ONLY/);
+  assert.match(transactionTemplate, /v-model="deliveryOptionModel"/);
+  assert.match(
+    transactionSource,
+    /set:\s*\(value\)\s*=>\s*emit\("update:deliveryOption", value\)/,
+  );
 
   const harness = createEditHarness();
 
@@ -772,21 +902,22 @@ test("Edit shows all current field errors but jumps only to the first DOM field"
 });
 
 test("Edit preserves lifecycle locks and ACTIVE original startAt update contract", async () => {
-  const template = templateSource;
   const script = scriptSetup(editSource);
 
   assert.match(
-    template,
-    /v-model\.number\s*=\s*["']form\.brandId["'][\s\S]*?:disabled\s*=\s*["']!editable \|\| auctionStatus === 'ACTIVE'["']/,
+    productTemplate,
+    /<select\b(?=[^>]*v-model\.number\s*=\s*["']form\.brandId["'])(?=[^>]*:disabled\s*=\s*["']!editable \|\| auctionStatus === 'ACTIVE'["'])[^>]*>/,
   );
   assert.match(
-    template,
-    /v-model\.number\s*=\s*["']form\.categoryId["'][\s\S]*?:disabled\s*=\s*["']!editable \|\| auctionStatus === 'ACTIVE'["']/,
+    productTemplate,
+    /<select\b(?=[^>]*v-model\.number\s*=\s*["']form\.categoryId["'])(?=[^>]*:disabled\s*=\s*["']!editable \|\| auctionStatus === 'ACTIVE'["'])[^>]*>/,
   );
   assert.match(
-    template,
-    /v-model\s*=\s*["']form\.startAt["'][\s\S]*?:disabled\s*=\s*["']!editable \|\| auctionStatus === 'ACTIVE'["']/,
+    settingsTemplate,
+    /<input\b(?=[^>]*v-model\s*=\s*["']form\.startAt["'])(?=[^>]*:disabled\s*=\s*["']!editable \|\| auctionStatus === 'ACTIVE'["'])[^>]*>/,
   );
+  assert.match(productTemplate, /競標開始後不可修改品牌／分類。/);
+  assert.match(settingsTemplate, /競標開始後不可修改開始時間。/);
   assert.match(script, /bidCount\.value\s*>\s*0/);
   assert.match(
     script,
