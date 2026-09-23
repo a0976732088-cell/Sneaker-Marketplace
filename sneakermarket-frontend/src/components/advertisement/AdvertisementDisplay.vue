@@ -199,10 +199,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (bannerTimer !== null) {
-    window.clearTimeout(bannerTimer);
-  }
-
   if (advertisementRefreshTimer !== null) {
     window.clearInterval(advertisementRefreshTimer);
   }
