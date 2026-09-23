@@ -23,13 +23,69 @@ async function readSource(url) {
 const createSource = await readSource(
   new URL("../src/views/auction/AuctionCreateView.vue", import.meta.url),
 );
+const sectionSources = Object.fromEntries(
+  await Promise.all(
+    ["Product", "Description", "Image", "Transaction", "Settings"].map(
+      async (section) => [
+        section.toLowerCase(),
+        await readSource(
+          new URL(
+            "../src/components/auction/create/AuctionCreate" + section + "Section.vue",
+            import.meta.url,
+          ),
+        ),
+      ],
+    ),
+  ),
+);
 const auctionServiceSource = await readSource(
   new URL("../src/service/auctionService.js", import.meta.url),
 );
 
-const templateMatch = createSource.match(/<template\b[^>]*>([\s\S]*?)<\/template\s*>/);
-assert.ok(templateMatch, "AuctionCreateView must retain a template");
-const templateSource = templateMatch[1];
+function sfcBlock(source, tag, label) {
+  const match = source.match(
+    new RegExp("<" + tag + "\\b[^>]*>([\\s\\S]*?)<\\/" + tag + "\\s*>"),
+  );
+  assert.ok(match, label + " must retain a " + tag + " block");
+  return match[1];
+}
+
+const createTemplateSource = sfcBlock(createSource, "template", "AuctionCreateView");
+const sectionTemplates = Object.fromEntries(
+  Object.entries(sectionSources).map(([section, source]) => [
+    section,
+    sfcBlock(source, "template", "AuctionCreate" + section + "Section"),
+  ]),
+);
+const templateSource = [createTemplateSource, ...Object.values(sectionTemplates)].join("\n");
+const sectionStyles = Object.fromEntries(
+  Object.entries(sectionSources).map(([section, source]) => [
+    section,
+    sfcBlock(source, "style", "AuctionCreate" + section + "Section"),
+  ]),
+);
+
+const fieldSection = {
+  brandId: "product",
+  categoryId: "product",
+  productName: "product",
+  model: "product",
+  size: "product",
+  condition: "product",
+  description: "description",
+  defectNote: "description",
+  authenticityNote: "description",
+  location: "description",
+  shippingMethod: "transaction",
+  shippingFee: "transaction",
+  paymentMethod: "transaction",
+  warrantyNote: "transaction",
+  allowReturn: "transaction",
+  startPrice: "settings",
+  minIncrement: "settings",
+  startAt: "settings",
+  endAt: "settings",
+};
 
 function classTokens(source) {
   return [...source.matchAll(/\bclass\s*=\s*["']([^"']*)["']/g)].flatMap(
@@ -39,8 +95,10 @@ function classTokens(source) {
 
 function assertModelBinding(field, modifier = "") {
   const directive = modifier ? `v-model\\.${modifier}` : "v-model";
+  const section = fieldSection[field];
+  assert.ok(section, "missing section mapping for " + field);
   assert.match(
-    templateSource,
+    sectionTemplates[section],
     new RegExp(`${directive}\\s*=\\s*["']form\\.${field}["']`),
     `expected ${directive} to keep form.${field}`,
   );
@@ -193,6 +251,101 @@ test("auction create uses the storefront page, hero and four-step section presen
   );
 });
 
+test("auction create wires section events and native field refs back to Parent", () => {
+  const sectionContracts = {
+    product: {
+      fields: ["brandId", "categoryId", "productName", "size", "condition"],
+      attributes: [
+        'v-model:selected-model-option="selectedModelOption"',
+        ':brands="brands"',
+        ':categories="categories"',
+        ':available-model-options="availableModelOptions"',
+        '@brand-change="handleBrandChange"',
+        '@model-option-change="handleModelOptionChange"',
+        '@revalidate-field="revalidateErroredField"',
+      ],
+    },
+    description: {
+      fields: ["description", "location"],
+      attributes: [
+        ':selected-description-option="selectedDescriptionOption"',
+        ':selected-form-options="selectedFormOptions"',
+        '@apply-description-template="applyDescriptionTemplate"',
+        '@start-custom-description="startCustomDescription"',
+        '@description-input="handleDescriptionInput"',
+        '@form-option-change="handleFormOptionChange"',
+        '@revalidate-field="revalidateErroredField"',
+      ],
+    },
+    image: {
+      fields: ["images"],
+      attributes: [':images="images"', '@change="handleImageChange"'],
+    },
+    transaction: {
+      fields: ["shippingMethod", "shippingFee", "paymentMethod"],
+      attributes: [
+        'v-model:delivery-option="deliveryOption"',
+        ':selected-form-options="selectedFormOptions"',
+        '@form-option-change="handleFormOptionChange"',
+        '@revalidate-field="revalidateErroredField"',
+      ],
+    },
+    settings: {
+      fields: ["startPrice", "minIncrement", "startAt", "endAt"],
+      attributes: [
+        ':revalidate-errored-field="revalidateErroredField"',
+        ':revalidate-time-fields="revalidateTimeFields"',
+      ],
+    },
+  };
+
+  for (const [section, { fields, attributes }] of Object.entries(sectionContracts)) {
+    const name = section[0].toUpperCase() + section.slice(1);
+    const tag = createTemplateSource.match(
+      new RegExp("<AuctionCreate" + name + "Section\\b[\\s\\S]*?\\/>"),
+    )?.[0];
+    assert.ok(tag, "missing " + name + " section in Parent form");
+    assert.ok(tag.includes(':field-errors="fieldErrors"'), name + " must share Parent errors");
+    assert.ok(tag.includes(':set-field-element="setFieldElement"'), name + " must share Parent DOM ref callback");
+    if (section !== "image") {
+      assert.ok(tag.includes(':form="form"'), name + " must share Parent reactive form");
+    }
+    for (const attribute of attributes) {
+      assert.ok(tag.includes(attribute), name + " missing " + attribute);
+    }
+    assert.match(
+      sectionSources[section],
+      /setFieldElement:\s*\{\s*type:\s*Function,\s*required:\s*true\s*\}/,
+    );
+
+    for (const field of fields) {
+      const nativeRef = new RegExp(
+        "<(?:input|select|textarea)\\b(?=[^>]*:ref\\s*=\\s*[\"']setFieldElement\\([\"']" +
+          field +
+          "[\"']\\)[\"'])[^>]*>",
+      );
+      assert.match(
+        sectionTemplates[section],
+        nativeRef,
+        field + " must register its native control rather than a Component instance",
+      );
+    }
+  }
+
+  assert.match(
+    sectionSources.product,
+    /const modelOption = computed\(\{[\s\S]*?get: \(\) => props\.selectedModelOption,[\s\S]*?set: \(value\) => emit\("update:selectedModelOption", value\)/,
+  );
+  assert.match(
+    sectionSources.product,
+    /emit\("update:selectedModelOption", event\.target\.value\);\s*emit\("model-option-change"\)/,
+  );
+  assert.match(
+    sectionSources.transaction,
+    /const deliveryOptionModel = computed\(\{[\s\S]*?get: \(\) => props\.deliveryOption,[\s\S]*?set: \(value\) => emit\("update:deliveryOption", value\)/,
+  );
+});
+
 test("auction create retains submit, loading, error and success-navigation behavior", () => {
   const formTag = templateSource.match(
     /<form\b(?=[^>]*\bv-if\s*=\s*["']ready["'])(?=[^>]*@submit\.prevent\s*=\s*["']submitAuction["'])[^>]*>/,
@@ -219,8 +372,8 @@ test("auction create retains submit, loading, error and success-navigation behav
 
 test("auction create retains the native multi-image input and one-to-ten image rules", () => {
   const imageInput =
-    templateSource.match(
-      /<input\b(?=[^>]*\btype\s*=\s*["']file["'])(?=[^>]*@change\s*=\s*["']handleImageChange["'])[^>]*>/,
+    sectionTemplates.image.match(
+      /<input\b(?=[^>]*\btype\s*=\s*["']file["'])(?=[^>]*@change\s*=\s*["']emit\('change', \$event\)["'])[^>]*>/,
     )?.[0] ?? "";
 
   assert.ok(imageInput, "missing native file input wired to handleImageChange");
@@ -236,14 +389,14 @@ test("auction create retains the native multi-image input and one-to-ten image r
     assert.ok(acceptedTypes.includes(extension), `image accept must retain ${extension}`);
   }
 
-  assert.match(templateSource, /images\.length/);
-  assert.match(templateSource, /image\.name/);
+  assert.match(sectionTemplates.image, /images\.length/);
+  assert.match(sectionTemplates.image, /image\.name/);
   assert.match(
     createSource,
     /selectedFiles\.length\s*>\s*MAX_AUCTION_IMAGE_COUNT/,
   );
   assert.match(createSource, /images\.value\.length\s*===\s*0/);
-  assert.match(templateSource, /最多\s*\{\{\s*MAX_AUCTION_IMAGE_COUNT\s*\}\}\s*張/);
+  assert.match(sectionTemplates.image, /最多\s*\{\{\s*MAX_AUCTION_IMAGE_COUNT\s*\}\}\s*張/);
   assert.equal(MAX_AUCTION_IMAGE_COUNT, 10);
 });
 
@@ -294,7 +447,7 @@ test("auction create retains every form binding and does not add draft or identi
 });
 
 test("auction create size select exposes only the supported sizes in order", () => {
-  const sizeSelect = templateSource.match(
+  const sizeSelect = sectionTemplates.product.match(
     /<select\b(?=[^>]*v-model\.trim\s*=\s*"form\.size")([^>]*)>([\s\S]*?)<\/select\s*>/,
   );
   assert.ok(sizeSelect, "form.size must remain a native select with v-model.trim");
@@ -315,24 +468,24 @@ test("auction create size select exposes only the supported sizes in order", () 
     "US 11",
   ]);
   assert.doesNotMatch(
-    templateSource,
+    sectionTemplates.product,
     /<input\b(?=[^>]*v-model\.trim\s*=\s*["']form\.size["'])[^>]*>/,
   );
 });
 
 test("auction create model options follow the brand and description uses editable template cards", async () => {
-  const modelSelect = templateSource.match(
-    /<select\b(?=[^>]*id\s*=\s*["']auction-model-option["'])(?=[^>]*v-model\s*=\s*["']selectedModelOption["'])[^>]*>([\s\S]*?)<\/select\s*>/,
+  const modelSelect = sectionTemplates.product.match(
+    /<select\b(?=[^>]*id\s*=\s*["']auction-model-option["'])(?=[^>]*v-model\s*=\s*["']modelOption["'])[^>]*>([\s\S]*?)<\/select\s*>/,
   );
   assert.ok(modelSelect, "model must use a brand-aware selection controller");
   assert.match(modelSelect[1], /v-for\s*=\s*["']option in availableModelOptions["']/);
   assert.match(modelSelect[1], /:value\s*=\s*["']CUSTOM_OPTION_VALUE["']/);
   assert.match(
-    templateSource,
+    sectionTemplates.product,
     /<input\b(?=[^>]*id\s*=\s*["']auction-model-custom["'])(?=[^>]*v-model\.trim\s*=\s*["']form\.model["'])[^>]*>/,
   );
 
-  const descriptionGrid = templateSource.match(
+  const descriptionGrid = sectionTemplates.description.match(
     /<div\b(?=[^>]*class\s*=\s*["']description-template-grid["'])[^>]*>([\s\S]*?)<\/div>/,
   );
   assert.ok(descriptionGrid, "description must expose canned copy cards");
@@ -340,13 +493,13 @@ test("auction create model options follow the brand and description uses editabl
     descriptionGrid[1],
     /v-for\s*=\s*["']\(option, index\) in AUCTION_DESCRIPTION_OPTIONS["']/,
   );
-  assert.match(descriptionGrid[1], /@click\s*=\s*["']applyDescriptionTemplate\(option\)["']/);
+  assert.match(descriptionGrid[1], /@click\s*=\s*["']emit\('apply-description-template', option\)["']/);
   assert.match(
-    templateSource,
-    /<button\b(?=[^>]*class\s*=\s*["']description-custom-button["'])(?=[^>]*@click\s*=\s*["']startCustomDescription["'])[^>]*>/,
+    sectionTemplates.description,
+    /<button\b(?=[^>]*class\s*=\s*["']description-custom-button["'])(?=[^>]*@click\s*=\s*["']emit\('start-custom-description'\)["'])[^>]*>/,
   );
   assert.match(
-    templateSource,
+    sectionTemplates.description,
     /<textarea\b(?=[^>]*v-model\.trim\s*=\s*["']form\.description["'])(?=[^>]*class\s*=\s*["']form-control description-editor["'])[^>]*>/,
   );
 
@@ -392,7 +545,7 @@ test("auction create model options follow the brand and description uses editabl
 });
 
 test("auction create location is a pure optional Taiwan city select", () => {
-  const locationSelect = templateSource.match(
+  const locationSelect = sectionTemplates.description.match(
     /<select\b(?=[^>]*\bid\s*=\s*["']auction-location["'])(?=[^>]*v-model\.trim\s*=\s*["']form\.location["'])[^>]*>([\s\S]*?)<\/select\s*>/,
   );
   assert.ok(locationSelect, "location must be a native select bound to form.location");
@@ -409,18 +562,18 @@ test("auction create location is a pure optional Taiwan city select", () => {
   assert.match(locationSelect[1], /:value\s*=\s*["']city["']/);
   assert.match(
     locationSelect[0],
-    /@change\s*=\s*["']revalidateErroredField\('location'\)["']/,
+    /@change\s*=\s*["']emit\('revalidate-field', 'location'\)["']/,
   );
 
-  const locationLabel = templateSource.match(
+  const locationLabel = sectionTemplates.description.match(
     /<label\b[^>]*for\s*=\s*["']auction-location["'][^>]*>([\s\S]*?)<\/label>/,
   );
   assert.ok(locationLabel);
   assert.doesNotMatch(locationLabel[1], /required-mark/);
 
-  assert.doesNotMatch(templateSource, /location-combobox|role\s*=\s*["']combobox["']/);
+  assert.doesNotMatch(sectionTemplates.description, /location-combobox|role\s*=\s*["']combobox["']/);
   assert.match(
-    templateSource,
+    sectionTemplates.description,
     /<p\b(?=[^>]*v-if\s*=\s*["']fieldErrors\.location["'])(?=[^>]*id\s*=\s*["']auction-location-error["'])[^>]*\brole\s*=\s*["']alert["']/,
   );
 });
@@ -439,7 +592,8 @@ test("auction create keeps optional custom fields but removes shipping and payme
   ];
 
   for (const [field, optionsName, tagName, maxlength, required] of fields) {
-    const selection = templateSource.match(
+    const fieldTemplateSource = sectionTemplates[fieldSection[field]];
+    const selection = fieldTemplateSource.match(
       new RegExp(
         `<select\\b(?=[^>]*v-model=["']selectedFormOptions\\.${field}["'])[^>]*>([\\s\\S]*?)<\\/select\\s*>`,
       ),
@@ -452,13 +606,13 @@ test("auction create keeps optional custom fields but removes shipping and payme
     );
 
     assert.match(
-      templateSource,
+      fieldTemplateSource,
       new RegExp(
         `v-if=["']selectedFormOptions\\.${field} === CUSTOM_OPTION_VALUE["']`,
       ),
     );
     const customControl =
-      templateSource.match(
+      fieldTemplateSource.match(
         new RegExp(
           `<${tagName}\\b(?=[^>]*v-model\\.trim=["']form\\.${field}["'])[^>]*>`,
         ),
@@ -476,7 +630,7 @@ test("auction create keeps optional custom fields but removes shipping and payme
     ["shippingMethod", "AUCTION_SHIPPING_METHOD_OPTIONS"],
     ["paymentMethod", "AUCTION_PAYMENT_METHOD_OPTIONS"],
   ]) {
-    const selection = templateSource.match(
+    const selection = sectionTemplates.transaction.match(
       new RegExp(
         `<select\\b(?=[^>]*v-model=["']selectedFormOptions\\.${field}["'])[^>]*>([\\s\\S]*?)<\\/select\\s*>`,
       ),
@@ -485,25 +639,25 @@ test("auction create keeps optional custom fields but removes shipping and payme
     assert.match(selection[1], new RegExp(`v-for=["']option in ${optionsName}["']`));
     assert.doesNotMatch(selection[1], /CUSTOM_OPTION_VALUE|其他（自行填寫）/);
     assert.doesNotMatch(
-      templateSource,
+      sectionTemplates.transaction,
       new RegExp(`id=["']auction-${field === "shippingMethod" ? "shipping-method" : "payment-method"}-custom["']`),
     );
   }
 
   assert.doesNotMatch(
-    templateSource,
+    sectionTemplates.transaction,
     /v-model\s*=\s*["']form\.allowMeetup["']/,
     "allowMeetup must be mapped from deliveryOption instead of a standalone checkbox",
   );
-  assert.match(templateSource, /v-model\s*=\s*["']deliveryOption["']/);
-  assert.match(templateSource, /DELIVERY_OPTION_VALUES\.SHIPPING_ONLY/);
-  assert.match(templateSource, /DELIVERY_OPTION_VALUES\.SHIPPING_OR_MEETUP/);
+  assert.match(sectionTemplates.transaction, /v-model\s*=\s*["']deliveryOptionModel["']/);
+  assert.match(sectionTemplates.transaction, /DELIVERY_OPTION_VALUES\.SHIPPING_ONLY/);
+  assert.match(sectionTemplates.transaction, /DELIVERY_OPTION_VALUES\.SHIPPING_OR_MEETUP/);
   assertModelBinding("allowReturn");
 });
 
 test("auction create marks only required controls and exposes inline error semantics", () => {
   const formTag =
-    templateSource.match(
+    createTemplateSource.match(
       /<form\b(?=[^>]*@submit\.prevent\s*=\s*["']submitAuction["'])[^>]*>/,
     )?.[0] ?? "";
   assert.match(formTag, /\bnovalidate\b/);
@@ -552,20 +706,20 @@ test("auction create marks only required controls and exposes inline error seman
   );
 
   const endAtInput =
-    templateSource.match(
+    sectionTemplates.settings.match(
       /<input\b(?=[^>]*v-model\s*=\s*["']form\.endAt["'])[^>]*>/,
     )?.[0] ?? "";
   assert.match(endAtInput, /:aria-invalid\s*=\s*["']Boolean\(fieldErrors\.endAt\)["']/);
   assert.match(endAtInput, /auction-end-at-error/);
   assert.match(endAtInput, /is-invalid-field/);
   assert.match(
-    templateSource,
+    sectionTemplates.settings,
     /<p\b(?=[^>]*v-if\s*=\s*["']fieldErrors\.endAt["'])(?=[^>]*id\s*=\s*["']auction-end-at-error["'])[^>]*\brole\s*=\s*["']alert["']/,
   );
 
   const imageInput =
-    templateSource.match(
-      /<input\b(?=[^>]*\btype\s*=\s*["']file["'])(?=[^>]*@change\s*=\s*["']handleImageChange["'])[^>]*>/,
+    sectionTemplates.image.match(
+      /<input\b(?=[^>]*\btype\s*=\s*["']file["'])(?=[^>]*@change\s*=\s*["']emit\('change', \$event\)["'])[^>]*>/,
     )?.[0] ?? "";
   assert.match(imageInput, /:aria-invalid\s*=\s*["']Boolean\(fieldErrors\.images\)["']/);
   assert.match(imageInput, /auction-images-error/);
@@ -573,10 +727,13 @@ test("auction create marks only required controls and exposes inline error seman
   const styleSource = createSource.match(
     /<style\b(?=[^>]*\bscoped\b)[^>]*>([\s\S]*?)<\/style\s*>/,
   )?.[1];
-  assert.ok(styleSource, "missing scoped validation styles");
-  assert.match(styleSource, /\.required-mark\s*\{[^}]*color\s*:\s*#dc3545/i);
-  assert.match(styleSource, /\.field-error\s*\{[^}]*color\s*:\s*#dc3545/i);
-  assert.match(styleSource, /\.is-invalid-field/);
+  assert.ok(styleSource, "missing scoped Parent styles");
+  for (const [section, style] of Object.entries(sectionStyles)) {
+    assert.match(sectionSources[section], /<style\b(?=[^>]*\bscoped\b)/);
+    assert.match(style, /\.required-mark\s*\{[^}]*color\s*:\s*#dc3545/i);
+    assert.match(style, /\.field-error\s*\{[^}]*color\s*:\s*#dc3545/i);
+    assert.match(style, /\.is-invalid-field/);
+  }
   assert.match(
     styleSource,
     /\.create-alert\s*\{[^}]*background\s*:\s*#f8d7da[^}]*border-left\s*:\s*4px\s+solid\s+#dc3545/i,
