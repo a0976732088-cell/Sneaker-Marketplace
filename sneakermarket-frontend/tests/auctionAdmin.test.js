@@ -64,7 +64,7 @@ test("admin views use shared status and time formatters and keep required SFC or
     "競標狀態",
     "訂單狀態",
     "管理狀態",
-    "全選目前頁",
+    "全選本頁",
     "上一頁",
     "下一頁",
   ]) {
@@ -130,7 +130,7 @@ test("admin view prevents duplicate submissions and shows per-item batch results
 
 test("admin list shows clear selectors, thumbnails, detail links and 15-row numbering", () => {
   assert.ok(view.includes('class="form-check-input batch-checkbox"'));
-  assert.ok(view.includes("border: 2px solid #334155"));
+  assert.ok(view.includes("border: 1.5px solid #98a2b3"));
   assert.match(view, /v-if="\s*auction\.imageUrl && !brokenImageIds\.has\(auction\.auctionId\)\s*"/);
   assert.ok(view.includes(':src="resolveAuctionImageUrl(auction.imageUrl)"'));
   assert.ok(view.includes("name: 'admin-auction-detail'"));
@@ -143,9 +143,9 @@ test("admin list shows clear selectors, thumbnails, detail links and 15-row numb
   );
   assert.match(
     view,
-    /v-if="auction\.orderStatus"[\s\S]*?formatAuctionOrderStatus\(auction\.orderStatus\)[\s\S]*?v-else[\s\S]*?—/,
+    /<span class="auction-status-item">\s*<span>訂單狀態<\/span>[\s\S]*?auction\.orderStatus \? formatAuctionOrderStatus\(auction\.orderStatus\) : "-"/,
   );
-  assert.match(view, /batchMode\.value \? 10 : 9/);
+  assert.match(view, /role="listitem"/);
 });
 
 test("admin list order-status filter exposes supported auction order states", () => {
@@ -172,30 +172,20 @@ test("admin list order-status filter exposes supported auction order states", ()
   assert.doesNotMatch(configured, /FAILED|NOT_SHIPPED|DELIVERED/);
 });
 
-test("admin list keeps filters readable and scrolls a non-breaking table when zoomed", () => {
+test("admin list uses compact responsive cards without a wide table", () => {
   assert.match(view, /class="col-12 col-xl-4"/);
   assert.equal((view.match(/class="col-12 col-md-4 col-xl-2"/g) || []).length, 3);
   assert.match(view, /class="col-12 col-xl-2 d-grid"/);
-  assert.match(view, /table admin-auction-table table-hover/);
-  assert.match(view, /\.admin-auction-table\s*{\s*min-width:\s*1380px/);
-  assert.match(
-    view,
-    /\.admin-auction-table thead th[\s\S]*?white-space:\s*nowrap[\s\S]*?word-break:\s*keep-all/,
-  );
-  for (const column of [
-    "price-column",
-    "status-column",
-    "time-column",
-    "action-column",
-  ]) {
-    assert.match(
-      view,
-      new RegExp(`\\.${column}\\s*\\{[\\s\\S]*?white-space:\\s*nowrap`),
-      column,
-    );
+  assert.match(view, /class="auction-list" role="list"/);
+  assert.match(view, /class="auction-card"/);
+  assert.match(view, /\.auction-card-head\s*\{[^}]*display:\s*flex/);
+  assert.match(view, /\.auction-card-meta\s*\{[^}]*display:\s*grid/);
+  assert.match(view, /auction-row-actions auction-action-buttons/);
+  for (const label of ["賣家", "目前價格／出價", "時間"]) {
+    assert.ok(view.includes('class="auction-field-label">' + label), label);
   }
-  assert.match(view, /class="d-flex flex-nowrap justify-content-end gap-2"/);
-  assert.match(view, /\.auction-name-link\s*{[\s\S]*?overflow-wrap:\s*anywhere/);
+  assert.match(view, /\.auction-name-link\s*\{[^}]*overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(view, /min-width:\s*1380px/);
 });
 
 test("admin detail remains available after moderation and resolves images against backend", () => {
@@ -532,7 +522,7 @@ function adminHarness(pages) {
     restoreAdminAuctionsBatch: async () => ({ data: { data: { totalCount: 0, successCount: 0, failureCount: 0, items: [] } } }),
     deleteAdminAuctionsBatch: async () => ({ data: { data: { totalCount: 0, successCount: 0, failureCount: 0, items: [] } } }),
   };
-  vm.runInNewContext(adminViewScript + String.fromCharCode(10) + "globalThis.subject = { filters, orderStatuses, items, selectedIds, selectedAuctionMap, pagination, errorMessage, dialog, canBatchRemove, canBatchRestore, canBatchDelete, canRestoreAuction, formatStatus, loadAuctions, enterBatchMode, toggleSelection, toggleCurrentPage, openBatchAction, confirmAction };", context);
+  vm.runInNewContext(adminViewScript + String.fromCharCode(10) + "globalThis.subject = { filters, orderStatuses, items, selectedIds, selectedAuctionMap, pagination, errorMessage, dialog, canBatchRemove, canBatchRestore, canBatchDelete, canRestoreAuction, formatStatus, loadAuctions, enterBatchMode, toggleSelection, toggleCurrentPage, toggleCurrentPageFromButton, openBatchAction, confirmAction };", context);
   return { ...context.subject, batchCalls, listCalls };
 }
 
@@ -565,6 +555,33 @@ test("batch selection remains across pages and current-page deselection preserve
 
   h.toggleCurrentPage({ target: { checked: false } });
   assert.deepEqual([...h.selectedIds.value], [1]);
+});
+
+test("batch toolbar selects eligible auctions on this page and toggles only this page", async () => {
+  const h = adminHarness([
+    [adminAuction(1), adminAuction(2), adminAuction(3, "DELETED")],
+    [adminAuction(16)],
+  ]);
+  await h.loadAuctions(0);
+  h.enterBatchMode();
+  h.toggleCurrentPageFromButton();
+  assert.deepEqual([...h.selectedIds.value], [1, 2]);
+
+  await h.loadAuctions(1);
+  h.toggleCurrentPageFromButton();
+  assert.deepEqual([...h.selectedIds.value], [1, 2, 16]);
+  h.toggleCurrentPageFromButton();
+  assert.deepEqual([...h.selectedIds.value], [1, 2]);
+});
+
+test("batch toolbar keeps the 100-item limit without partial current-page selection", async () => {
+  const h = adminHarness([[adminAuction(101), adminAuction(102)]]);
+  await h.loadAuctions(0);
+  h.enterBatchMode();
+  for (let id = 1; id <= 99; id++) h.toggleSelection(adminAuction(id));
+  h.toggleCurrentPageFromButton();
+  assert.equal(h.selectedIds.value.length, 99);
+  assert.equal(h.errorMessage.value, "批量操作最多可選取 100 筆");
 });
 
 test("batch action eligibility rejects terminal statuses retained from multiple pages", async () => {

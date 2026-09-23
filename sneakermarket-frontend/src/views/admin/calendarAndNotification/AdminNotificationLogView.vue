@@ -5,11 +5,11 @@ import NotificationLog
 
 <template>
   <section class="operation-page">
-    <header class="log-page-header">
+    <header class="log-page-header admin-page-heading">
       <div>
-        <p class="eyebrow">SNEAKERMARKET ADMIN</p>
+        <p class="eyebrow admin-page-eyebrow">SNEAKERMARKET ADMIN</p>
         <h1>發送紀錄</h1>
-        <p>查詢通知發送結果與投遞狀態。</p>
+        <p class="admin-page-description">查詢通知發送結果與投遞狀態。</p>
       </div>
     </header>
 

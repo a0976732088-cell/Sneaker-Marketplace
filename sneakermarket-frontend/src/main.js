@@ -9,6 +9,7 @@ import '@/assets/css/global.css'
 import '@/assets/css/layout.css'
 import '@/assets/css/components.css'
 import "@/assets/css/calendarAndNotificationDashboard.css"
+import "@/assets/css/admin-theme.css"
 
 createApp(App)
   .use(router)

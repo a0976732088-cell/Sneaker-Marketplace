@@ -19,11 +19,11 @@ const navigate = (target) => {
 
 <template>
   <section class="operation-page">
-    <header class="overview-header">
+    <header class="overview-header admin-page-heading">
       <div>
-        <p class="eyebrow">SNEAKERMARKET ADMIN</p>
+        <p class="eyebrow admin-page-eyebrow">SNEAKERMARKET ADMIN</p>
         <h1>活動營運中心</h1>
-        <p>掌握活動、會員關注與通知發送狀態。</p>
+        <p class="admin-page-description">掌握活動、會員關注與通知發送狀態。</p>
       </div>
 
       <button

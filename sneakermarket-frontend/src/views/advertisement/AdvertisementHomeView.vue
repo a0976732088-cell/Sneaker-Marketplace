@@ -62,11 +62,11 @@ onUnmounted(() => {
 <template>
   <section class="ad-admin-shell">
     <main class="ad-workspace">
-      <header class="workspace-header">
+      <header class="workspace-header admin-page-heading">
         <div>
-          <div class="eyebrow">ADVERTISEMENT ADMIN</div>
+          <div class="eyebrow admin-page-eyebrow">SNEAKERMARKET ADMIN</div>
           <h1>廣告管理</h1>
-          <p>建立、排程並追蹤平台上的每一則廣告活動。</p>
+          <p class="admin-page-description">建立、排程並追蹤平台上的每一則廣告活動。</p>
         </div>
 
         <div class="header-actions">

@@ -1,0 +1,268 @@
+/* Admin-only visual rules. Keep workflow, state, and status colors in each feature. */
+.admin-page {
+  --sm-admin-ink: #111;
+  --sm-admin-muted: #667085;
+  --sm-admin-border: #e5e7eb;
+  --sm-admin-surface: #fff;
+  --sm-admin-background: #f8f9fa;
+  color: var(--sm-admin-ink);
+}
+
+/* The routed layout already supplies the content width and padding. */
+.admin-page .admin-content-inner > .container {
+  width: 100%;
+  max-width: none;
+  padding: 0 !important;
+}
+
+.admin-page .admin-content-inner .ad-admin-shell {
+  --ink: var(--sm-admin-ink);
+  --muted: var(--sm-admin-muted);
+  --line: var(--sm-admin-border);
+  --coral: var(--sm-admin-ink);
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  margin: 0;
+}
+
+.admin-page .admin-content-inner .ad-workspace {
+  padding: 0;
+}
+
+.admin-page .event-admin {
+  --admin-black: #111;
+  --admin-black-soft: #303030;
+  --admin-paper: #fff;
+  --admin-cement: #f8f9fa;
+  --admin-cement-dark: #e9ecef;
+  --admin-text: #111;
+  --admin-text-soft: #667085;
+  --admin-muted: #667085;
+  --admin-line: #e5e7eb;
+}
+
+.admin-page .event-admin .admin-header {
+  padding-top: 0;
+}
+
+/* Headings use the same scale across member, commerce, ad, event, and auction pages. */
+.admin-page .admin-content-inner h1 {
+  color: var(--sm-admin-ink);
+  font-size: clamp(1.7rem, 2.4vw, 2rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.admin-page .admin-content-inner :is(
+  .page-description,
+  .workspace-header p,
+  .overview-header p,
+  .log-page-header p,
+  .admin-description
+) {
+  color: var(--sm-admin-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.admin-page .admin-content-inner :is(.eyebrow, .admin-eyebrow) {
+  color: var(--sm-admin-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+}
+
+/* Shared surface language for lists, forms, detail sections, and dashboards. */
+.admin-page .admin-content-inner :is(.panel, .card, .ad-panel, .management-card),
+.admin-page .ad-admin-shell .metric-grid article,
+.admin-page .log-kpi-card {
+  border: 1px solid var(--sm-admin-border) !important;
+  border-radius: 10px !important;
+  background: var(--sm-admin-surface) !important;
+  box-shadow: none !important;
+}
+
+.admin-page .admin-content-inner .card-header {
+  border-bottom: 1px solid var(--sm-admin-border);
+  color: var(--sm-admin-ink);
+  background: var(--sm-admin-surface);
+}
+
+.admin-page .admin-member-page .panel {
+  padding: 24px;
+}
+
+.admin-page .admin-content-inner .ad-admin-shell .metric-grid i {
+  color: #344054;
+  background: #f2f4f7;
+}
+
+/* Brand actions are black; success, warning, and danger keep their meanings. */
+.admin-page .admin-content-inner :is(.btn-primary, .btn-dark, .create-button, .primary-button) {
+  border-color: #111;
+  color: #fff;
+  background: #111;
+  box-shadow: none;
+}
+
+.admin-page .admin-content-inner :is(.btn-primary, .btn-dark, .create-button, .primary-button):hover {
+  border-color: #303030;
+  color: #fff;
+  background: #303030;
+}
+
+.admin-page .admin-content-inner :is(.btn:not(.btn-sm):not(.btn-close), .create-button, .primary-button, .secondary-button) {
+  min-height: 40px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.admin-page .event-admin .btn {
+  border-radius: 8px;
+}
+
+.admin-page .ad-admin-shell .header-actions .btn-primary {
+  border: 1px solid #cfd4dc;
+  color: #111;
+  background: #fff;
+}
+
+.admin-page .ad-admin-shell .header-actions .btn-primary:hover {
+  border-color: #111;
+  color: #111;
+  background: #f2f4f7;
+}
+
+.admin-page .ad-admin-shell .create-button {
+  box-shadow: none;
+}
+
+.admin-page .admin-content-inner :is(.btn-outline-secondary, .secondary-button) {
+  border-color: #cfd4dc;
+  color: #344054;
+  background: #fff;
+}
+
+.admin-page .admin-content-inner :is(.form-control, .form-select),
+.admin-page .admin-member-page :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-color: #cfd4dc;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-page .admin-content-inner :is(input.form-control, select.form-select) {
+  min-height: 40px;
+}
+
+.admin-page :is(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 2px;
+}
+
+/* Tables retain their columns and actions, with a consistent reading surface. */
+.admin-page .admin-content-inner :is(.table, .member-table) thead th,
+.admin-page .ad-admin-shell table thead th {
+  border-bottom: 1px solid var(--sm-admin-border);
+  color: #475467;
+  background: #f8f9fa;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.admin-page .admin-content-inner :is(.table, .member-table) tbody td,
+.admin-page .ad-admin-shell table tbody td {
+  border-color: var(--sm-admin-border);
+}
+
+.admin-page .admin-content-inner :is(.member-table-wrapper, .table-responsive, .table-wrap) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 576px) {
+  .admin-page .admin-content-inner :is(.page-header, .workspace-header, .overview-header, .admin-header-top) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .admin-page .ad-admin-shell .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .admin-page .ad-admin-shell .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-page .admin-member-page .panel {
+    padding: 18px;
+  }
+}
+
+/* Match every routed page header to the activity operations center. */
+.admin-page .admin-content-inner .ad-admin-shell .admin-page-heading {
+  font-family: var(--bs-body-font-family, system-ui, sans-serif);
+}
+
+.admin-page .admin-content-inner .admin-page-heading {
+  display: flex;
+  align-items: flex-start !important;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px !important;
+}
+
+.admin-page .admin-content-inner .admin-page-heading .admin-page-eyebrow {
+  display: block;
+  margin: 0 0 6px !important;
+  color: #73766f !important;
+  font-family: inherit;
+  font-size: 11px !important;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.16em;
+}
+
+.admin-page .admin-content-inner .admin-page-heading h1 {
+  margin: 0 !important;
+  color: #161816;
+  font-family: inherit;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+
+.admin-page .admin-content-inner .admin-page-heading .admin-page-description {
+  display: block;
+  max-width: 620px;
+  margin: 8px 0 0 !important;
+  color: #73766f !important;
+  font-family: inherit;
+  font-size: 1rem !important;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.admin-page .event-admin .admin-header {
+  border-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .admin-page .admin-content-inner .admin-page-heading {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 16px;
+  }
+
+  .admin-page .admin-content-inner .admin-page-heading > :first-child {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-page .admin-content-inner .admin-page-heading h1 {
+    font-size: clamp(1.9rem, 7vw, 2.5rem);
+  }
+}

@@ -1,11 +1,11 @@
 <template>
   <div class="event-admin notification-center">
     <header class="admin-header">
-      <div class="admin-header-top">
+      <div class="admin-header-top admin-page-heading">
         <div>
-          <span class="admin-eyebrow">SNEAKERMARKET ADMIN</span>
+          <span class="admin-eyebrow admin-page-eyebrow">SNEAKERMARKET ADMIN</span>
           <h1 class="admin-title">通知中心</h1>
-          <p class="admin-description">
+          <p class="admin-description admin-page-description">
             建立、搜尋、編輯、發送與管理會員通知。
           </p>
         </div>

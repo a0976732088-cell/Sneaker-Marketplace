@@ -557,13 +557,13 @@ watch(
            Page Header
       ====================================== -->
 
-      <div class="page-header">
+      <div class="page-header admin-page-heading">
         <div>
-          <p class="eyebrow">MEMBER MANAGEMENT</p>
+          <p class="eyebrow admin-page-eyebrow">SNEAKERMARKET ADMIN</p>
 
           <h1>會員管理</h1>
 
-          <p class="page-description">
+          <p class="page-description admin-page-description">
             管理 SneakerMarket 會員資料、建立會員、 修改會員與刪除會員。
           </p>
 

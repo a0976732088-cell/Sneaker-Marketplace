@@ -185,13 +185,13 @@ onMounted(() => {
 <template>
   <div class="event-admin activity-management">
     <header class="admin-header">
-      <div class="admin-header-top">
+      <div class="admin-header-top admin-page-heading">
         <div>
-          <span class="admin-eyebrow">SNEAKERMARKET ADMIN</span>
+          <span class="admin-eyebrow admin-page-eyebrow">SNEAKERMARKET ADMIN</span>
 
           <h1 class="admin-title">活動管理</h1>
 
-          <p class="admin-description">
+          <p class="admin-description admin-page-description">
             建立、查詢、編輯與追蹤平台活動。
           </p>
         </div>
