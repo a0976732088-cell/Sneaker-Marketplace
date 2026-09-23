@@ -94,7 +94,7 @@ const isAuctionSection = computed(() => {
 <template>
   <aside class="admin-sidebar">
     <div class="sidebar-heading">
-      <small>SNEAKERMARKET</small>
+      <small>酷客 kicks</small>
       <strong>管理後台</strong>
     </div>
     <!-- =========================================
