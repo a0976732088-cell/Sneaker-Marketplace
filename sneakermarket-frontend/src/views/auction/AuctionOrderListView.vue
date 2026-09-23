@@ -53,11 +53,14 @@
             <p class="record-product-meta">{{ formatProductMeta(order) }}</p>
           </template>
 
-          <div class="record-metrics">
-            <div class="record-metric">
-              <span class="record-metric__label">成交金額</span>
-              <strong class="record-metric__value">{{ formatTwd(order.finalPrice) }}</strong>
+          <div class="order-amount">
+            <div class="order-amount__main">
+              <span class="order-amount__label">訂單總額</span>
+              <strong class="order-amount__value">{{ formatTwd(order.totalAmount) }}</strong>
             </div>
+            <p class="order-amount__breakdown">
+              成交價 {{ formatTwd(order.finalPrice) }} <span aria-hidden="true">·</span> 運費 {{ formatTwd(order.shippingFee) }}
+            </p>
           </div>
 
           <p
@@ -125,11 +128,14 @@
             <p class="record-product-meta">{{ formatProductMeta(order) }}</p>
           </template>
 
-          <div class="record-metrics">
-            <div class="record-metric">
-              <span class="record-metric__label">成交金額</span>
-              <strong class="record-metric__value">{{ formatTwd(order.finalPrice) }}</strong>
+          <div class="order-amount">
+            <div class="order-amount__main">
+              <span class="order-amount__label">訂單總額（買家應付）</span>
+              <strong class="order-amount__value">{{ formatTwd(order.totalAmount) }}</strong>
             </div>
+            <p class="order-amount__breakdown">
+              成交價 {{ formatTwd(order.finalPrice) }} <span aria-hidden="true">·</span> 運費 {{ formatTwd(order.shippingFee) }}
+            </p>
           </div>
 
           <template #actions>
@@ -217,6 +223,40 @@ function formatProductMeta(item) {
 .order-role-tab.is-active {
   border-bottom-color: #111;
   color: #111;
+}
+
+.order-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.order-amount__main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+
+.order-amount__label {
+  color: #6c757d;
+  font-size: 0.82rem;
+}
+
+.order-amount__value {
+  color: #111;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.order-amount__breakdown {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .payment-deadline {

@@ -114,13 +114,15 @@ class AuctionMemberAccessTests {
                         AuctionStatus.SOLD, AuctionAdminManagementState.VISIBLE, AuctionResultStatus.SOLD,
                         money, at, at, at, "/images/listing.jpg")), 0, 10, 1, 1));
         when(queries.getMyAuctionOrders(77L, 0, 10)).thenReturn(new PageData<>(List.of(
-                new AuctionOrderSummaryResponse("AO-test", 1L, "Shoe", money, "Transfer",
+                new AuctionOrderSummaryResponse("AO-test", 1L, "Shoe", money,
+                        new BigDecimal("120"), new BigDecimal("6620"), "Transfer",
                         AuctionPaymentStatus.PENDING, AuctionShippingStatus.NOT_SHIPPED,
                         AuctionOrderStatus.PENDING_PAYMENT, at, at,
                         "Order Model", "US 10", "/images/order.jpg", dueAt,
                         AuctionAdminManagementState.VISIBLE)), 0, 10, 1, 1));
         when(queries.getMyAuctionSales(77L, 0, 10)).thenReturn(new PageData<>(List.of(
-                new AuctionOrderSummaryResponse("AO-sale", 1L, "Shoe", money, "Transfer",
+                new AuctionOrderSummaryResponse("AO-sale", 1L, "Shoe", money,
+                        new BigDecimal("120"), new BigDecimal("6620"), "Transfer",
                         AuctionPaymentStatus.PAID, AuctionShippingStatus.NOT_SHIPPED,
                         AuctionOrderStatus.PAID, at, at,
                         "Sale Model", "US 11", "/images/sale.jpg", dueAt,
@@ -148,12 +150,16 @@ class AuctionMemberAccessTests {
                 .andExpect(jsonPath("$.data.items[0].model").value("Order Model"))
                 .andExpect(jsonPath("$.data.items[0].size").value("US 10"))
                 .andExpect(jsonPath("$.data.items[0].imageUrl").value("/images/order.jpg"))
+                .andExpect(jsonPath("$.data.items[0].shippingFee").value(120))
+                .andExpect(jsonPath("$.data.items[0].totalAmount").value(6620))
                 .andExpect(jsonPath("$.data.items[0].paymentDueAt").value("2026-09-12T12:00:00"))
                 .andExpect(jsonPath("$.data.items[0].managementState").value("VISIBLE"));
         mvc.perform(get("/api/auction-orders/me/sales").session(activeSession()))
                 .andExpect(jsonPath("$.data.items[0].model").value("Sale Model"))
                 .andExpect(jsonPath("$.data.items[0].size").value("US 11"))
                 .andExpect(jsonPath("$.data.items[0].imageUrl").value("/images/sale.jpg"))
+                .andExpect(jsonPath("$.data.items[0].shippingFee").value(120))
+                .andExpect(jsonPath("$.data.items[0].totalAmount").value(6620))
                 .andExpect(jsonPath("$.data.items[0].paymentDueAt").value("2026-09-12T12:00:00"))
                 .andExpect(jsonPath("$.data.items[0].managementState").value("REMOVED"));
     }

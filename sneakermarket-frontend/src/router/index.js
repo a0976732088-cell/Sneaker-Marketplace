@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import HomeView from "@/views/HomeView.vue";
+import HomeView from "@/views/advertisement/StorefrontHomeView.vue";
 
 import { getCurrentMember } from "@/service/authService";
 
@@ -423,7 +423,6 @@ router.beforeEach(async (to) => {
     const member = await getCurrentMember();
 
     if (member.role !== "ROLE_ADMIN") {
-
       return {
         name: "forbidden",
       };
@@ -431,7 +430,6 @@ router.beforeEach(async (to) => {
 
     return true;
   } catch (error) {
-
     return {
       name: "login",
 
