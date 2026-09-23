@@ -5,7 +5,7 @@
   <div class="admin-header-top">
     <div>
       <span class="admin-eyebrow">
-        SNEAKERMARKET ADMIN
+        酷客 Kicks ADMIN
       </span>
 
       <h1 class="admin-title">

@@ -54,7 +54,7 @@ public class PaymentController {
         params.put("MerchantTradeDate", merchantTradeDate);
         params.put("PaymentType", "aio");
         params.put("TotalAmount", String.valueOf(order.getTotalAmount().intValue()));
-        params.put("TradeDesc", "SneakerMarket訂單付款");
+        params.put("TradeDesc", "酷客 Kicks 訂單付款");
         params.put("ItemName", "訂單" + order.getOrderNumber());
         params.put("ReturnURL", returnUrl);
         params.put("ClientBackURL", CLIENT_BACK_URL_PREFIX + orderId + "?fromPayment=true");

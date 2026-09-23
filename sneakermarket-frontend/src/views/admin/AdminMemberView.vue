@@ -7,7 +7,7 @@
       <div>
         <h1 class="h2 mb-2">會員管理</h1>
         <p class="text-secondary mb-0">
-          SneakerMarket 後台會員資料
+          酷客 Kicks 後台會員資料
         </p>
       </div>
 

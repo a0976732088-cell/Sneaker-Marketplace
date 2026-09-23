@@ -3,7 +3,7 @@
     <header class="create-hero">
       <div class="create-hero-inner">
         <div class="create-hero-content">
-          <p class="create-eyebrow">SneakerMarket</p>
+          <p class="create-eyebrow">酷客 Kicks</p>
           <h1>建立競標</h1>
           <p class="create-hero-copy">
             填寫商品與競標資訊，開始你的球鞋競價。

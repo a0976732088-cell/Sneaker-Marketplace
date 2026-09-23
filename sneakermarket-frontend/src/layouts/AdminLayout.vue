@@ -12,7 +12,7 @@ import AdminSidebar from "@/components/admin/AdminSidebar.vue";
          使用跟 Navbar 一樣的 Bootstrap container
 
          所以：
-         左側 Sidebar 會對齊 SneakerMarket
+         左側 Sidebar 會對齊酷客 Kicks
          右側內容會對齊 登出
     ========================================== -->
     <div class="container admin-layout">

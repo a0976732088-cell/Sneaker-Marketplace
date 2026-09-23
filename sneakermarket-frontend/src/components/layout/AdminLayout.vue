@@ -5,7 +5,7 @@
         <span class="brand-logo">SM</span>
 
         <span>
-          <strong>SneakerMarket</strong>
+          <strong>酷客 Kicks</strong>
           <small>管理後台</small>
         </span>
       </RouterLink>

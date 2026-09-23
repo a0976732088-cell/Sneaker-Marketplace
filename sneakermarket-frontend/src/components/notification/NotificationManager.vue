@@ -41,10 +41,15 @@
       </div>
 
       <div class="filter-actions">
-        <button class="filter-button reset-filter" @click="handleReset">
+        <button
+          type="button"
+          class="filter-button reset-filter"
+          @click="handleReset"
+        >
           重設
         </button>
         <button
+          type="button"
           class="filter-button search-filter"
           @click="fetchNotifications(1)"
         >
@@ -68,7 +73,10 @@
         </thead>
 
         <tbody>
-          <tr v-for="item in notificationLogList" :key="item.notificationId">
+          <tr
+            v-for="(item, index) in notificationLogList"
+            :key="item.notificationId"
+          >
             <td class="notification-title-cell">
               <strong>{{ item.title }}</strong>
 
@@ -77,7 +85,7 @@
 
             <td>
               <span class="type-badge">
-                {{ item.notificationType }}
+                {{ notificationTypeLabel(item.notificationType) }}
               </span>
             </td>
 
@@ -109,60 +117,91 @@
               </span>
             </td>
 
-            <td class="notification-action-cell">
+            <td
+              class="notification-action-cell"
+              :class="{
+                'menu-open': openActionMenuId === item.notificationId,
+              }"
+            >
               <div class="notification-actions">
-                <button
-                  type="button"
-                  class="notification-action action-view"
-                  title="查看通知"
-                  @click="openDetailModal(item)"
-                >
-                  查看
-                </button>
+                <div class="notification-more-menu">
+                  <button
+                    type="button"
+                    class="notification-more-action"
+                    aria-label="更多通知操作"
+                    :aria-expanded="openActionMenuId === item.notificationId"
+                    :aria-controls="`notification-menu-${item.notificationId}`"
+                    @click.stop="toggleActionMenu(item.notificationId)"
+                  >
+                    •••
+                  </button>
 
-                <button
-                  v-if="!item.isSent"
-                  type="button"
-                  class="notification-action action-edit"
-                  title="編輯通知"
-                  @click="openEditModal(item)"
-                >
-                  編輯
-                </button>
+                  <div
+                    v-if="openActionMenuId === item.notificationId"
+                    :id="`notification-menu-${item.notificationId}`"
+                    class="notification-action-menu"
+                    :class="{
+                      'open-up': index >= notificationLogList.length - 2,
+                    }"
+                    role="menu"
+                    @click.stop
+                  >
+                    <button
+                      type="button"
+                      class="notification-menu-item"
+                      role="menuitem"
+                      @click="handleOpenDetailFromMenu(item)"
+                    >
+                      查看詳情
+                    </button>
 
-                <button
-                  v-if="!item.isSent"
-                  type="button"
-                  class="notification-action action-all"
-                  title="發送給全體會員"
-                  :disabled="item.isQueued"
-                  @click="handleSendNotice(item, 'ALL_MEMBERS')"
-                >
-                  發給全體
-                </button>
+                    <button
+                      v-if="!item.isSent"
+                      type="button"
+                      class="notification-menu-item"
+                      role="menuitem"
+                      @click="handleOpenEditFromMenu(item)"
+                    >
+                      編輯通知
+                    </button>
 
-                <button
-                  v-if="
-                    !item.isSent && item.targetType === 'EVENT' && item.targetId
-                  "
-                  type="button"
-                  class="notification-action action-followers"
-                  title="發送給活動關注者"
-                  :disabled="item.isQueued"
-                  @click="handleSendNotice(item, 'EVENT_FOLLOWERS')"
-                >
-                  發給關注者
-                </button>
+                    <button
+                      v-if="!item.isSent"
+                      type="button"
+                      class="notification-menu-item"
+                      role="menuitem"
+                      :disabled="item.isQueued"
+                      @click="handleSendFromMenu(item, 'ALL_MEMBERS')"
+                    >
+                      發給全體會員
+                    </button>
 
-                <button
-                  v-if="!item.isSent"
-                  type="button"
-                  class="notification-action action-delete"
-                  title="刪除通知"
-                  @click="handleDelete(item.notificationId)"
-                >
-                  刪除
-                </button>
+                    <button
+                      v-if="
+                        !item.isSent &&
+                        item.targetType === 'EVENT' &&
+                        item.targetId
+                      "
+                      type="button"
+                      class="notification-menu-item"
+                      role="menuitem"
+                      :disabled="item.isQueued"
+                      @click="handleSendFromMenu(item, 'EVENT_FOLLOWERS')"
+                    >
+                      發給活動關注者
+                    </button>
+
+                    <button
+                      v-if="!item.isSent"
+                      type="button"
+                      class="notification-menu-item danger"
+                      role="menuitem"
+                      @click="handleDeleteFromMenu(item.notificationId)"
+                    >
+                      刪除通知
+                    </button>
+                  </div>
+                </div>
               </div>
             </td>
           </tr>
@@ -177,7 +216,11 @@
     </div>
 
     <!-- 分頁導覽 -->
-    <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-3">
+    <nav
+      v-if="totalPages > 1"
+      class="notification-pagination"
+      aria-label="通知列表分頁"
+    >
       <ul class="pagination">
         <li :class="['page-item', currentPage === 1 ? 'disabled' : '']">
           <button
@@ -227,12 +270,14 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+
 import {
   deleteNotification,
   getNotificationPage,
   sendNotification,
 } from "@/service/notificationService";
+
 import NotificationDetailModal from "./NotificationDetailModal.vue";
 import NotificationEditModal from "./NotificationEditModal.vue";
 
@@ -243,6 +288,8 @@ const props = defineProps({
     validator: (value) => ["ALL", "UNSENT", "SENT"].includes(value),
   },
 });
+
+const emit = defineEmits(["changed"]);
 
 // 查詢條件與分頁狀態
 const searchParams = ref({
@@ -259,6 +306,45 @@ const notificationLogList = ref([]);
 const showDetailModal = ref(false);
 const showEditModal = ref(false);
 const selectedNotification = ref(null);
+
+const openActionMenuId = ref(null);
+
+const closeActionMenu = () => {
+  openActionMenuId.value = null;
+};
+
+const toggleActionMenu = (notificationId) => {
+  openActionMenuId.value =
+    openActionMenuId.value === notificationId ? null : notificationId;
+};
+
+const handleOpenDetailFromMenu = (item) => {
+  closeActionMenu();
+  openDetailModal(item);
+};
+
+const handleOpenEditFromMenu = (item) => {
+  closeActionMenu();
+  openEditModal(item);
+};
+
+const handleSendFromMenu = (item, audienceType) => {
+  closeActionMenu();
+  handleSendNotice(item, audienceType);
+};
+
+const handleDeleteFromMenu = (notificationId) => {
+  closeActionMenu();
+  handleDelete(notificationId);
+};
+
+onMounted(() => {
+  document.addEventListener("click", closeActionMenu);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", closeActionMenu);
+});
 
 watch(
   () => props.sentStatus,
@@ -340,9 +426,11 @@ const openEditModal = (item) => {
 };
 
 // 編輯成功處置
-const handleEditSuccess = () => {
+const handleEditSuccess = async () => {
   showEditModal.value = false;
-  fetchNotifications(currentPage.value);
+
+  await fetchNotifications(currentPage.value);
+  emit("changed");
 };
 
 // 「發送」推播按鈕
@@ -373,8 +461,9 @@ const handleSendNotice = async (item, audienceType) => {
       alert(`${response.data.message}\n任務編號：${response.data.jobId}`);
 
       // Redis 背景發送，稍後更新列表
-      setTimeout(() => {
-        fetchNotifications(currentPage.value);
+      setTimeout(async () => {
+        await fetchNotifications(currentPage.value);
+        emit("changed");
       }, 2000);
     } else {
       alert(
@@ -385,6 +474,7 @@ const handleSendNotice = async (item, audienceType) => {
       item.isQueued = false;
 
       await fetchNotifications(currentPage.value);
+      emit("changed");
     }
   } catch (error) {
     // 加入 Redis 失敗，重新開放按鈕
@@ -408,7 +498,8 @@ const handleDelete = async (id) => {
   try {
     await deleteNotification(id);
     alert("刪除成功");
-    fetchNotifications(currentPage.value);
+    await fetchNotifications(currentPage.value);
+    emit("changed");
   } catch (err) {
     console.error("刪除失敗", err);
     alert("刪除失敗");
@@ -436,6 +527,17 @@ const notificationStatus = (item) => {
   };
 };
 
+const notificationTypeLabel = (type) => {
+  const labels = {
+    EVENT_REMINDER: "活動提醒",
+    SYSTEM_NOTICE: "系統公告",
+    ORDER_UPDATE: "訂單更新",
+    PROMOTION: "促銷優惠",
+  };
+
+  return labels[type] || type || "未分類";
+};
+
 const notificationAudience = (item) => {
   if (item.targetType === "EVENT" && item.targetId) {
     return "活動關注者";
@@ -455,129 +557,175 @@ const formatDate = (dateStr) => {
 .table-responsive {
   max-width: 100%;
   overflow-x: auto;
+  border: 1px solid #e3e4e0;
+  border-radius: 5px;
+  background: #ffffff;
 }
+
+/* 右側操作欄 */
 
 .notification-action-heading,
 .notification-action-cell {
   position: sticky;
   right: 0;
-  width: 220px;
-  min-width: 220px;
+  width: 104px;
+  min-width: 104px;
 }
 
 .notification-action-heading {
   z-index: 3;
-  background: #eeece8;
+  background: #f7f7f5 !important;
+  text-align: center;
 }
 
 .notification-action-cell {
   z-index: 2;
-  background: #ffffff;
-  box-shadow: -8px 0 12px rgba(15, 23, 42, 0.05);
+  background: #ffffff !important;
+  box-shadow: -7px 0 10px rgb(17 17 17 / 4%);
+}
+
+.notification-action-cell.menu-open {
+  z-index: 10;
+}
+
+.notification-table tbody tr:hover .notification-action-cell {
+  background: #fafaf8 !important;
 }
 
 .notification-actions {
-  display: grid;
-  grid-template-columns: repeat(3, max-content);
-  justify-content: start;
-  gap: 8px;
-}
-
-.notification-action {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
+}
+
+.notification-more-action {
   height: 28px;
-  padding: 0 8px;
-  border: 0;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.notification-more-menu {
+  position: relative;
+}
+
+.notification-more-action {
+  width: 30px;
+  padding: 0;
+  border: 1px solid #dedfdb;
+  color: #5c6059;
+  background: #ffffff;
+  letter-spacing: 1px;
+}
+
+.notification-more-action:hover {
+  border-color: #bfc1bb;
+  background: #f3f3f0;
+}
+
+/* 操作下拉選單 */
+
+.notification-action-menu {
+  position: absolute;
+  z-index: 20;
+  top: 34px;
+  right: 0;
+  width: 154px;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid #dedfdb;
+  border-radius: 5px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgb(17 17 17 / 12%);
+}
+
+.notification-action-menu.open-up {
+  top: auto;
+  bottom: 34px;
+}
+
+.notification-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 3px;
+  color: #464943;
+  background: transparent;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notification-menu-item:hover:not(:disabled) {
+  background: #f2f2ef;
+}
+
+.notification-menu-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.notification-menu-item.danger {
+  color: #9a554f;
+}
+
+.notification-menu-item.danger:hover {
+  background: #f7eae8;
+}
+/* 通知列表基本版面 */
+
+.notification-table {
+  width: 100%;
+  min-width: 880px;
+  margin-bottom: 0;
+}
+
+.notification-table thead th {
+  padding: 10px 11px;
+  border-bottom: 1px solid #dedfdb;
+  color: #6c7069;
+  background: #f7f7f5;
+  font-size: 11px;
   font-weight: 650;
   white-space: nowrap;
 }
 
-.action-view,
-.action-edit,
-.action-delete {
-  min-width: 60px;
-}
-
-.action-all {
-  min-width: 88px;
-}
-
-.action-followers {
-  min-width: 104px;
-}
-
-.notification-action:hover:not(:disabled) {
-  transform: translateY(-1px);
-  filter: brightness(0.95);
-}
-
-.notification-action:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
-}
-
-/* 查看：霧藍灰 */
-.action-view {
-  color: #526168;
-  background: #dce3e6;
-}
-
-/* 編輯：中性水泥灰 */
-.action-edit {
-  color: #3f403d;
-  background: #dfded9;
-}
-
-/* 發送全體：鼠尾草綠 */
-.action-all {
-  color: #52604e;
-  background: #dce3d8;
-}
-
-/* 活動關注者：陶土色 */
-.action-followers {
-  color: #70594c;
-  background: #e8dcd4;
-}
-
-/* 刪除：灰玫瑰 */
-.action-delete {
-  color: #744f4b;
-  background: #eadbd9;
-}
-
-/* 通知列表基本版面 */
-
-.notification-table {
-  min-width: 940px;
-}
-
-.notification-table thead th {
-  padding: 14px 12px;
-  border-bottom: 1px solid #deddd8;
-  color: #666660;
-  background: #f5f4f1;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .notification-table tbody td {
-  padding: 14px 12px;
+  padding: 10px 11px;
+  border-bottom: 1px solid #ecece9;
+  color: #383b37;
+  background: #ffffff;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+.notification-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.notification-table tbody tr:hover td {
+  background: #fafaf8;
+}
+
+.notification-table tbody tr:hover .notification-action-cell {
+  background: #fafaf8 !important;
 }
 
 /* 通知名稱 */
 
+.notification-title-cell {
+  width: 27%;
+}
+
 .notification-title-cell strong {
   display: block;
-  max-width: 280px;
+  max-width: 260px;
   overflow: hidden;
-  color: #222222;
+  color: #222420;
+  font-size: 12px;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -585,9 +733,9 @@ const formatDate = (dateStr) => {
 .notification-title-cell small,
 .notification-table td > small {
   display: block;
-  margin-top: 4px;
-  color: #8a8a84;
-  font-size: 11px;
+  margin-top: 3px;
+  color: #949791;
+  font-size: 10px;
 }
 
 /* 通知類型 */
@@ -597,9 +745,9 @@ const formatDate = (dateStr) => {
   align-items: center;
   padding: 5px 9px;
   border-radius: 999px;
-  color: #526168;
-  background: #dce3e6;
-  font-size: 11px;
+  color: #67536a;
+  background: #eee3ec;
+  font-size: 10px;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -608,9 +756,9 @@ const formatDate = (dateStr) => {
 
 .audience-label {
   display: block;
-  color: #444440;
-  font-size: 12px;
-  font-weight: 650;
+  color: #444742;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 /* 通知狀態 */
@@ -618,64 +766,64 @@ const formatDate = (dateStr) => {
 .notification-status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 650;
   white-space: nowrap;
 }
 
 .notification-status i {
   width: 7px;
   height: 7px;
+  flex: 0 0 7px;
   border-radius: 50%;
 }
 
 .status-unsent {
-  color: #666660;
-  background: #e8e8e5;
+  color: #6d706b;
 }
 
 .status-unsent i {
-  background: #9b9b95;
+  background: #a5a69f;
 }
 
 .status-processing {
-  color: #526168;
-  background: #dce8f2;
+  color: #526a82;
 }
 
 .status-processing i {
-  background: #6693bf;
+  background: #7095bf;
 }
 
 .status-sent {
-  color: #52604e;
-  background: #dce8d9;
+  color: #586d54;
 }
 
 .status-sent i {
-  background: #7f9f79;
+  background: #79a278;
 }
 
 .notification-manager {
   min-width: 0;
   padding: 0;
   border: 0;
-  background: #ffffff;
+  background: transparent;
 }
 
 .notification-filter {
   display: grid;
   grid-template-columns:
-    minmax(180px, 1.3fr)
-    minmax(140px, 0.9fr)
-    minmax(170px, 1fr)
-    minmax(170px, 1fr)
-    auto;
+    minmax(0, 1.25fr)
+    minmax(0, 0.95fr)
+    minmax(0, 1.15fr)
+    minmax(0, 1.15fr)
+    108px;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.notification-filter > div {
+  min-width: 0;
 }
 
 .notification-filter .form-control,
@@ -689,18 +837,16 @@ const formatDate = (dateStr) => {
 
 .filter-actions {
   display: flex;
-  gap: 6px;
-}
-
-.filter-actions {
-  display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 108px;
 }
 
 .filter-button {
+  flex: 1 1 0;
   height: 38px;
-  padding: 0 13px;
+  min-width: 0;
+  padding: 0 10px;
   border-radius: 5px;
   font-size: 12px;
   font-weight: 650;
@@ -717,5 +863,79 @@ const formatDate = (dateStr) => {
   border: 1px solid #222320;
   color: #ffffff;
   background: #222320;
+}
+
+.notification-filter .form-control:focus,
+.notification-filter .form-select:focus {
+  border-color: #9a9d96;
+  box-shadow: 0 0 0 2px rgb(17 17 17 / 6%);
+}
+
+.reset-filter:hover {
+  border-color: #bfc1bb;
+  background: #f6f6f3;
+}
+
+.search-filter:hover {
+  background: #111211;
+}
+
+.notification-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.notification-pagination .pagination {
+  gap: 4px;
+  margin: 0;
+}
+
+.notification-pagination .page-link {
+  min-width: 32px;
+  border-color: #dedfdb;
+  color: #565a53;
+  background: #ffffff;
+  font-size: 11px;
+  text-align: center;
+}
+
+.notification-pagination .page-item.active .page-link {
+  border-color: #292b28;
+  color: #ffffff;
+  background: #292b28;
+}
+
+@media (max-width: 1100px) {
+  .notification-filter {
+    grid-template-columns:
+      minmax(0, 1.2fr)
+      minmax(0, 0.8fr)
+      minmax(0, 1fr)
+      minmax(0, 1fr);
+  }
+
+  .filter-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 760px) {
+  .notification-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    grid-column: auto;
+  }
+
+  .filter-button {
+    flex: 1;
+  }
+
+  .notification-table {
+    min-width: 820px;
+  }
 }
 </style>

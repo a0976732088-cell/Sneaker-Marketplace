@@ -1,7 +1,7 @@
 <template>
   <section class="py-4">
     <div class="p-4 p-md-5 bg-body-tertiary rounded-3 border">
-      <h1 class="display-6 fw-bold">SneakerMarket</h1>
+      <h1 class="display-6 fw-bold">酷客 Kicks</h1>
       <p class="lead mb-4">球鞋電子商城＋競標平台 Vue 前端 BASE。</p>
 
       <div class="d-flex flex-wrap gap-2">

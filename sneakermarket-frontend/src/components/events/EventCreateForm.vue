@@ -255,6 +255,7 @@ import { ref, reactive } from "vue";
 import { createEvent } from "@/service/eventService";
 import LocationPickerMap from "@/components/events/LocationPickerMap.vue";
 
+const emit = defineEmits(["success"]);
 const loading = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
@@ -352,6 +353,7 @@ const submitForm = async () => {
     if (response.status === 201) {
       successMessage.value = "活動新增成功！";
       resetForm();
+      emit("success", response.data);
     }
   } catch (error) {
     console.error("新增失敗：", error);

@@ -6,18 +6,68 @@
         <p class="admin-page-description">查詢通知發送結果與投遞狀態。</p>
       </div>
 
-      <button type="button" class="export-button">↓ 匯出紀錄</button>
+      <button
+        type="button"
+        class="export-button"
+        :disabled="exporting"
+        @click="handleExport"
+      >
+        {{ exporting ? "匯出中…" : "↓ 匯出紀錄" }}
+      </button>
     </header>
 
-    <NotificationLog />
+    <NotificationLog ref="notificationLogRef" />
   </section>
 </template>
 
 <script setup>
+import { ref } from "vue";
+
 import NotificationLog from "@/components/notification/NotificationLog.vue";
+
+const notificationLogRef = ref(null);
+const exporting = ref(false);
+
+const handleExport = async () => {
+  if (
+    exporting.value ||
+    !notificationLogRef.value
+  ) {
+    return;
+  }
+
+  exporting.value = true;
+
+  try {
+    const count =
+      await notificationLogRef.value.exportLogsCsv();
+
+    if (count === 0) {
+      alert("目前搜尋條件下沒有可匯出的紀錄。");
+    }
+  } catch (error) {
+    console.error("匯出發送紀錄失敗：", error);
+    alert("匯出失敗，請稍後再試。");
+  } finally {
+    exporting.value = false;
+  }
+};
 </script>
 
 <style scoped>
+.export-button {
+  cursor: pointer;
+}
+
+.export-button:hover:not(:disabled) {
+  background: #f3f3f0;
+}
+
+.export-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .operation-page {
   width: 100%;
 }

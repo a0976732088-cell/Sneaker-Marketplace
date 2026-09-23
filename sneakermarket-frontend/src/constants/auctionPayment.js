@@ -9,8 +9,8 @@ export const AUCTION_PAYMENT_METHOD = Object.freeze({
  * never persisted with an auction order.
  */
 export const AUCTION_TRANSFER_ACCOUNT = Object.freeze({
-  bankName: "SneakerMarket 模擬銀行",
+  bankName: "酷客 Kicks 模擬銀行",
   bankCode: "999",
-  accountName: "SneakerMarket",
+  accountName: "酷客 Kicks",
   accountNumber: "123456789012",
 });

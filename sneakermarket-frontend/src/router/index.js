@@ -293,6 +293,14 @@ const routes = [
         component: () => import("@/views/admin/AdminHomeView.vue"),
       },
 
+      {
+        path: "members",
+
+        name: "admin-members",
+
+        component: () => import("@/views/admin/AdminMemberManagementView.vue"),
+      },
+
       // ================================================
       // Product
       // ================================================
@@ -336,7 +344,7 @@ const routes = [
       // Calendar / Notification
       // ================================================
       {
-        path: "events",
+        path: "events-and-notifications",
         name: "admin-activity-overview",
         component: () =>
           import("@/views/admin/calendarAndNotification/AdminActivityOverviewView.vue"),

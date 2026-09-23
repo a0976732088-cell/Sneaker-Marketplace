@@ -4,8 +4,8 @@
   >
     <div class="container">
       <RouterLink class="navbar-brand brand" to="/">
-        <img src="/images/brand/logo-circle.png" alt="" />
-        <span>SneakerMarket</span>
+        <img src="/images/brand/newLogo_circle.png" alt="" />
+        <span>酷客 Kicks</span>
       </RouterLink>
 
       <button
@@ -420,8 +420,8 @@ onUnmounted(() => {
 }
 
 .brand img {
-  width: 40px;
-  height: 40px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
   object-fit: cover;
 }
@@ -533,9 +533,10 @@ onUnmounted(() => {
   width: 34px;
   height: 34px;
   place-items: center;
+  border: 1px solid #d9dddf;
   border-radius: 50%;
-  background: #24282b;
-  color: #fff;
+  background: #ffffff;
+  color: #202326;
 }
 
 .account-avatar svg {

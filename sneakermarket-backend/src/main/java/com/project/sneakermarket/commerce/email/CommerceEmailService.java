@@ -97,7 +97,7 @@ public class CommerceEmailService {
 
         message.setTo(member.getEmail());
 
-        message.setSubject("SneakerMarket｜付款成功通知");
+        message.setSubject("酷客 Kicks｜付款成功通知");
 
         message.setText(
                 "您好，" + member.getName() + "！\n\n"
@@ -130,7 +130,7 @@ public class CommerceEmailService {
                         + "\n\n"
 
                         + "感謝您的購買！\n"
-                        + "SneakerMarket"
+                        + "酷客 Kicks"
         );
 
         sender.send(message);

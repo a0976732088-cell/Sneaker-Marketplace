@@ -6,5 +6,13 @@ export const EVENT_TYPES = [
   { key: "OTHER", label: "其他", color: "#bcc2c9" },
 ];
 
-export const getEventType = (key) =>
-  EVENT_TYPES.find((type) => type.key === key) ?? EVENT_TYPES[4];
+const EVENT_TYPE_ALIASES = {
+  PROMOTION: "SALE",
+  CAMPAIGN: "EVENT",
+  SYSTEM: "NOTICE",
+};
+
+export const getEventType = (key) => {
+  const normalizedKey = EVENT_TYPE_ALIASES[key] || key;
+  return EVENT_TYPES.find((type) => type.key === normalizedKey) ?? EVENT_TYPES[4];
+};

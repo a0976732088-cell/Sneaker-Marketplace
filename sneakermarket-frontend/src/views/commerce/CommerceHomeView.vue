@@ -156,7 +156,7 @@ onMounted(() => {
             class="text-uppercase small text-white-50 mb-2 fw-semibold"
             style="letter-spacing: 0.15em"
           >
-            SneakerMarket
+            酷客 Kicks
           </p>
           <h1 class="display-5 fw-bold mb-2">一般商城</h1>
           <p class="text-white-50 mb-4">嚴選球鞋，找到你的下一雙戰靴</p>

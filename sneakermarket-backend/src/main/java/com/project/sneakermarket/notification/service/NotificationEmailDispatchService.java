@@ -75,14 +75,14 @@ public class NotificationEmailDispatchService {
                 );
             }
 
-            String subject = "SneakerMarket - "
+            String subject = "酷客 Kicks - "
                     + notification.getTitle().replaceAll("[\\r\\n]+", " ");
 
 
             boolean isEvent = "EVENT".equals(notification.getTargetType());
             String destinationUrl = frontendBaseUrl.replaceAll("/+$", "")
                     + (isEvent ? "/calendar" : "/");
-            String linkLabel = isEvent ? "開啟行事曆" : "前往 SneakerMarket";
+            String linkLabel = isEvent ? "開啟行事曆" : "前往酷客 Kicks";
 
             String safeTitle = HtmlUtils.htmlEscape(notification.getTitle());
             String safeContent = HtmlUtils.htmlEscape(notification.getContent());
@@ -108,7 +108,7 @@ public class NotificationEmailDispatchService {
                   <h1 style="margin:0 0 28px;
                              font-size:24px;
                              line-height:1.4;">
-                    SneakerMarket - %s
+                    酷客 Kicks - %s
                   </h1>
 
                   <p style="margin:0 0 28px;
@@ -150,7 +150,7 @@ public class NotificationEmailDispatchService {
                                    vertical-align:middle;">
 
                           <img src="cid:brandLogo"
-                               alt="SneakerMarket"
+                               alt="酷客 Kicks"
                                width="300"
                                style="display:block;
                                       width:100%%;
@@ -174,7 +174,7 @@ public class NotificationEmailDispatchService {
                                     font-size:14px;
                                     line-height:1.8;
                                     color:#374151;">
-                            SneakerMarket 不會透過 Email
+                            酷客 Kicks 不會透過 Email
                             要求您提供密碼、驗證碼或匯款。<br>
                             如收到可疑訊息，請勿點擊不明連結。
                           </p>
@@ -198,13 +198,13 @@ public class NotificationEmailDispatchService {
             );
 
             String plainText =
-                    "SneakerMarket - " + notification.getTitle()
+                    "酷客 Kicks - " + notification.getTitle()
                             + "\n\n"
                             + notification.getContent()
                             + "\n\n查看詳情："
                             + destinationUrl
                             + "\n\n※ 防詐騙提醒 ※"
-                            + "\nSneakerMarket 不會透過 Email"
+                            + "\n酷客 Kicks 不會透過 Email"
                             + "要求您提供密碼、驗證碼或匯款。"
                             + "\n如收到可疑訊息，請勿點擊不明連結。";
 
@@ -220,7 +220,7 @@ public class NotificationEmailDispatchService {
             helper.addInline(
                     "brandLogo",
                     new ClassPathResource(
-                            "logoPhoto/05_banner_white.png"
+                            "logoPhoto/newLogo_rectangle.png"
                     ),
                     "image/png"
             );
