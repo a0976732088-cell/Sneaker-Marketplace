@@ -206,115 +206,152 @@
         </div>
       </div>
 
-      <div class="detail-information">
-        <section class="information-section" aria-labelledby="product-info-title">
-          <header>
-            <p>Product</p>
-            <h2 id="product-info-title">商品資訊</h2>
-          </header>
-
-          <dl class="information-list">
-            <div class="full-row">
-              <dt>商品描述</dt>
-              <dd>{{ auction.description || "-" }}</dd>
-            </div>
-            <div>
-              <dt>商品狀況</dt>
-              <dd>{{ formatCondition(auction.condition) }}</dd>
-            </div>
-            <div>
-              <dt>商品所在地</dt>
-              <dd>{{ auction.location || "-" }}</dd>
-            </div>
-            <div class="full-row">
-              <dt>瑕疵說明</dt>
-              <dd>{{ auction.defectNote || "無" }}</dd>
-            </div>
-            <div class="full-row">
-              <dt>真偽／來源說明</dt>
-              <dd>{{ auction.authenticityNote || "-" }}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <!-- 交易資訊 -->
-        <section class="information-section" aria-labelledby="transaction-info-title">
-          <header>
-            <p>Transaction</p>
-            <h2 id="transaction-info-title">交易資訊</h2>
-          </header>
-
-          <dl class="information-list">
-            <div>
-              <dt>交付方式</dt>
-              <dd>
-                {{
-                  formatDeliveryMethod(
-                    auction.shippingMethod,
-                    auction.allowMeetup,
-                  )
-                }}
-              </dd>
-            </div>
-            <div>
-              <dt>運費</dt>
-              <dd>{{ formatTwd(auction.shippingFee) }}</dd>
-            </div>
-            <div>
-              <dt>付款方式</dt>
-              <dd>{{ auction.paymentMethod }}</dd>
-            </div>
-            <div>
-              <dt>允許退貨</dt>
-              <dd>{{ formatBoolean(auction.allowReturn) }}</dd>
-            </div>
-            <div class="full-row">
-              <dt>保固／售後</dt>
-              <dd>{{ auction.warrantyNote || "-" }}</dd>
-            </div>
-          </dl>
-        </section>
+      <div class="detail-tabs" role="tablist" aria-label="競標詳細內容">
+        <button
+          id="detail-information-tab"
+          type="button"
+          role="tab"
+          :aria-selected="activeDetailTab === 'information'"
+          aria-controls="detail-information-panel"
+          :tabindex="activeDetailTab === 'information' ? 0 : -1"
+          @click="activeDetailTab = 'information'"
+          @keydown="handleDetailTabKeydown"
+        >
+          商品與交易資訊
+        </button>
+        <button
+          id="bid-history-tab"
+          type="button"
+          role="tab"
+          :aria-selected="activeDetailTab === 'history'"
+          aria-controls="bid-history-panel"
+          :tabindex="activeDetailTab === 'history' ? 0 : -1"
+          @click="activeDetailTab = 'history'"
+          @keydown="handleDetailTabKeydown"
+        >
+          出價紀錄 <span class="detail-tab-count">{{ bids.length }}</span>
+        </button>
       </div>
 
-      <!-- 出價紀錄 -->
-      <section class="bid-history-section" aria-labelledby="bid-history-title">
-        <header>
-          <div>
-            <p>Bid history</p>
-            <h2 id="bid-history-title">出價紀錄</h2>
+      <div
+        v-show="activeDetailTab === 'information'"
+        id="detail-information-panel"
+        class="detail-tab-panel"
+        role="tabpanel"
+        aria-labelledby="detail-information-tab"
+        tabindex="0"
+      >
+        <div class="detail-information">
+          <section class="information-section" aria-labelledby="product-info-title">
+            <header>
+              <p>Product</p>
+              <h2 id="product-info-title">商品資訊</h2>
+            </header>
+
+            <dl class="information-list">
+              <div class="full-row">
+                <dt>商品描述</dt>
+                <dd>{{ auction.description || "-" }}</dd>
+              </div>
+              <div>
+                <dt>商品狀況</dt>
+                <dd>{{ formatCondition(auction.condition) }}</dd>
+              </div>
+              <div>
+                <dt>商品所在地</dt>
+                <dd>{{ auction.location || "-" }}</dd>
+              </div>
+              <div class="full-row">
+                <dt>瑕疵說明</dt>
+                <dd>{{ auction.defectNote || "無" }}</dd>
+              </div>
+              <div class="full-row">
+                <dt>真偽／來源說明</dt>
+                <dd>{{ auction.authenticityNote || "-" }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <!-- 交易資訊 -->
+          <section class="information-section" aria-labelledby="transaction-info-title">
+            <header>
+              <p>Transaction</p>
+              <h2 id="transaction-info-title">交易資訊</h2>
+            </header>
+
+            <dl class="information-list">
+              <div>
+                <dt>交付方式</dt>
+                <dd>
+                  {{
+                    formatDeliveryMethod(
+                      auction.shippingMethod,
+                      auction.allowMeetup,
+                    )
+                  }}
+                </dd>
+              </div>
+              <div>
+                <dt>運費</dt>
+                <dd>{{ formatTwd(auction.shippingFee) }}</dd>
+              </div>
+              <div>
+                <dt>付款方式</dt>
+                <dd>{{ auction.paymentMethod }}</dd>
+              </div>
+              <div>
+                <dt>允許退貨</dt>
+                <dd>{{ formatBoolean(auction.allowReturn) }}</dd>
+              </div>
+              <div class="full-row">
+                <dt>保固／售後</dt>
+                <dd>{{ auction.warrantyNote || "-" }}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+      </div>
+
+      <div
+        v-show="activeDetailTab === 'history'"
+        id="bid-history-panel"
+        class="detail-tab-panel"
+        role="tabpanel"
+        aria-labelledby="bid-history-tab"
+        tabindex="0"
+      >
+        <!-- 出價紀錄 -->
+        <section class="bid-history-section" aria-label="出價紀錄">
+          <div v-if="bids.length === 0" class="empty-bid-history">
+            目前尚無出價紀錄。
           </div>
-          <span>{{ bids.length }} 筆</span>
-        </header>
 
-        <div v-if="bids.length === 0" class="empty-bid-history">
-          目前尚無出價紀錄。
-        </div>
+          <div v-else class="table-responsive">
+            <table class="table bid-history-table">
+              <thead>
+                <tr>
+                  <th>出價者</th>
+                  <th>出價金額</th>
+                  <th>出價時間</th>
+                </tr>
+              </thead>
 
-        <div v-else class="table-responsive">
-          <table class="table bid-history-table">
-            <thead>
-              <tr>
-                <th>出價者</th>
-                <th>出價金額</th>
-                <th>出價時間</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              <tr
-                v-for="(bid, index) in bids"
-                :key="`${bid.createdAt}-${index}`"
-              >
-                <td>
-                  {{ bid.bidderName || "會員資料未提供" }}
-                </td>
-                <td>{{ formatTwd(bid.bidAmount) }}</td>
-                <td>{{ formatDateTime(bid.createdAt) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+              <tbody>
+                <tr
+                  v-for="(bid, index) in bids"
+                  :key="`${bid.createdAt}-${index}`"
+                >
+                  <td>
+                    {{ bid.bidderName || "會員資料未提供" }}
+                  </td>
+                  <td>{{ formatTwd(bid.bidAmount) }}</td>
+                  <td>{{ formatDateTime(bid.createdAt) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </div>
   </section>
 </template>
@@ -357,6 +394,27 @@ const auction = ref(null);
 
 // 出價紀錄
 const bids = ref([]);
+
+// 詳細內容頁籤
+const activeDetailTab = ref("information");
+
+function handleDetailTabKeydown(event) {
+  const tabs = Array.from(
+    event.currentTarget.parentElement.querySelectorAll('[role="tab"]'),
+  );
+  const currentIndex = tabs.indexOf(event.currentTarget);
+  let nextIndex;
+
+  if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
+  else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+  else if (event.key === "Home") nextIndex = 0;
+  else if (event.key === "End") nextIndex = tabs.length - 1;
+  else return;
+
+  event.preventDefault();
+  activeDetailTab.value = nextIndex === 0 ? "information" : "history";
+  tabs[nextIndex].focus();
+}
 
 // 是否正在讀取資料
 const loading = ref(false);
@@ -1125,7 +1183,7 @@ function resolveImageUrl(imageUrl) {
   align-items: center;
   justify-content: center;
   gap: 0.65rem;
-  color: #6c757d;
+  color: #495057;
 }
 
 .back-link {
@@ -1171,7 +1229,7 @@ function resolveImageUrl(imageUrl) {
   margin-bottom: 0.85rem;
   padding: 0.2rem 0.68rem;
   border-radius: 999px;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.04em;
 }
@@ -1195,7 +1253,7 @@ function resolveImageUrl(imageUrl) {
 .status-cancelled,
 .status-removed {
   background: #f1f1f1;
-  color: #6c757d;
+  color: #495057;
 }
 
 .summary-heading h1 {
@@ -1212,8 +1270,8 @@ function resolveImageUrl(imageUrl) {
   flex-wrap: wrap;
   gap: 0.4rem;
   margin: 0.8rem 0 0;
-  color: #6c757d;
-  font-size: 0.92rem;
+  color: #495057;
+  font-size: 1.05rem;
 }
 
 .product-meta-grid,
@@ -1240,8 +1298,8 @@ function resolveImageUrl(imageUrl) {
 .auction-metrics dt,
 .information-list dt {
   margin-bottom: 0.25rem;
-  color: #6c757d;
-  font-size: 0.72rem;
+  color: #495057;
+  font-size: 0.88rem;
   font-weight: 600;
 }
 
@@ -1254,7 +1312,7 @@ function resolveImageUrl(imageUrl) {
 }
 
 .product-meta-grid dd {
-  font-size: 0.88rem;
+  font-size: 1.05rem;
   font-weight: 600;
 }
 
@@ -1265,8 +1323,8 @@ function resolveImageUrl(imageUrl) {
 }
 
 .current-price-block > span {
-  color: #6c757d;
-  font-size: 0.78rem;
+  color: #495057;
+  font-size: 0.95rem;
   font-weight: 600;
 }
 
@@ -1281,7 +1339,8 @@ function resolveImageUrl(imageUrl) {
 
 .current-price-block > small {
   margin-top: 0.3rem;
-  color: #8a9096;
+  color: #495057;
+  font-size: 0.95rem;
 }
 
 .auction-metrics {
@@ -1299,7 +1358,7 @@ function resolveImageUrl(imageUrl) {
 }
 
 .auction-metrics dd {
-  font-size: 0.83rem;
+  font-size: 1.05rem;
   font-weight: 700;
 }
 
@@ -1322,19 +1381,19 @@ function resolveImageUrl(imageUrl) {
 }
 
 .auction-time-panel span {
-  color: #6c757d;
-  font-size: 0.78rem;
+  color: #495057;
+  font-size: 0.95rem;
 }
 
 .auction-time-panel strong {
   color: #343a40;
-  font-size: 0.82rem;
+  font-size: 1.05rem;
   text-align: right;
 }
 
 .auction-time-panel .remaining-row strong {
   color: #111;
-  font-size: 1rem;
+  font-size: 1.15rem;
 }
 
 .bid-panel {
@@ -1352,10 +1411,9 @@ function resolveImageUrl(imageUrl) {
 }
 
 .section-title-row p,
-.information-section header p,
-.bid-history-section header p {
+.information-section header p {
   margin: 0 0 0.25rem;
-  color: #8a9096;
+  color: #495057;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 0.66rem;
@@ -1364,8 +1422,7 @@ function resolveImageUrl(imageUrl) {
 
 .section-title-row h2,
 .seller-panel h2,
-.information-section h2,
-.bid-history-section h2 {
+.information-section h2 {
   margin: 0;
   color: #111;
   font-size: 1.15rem;
@@ -1373,7 +1430,7 @@ function resolveImageUrl(imageUrl) {
 }
 
 .section-title-row > span {
-  color: #6c757d;
+  color: #495057;
   font-size: 0.75rem;
   white-space: nowrap;
 }
@@ -1382,7 +1439,7 @@ function resolveImageUrl(imageUrl) {
 .seller-message,
 .bid-availability-message {
   margin: 0;
-  color: #6c757d;
+  color: #495057;
   font-size: 0.82rem;
   line-height: 1.6;
 }
@@ -1411,7 +1468,8 @@ function resolveImageUrl(imageUrl) {
 }
 
 .bid-stepper button:disabled {
-  color: #adb5bd;
+  background: #e9ecef;
+  color: #495057;
   cursor: not-allowed;
 }
 
@@ -1449,8 +1507,9 @@ function resolveImageUrl(imageUrl) {
 }
 
 .place-bid-button:disabled {
-  border-color: #adb5bd;
-  background: #adb5bd;
+  border-color: #ced4da;
+  background: #e9ecef;
+  color: #495057;
   cursor: not-allowed;
 }
 
@@ -1503,75 +1562,124 @@ function resolveImageUrl(imageUrl) {
   margin-top: 0.65rem;
 }
 
+.detail-tabs {
+  display: flex;
+  gap: clamp(1.25rem, 4vw, 2.5rem);
+  margin-top: clamp(3rem, 5vw, 4rem);
+  border-bottom: 1px solid #dee2e6;
+  overflow-x: auto;
+}
+
+.detail-tabs button {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 3.5rem;
+  padding: 0.75rem 0.15rem;
+  border: 0;
+  background: transparent;
+  color: #495057;
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.detail-tabs button:hover,
+.detail-tabs button[aria-selected="true"] {
+  color: #111;
+}
+
+.detail-tabs button[aria-selected="true"]::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: #111;
+  content: "";
+}
+
+.detail-tabs button:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: -4px;
+}
+
+.detail-tab-count {
+  display: inline-block;
+  min-width: 1.5rem;
+  margin-left: 0.2rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 1rem;
+  background: #f1f3f5;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.detail-tab-panel {
+  padding-top: clamp(1.75rem, 3vw, 2.25rem);
+}
+
 .detail-information {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3rem;
-  margin-top: 4rem;
-  padding-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 920px;
+}
+
+.information-section + .information-section {
+  padding-top: 1.5rem;
   border-top: 1px solid #dee2e6;
 }
 
-.information-section header,
-.bid-history-section > header {
-  margin-bottom: 1.25rem;
+.information-section header {
+  margin-bottom: 0.4rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.information-section h2 {
+  font-size: 1.35rem;
 }
 
 .information-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .information-list div {
+  display: grid;
+  grid-template-columns: minmax(0, 34%) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(0.75rem, 2vw, 1.25rem);
   padding: 0.85rem 0;
-  border-bottom: 1px solid #e9ecef;
 }
 
-.information-list div:nth-child(odd):not(.full-row) {
-  padding-right: 1rem;
-}
-
-.information-list div:nth-child(even):not(.full-row) {
-  padding-left: 1rem;
-}
-
-.information-list .full-row {
-  grid-column: 1 / -1;
+.information-list dt {
+  margin: 0;
+  color: #212529;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.7;
 }
 
 .information-list dd {
-  font-size: 0.88rem;
-  line-height: 1.65;
+  font-size: 1.05rem;
+  line-height: 1.7;
   white-space: pre-line;
 }
 
 .bid-history-section {
-  margin-top: 4rem;
-  padding-top: 2rem;
-  border-top: 1px solid #dee2e6;
-}
-
-.bid-history-section > header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.bid-history-section > header > span {
-  color: #6c757d;
-  font-size: 0.78rem;
+  width: 100%;
 }
 
 .empty-bid-history {
   padding: 2rem;
   background: #f8f9fa;
-  color: #6c757d;
+  color: #495057;
   text-align: center;
 }
 
 .bid-history-table {
+  width: 100%;
   min-width: 620px;
   margin-bottom: 0;
 }
@@ -1579,15 +1687,15 @@ function resolveImageUrl(imageUrl) {
 .bid-history-table th {
   padding: 0.8rem 0.5rem;
   border-bottom-color: #212529;
-  color: #6c757d;
-  font-size: 0.72rem;
+  color: #495057;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
 .bid-history-table td {
   padding: 1rem 0.5rem;
   color: #343a40;
-  font-size: 0.86rem;
+  font-size: 0.95rem;
   vertical-align: middle;
 }
 
@@ -1638,31 +1746,19 @@ function resolveImageUrl(imageUrl) {
     border-left: 1px solid #e9ecef;
   }
 
-  .detail-information {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2.5rem;
-    margin-top: 3rem;
-  }
+}
 
-  .bid-history-section {
-    margin-top: 3rem;
+@media (max-width: 575.98px) {
+  .information-list div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.2rem;
+    padding: 0.75rem 0;
   }
 }
 
 @media (max-width: 479.98px) {
-  .product-meta-grid,
-  .information-list {
+  .product-meta-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .information-list .full-row {
-    grid-column: auto;
-  }
-
-  .information-list div:nth-child(odd):not(.full-row),
-  .information-list div:nth-child(even):not(.full-row) {
-    padding-right: 0;
-    padding-left: 0;
   }
 
   .auction-metrics {

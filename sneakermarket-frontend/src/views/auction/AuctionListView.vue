@@ -15,12 +15,12 @@
 
         <div class="hero-content">
           <p
-            class="hero-brand text-uppercase small text-white-50 mb-2 fw-semibold"
+            class="hero-brand text-uppercase small mb-2 fw-semibold"
           >
             SneakerMarket
           </p>
           <h1 class="display-5 fw-bold mb-2">競標商城</h1>
-          <p class="hero-copy text-white-50 mb-4">
+          <p class="hero-copy mb-4">
             熱門球鞋限時競價，出價競逐你的下一雙收藏
           </p>
 
@@ -1009,7 +1009,13 @@ onUnmounted(() => {
   z-index: 1;
 }
 
+.hero-brand,
+.hero-copy {
+  color: #dee2e6;
+}
+
 .hero-brand {
+  font-size: 1rem;
   letter-spacing: 0.15em;
 }
 
@@ -1039,7 +1045,7 @@ onUnmounted(() => {
 
 .hero-search input {
   min-width: 0;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .hero-search-btn {
@@ -1082,6 +1088,7 @@ onUnmounted(() => {
 }
 
 .filter-toggle-btn {
+  font-size: 0.95rem;
   font-weight: 500;
 }
 
@@ -1093,6 +1100,7 @@ onUnmounted(() => {
   border: 0;
   background-color: transparent;
   box-shadow: none;
+  font-size: 0.95rem;
   font-weight: 500;
 }
 
@@ -1108,7 +1116,7 @@ onUnmounted(() => {
 .filter-sidebar {
   position: sticky;
   top: 103px;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 
 .filter-block {
@@ -1159,7 +1167,7 @@ onUnmounted(() => {
   background: none;
   color: #212529;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   font-weight: 600;
   list-style: none;
 }
@@ -1173,7 +1181,7 @@ onUnmounted(() => {
 }
 
 .filter-icon {
-  color: #6c757d;
+  color: #495057;
 }
 
 .filter-icon::before {
@@ -1188,14 +1196,14 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1rem;
-  height: 1rem;
+  min-width: 1.3rem;
+  height: 1.3rem;
   padding: 0 0.25rem;
   margin-left: 0.35rem;
   border-radius: 50%;
   background: #111;
   color: #fff;
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
@@ -1211,21 +1219,21 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.4rem;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 
 .filter-option input[type="checkbox"] {
   flex: 0 0 auto;
-  width: 0.85rem;
-  height: 0.85rem;
+  width: 1rem;
+  height: 1rem;
   accent-color: #111;
 }
 
 .filter-group .form-control {
-  min-height: 31px;
+  min-height: 36px;
   border-color: #dee2e6;
   border-radius: 0.25rem;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 
 .price-inputs {
@@ -1245,7 +1253,7 @@ onUnmounted(() => {
 }
 
 .price-inputs span {
-  color: #adb5bd;
+  color: #495057;
 }
 
 .filter-actions {
@@ -1255,12 +1263,12 @@ onUnmounted(() => {
 }
 
 .apply-filter-button {
-  min-height: 31px;
+  min-height: 36px;
   border: 1px solid #111;
   border-radius: 0.25rem;
   background: #111;
   color: #fff;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   font-weight: 700;
 }
 
@@ -1269,13 +1277,15 @@ onUnmounted(() => {
 }
 
 .apply-filter-button:disabled {
-  border-color: #adb5bd;
-  background: #adb5bd;
+  border-color: #ced4da;
+  background: #e9ecef;
+  color: #495057;
+  opacity: 1;
 }
 
 .clear-filter-button {
   border-radius: 0.25rem;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 
 .auction-results {
@@ -1290,7 +1300,7 @@ onUnmounted(() => {
   justify-content: center;
 
   gap: 0.65rem;
-  color: #6c757d;
+  color: #495057;
 }
 
 .empty-state {
@@ -1355,13 +1365,12 @@ onUnmounted(() => {
   justify-content: center;
 
   gap: 0.4rem;
-
-  color: #8b9197;
-  font-size: 0.78rem;
+  color: #495057;
+  font-size: 0.9rem;
 }
 
 .placeholder-mark {
-  color: #c4c8cc;
+  color: #5d6670;
 
   font-size: 1.5rem;
   font-weight: 800;
@@ -1379,7 +1388,7 @@ onUnmounted(() => {
 
   border-radius: 999px;
 
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   font-weight: 800;
 
   letter-spacing: 0.03em;
@@ -1407,10 +1416,9 @@ onUnmounted(() => {
 
 .product-brand {
   margin: 0 0 0.25rem;
+  color: #495057;
 
-  color: #6c757d;
-
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   font-weight: 400;
 }
 
@@ -1422,7 +1430,7 @@ onUnmounted(() => {
 
   color: #111;
 
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 500;
   line-height: 1.35;
 
@@ -1440,9 +1448,8 @@ onUnmounted(() => {
   margin: 0.3rem 0 0;
 
   overflow: hidden;
-
-  color: #6c757d;
-  font-size: 0.78rem;
+  color: #495057;
+  font-size: 0.95rem;
 
   text-overflow: ellipsis;
 
@@ -1459,13 +1466,13 @@ onUnmounted(() => {
 }
 
 .price-block span {
-  color: #6c757d;
-  font-size: 0.72rem;
+  color: #495057;
+  font-size: 0.9rem;
 }
 
 .price-block strong {
   color: #111;
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 600;
 }
 
@@ -1483,7 +1490,7 @@ onUnmounted(() => {
 
   color: #495057;
 
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
@@ -1494,9 +1501,8 @@ onUnmounted(() => {
   gap: 0.2rem;
 
   margin-top: 0.65rem;
-
-  color: #8a9096;
-  font-size: 0.7rem;
+  color: #495057;
+  font-size: 0.9rem;
 }
 
 .auction-pagination {
@@ -1516,9 +1522,8 @@ onUnmounted(() => {
 
 .auction-pagination p {
   margin: 0;
-
-  color: #6c757d;
-  font-size: 0.82rem;
+  color: #495057;
+  font-size: 0.95rem;
 }
 
 .pagination-actions {
@@ -1542,7 +1547,7 @@ onUnmounted(() => {
   background: #fff;
   color: #212529;
 
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 
 .pagination-actions button {
@@ -1554,7 +1559,8 @@ onUnmounted(() => {
 }
 
 .pagination-actions button:disabled {
-  color: #adb5bd;
+  background: #f1f3f5;
+  color: #495057;
   cursor: not-allowed;
 }
 

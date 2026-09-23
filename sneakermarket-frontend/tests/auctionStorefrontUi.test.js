@@ -347,7 +347,7 @@ test("auction list size checkboxes expose the supported US sizes in order", () =
   assert.doesNotMatch(sizeFilter, /<select\b/);
 });
 
-test("auction storefront matches the general commerce typography, search and compact filter language", () => {
+test("auction storefront keeps the commerce layout with readable search and filter text", () => {
   const auctionStyle = section(
     listSource,
     /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
@@ -366,13 +366,15 @@ test("auction storefront matches the general commerce typography, search and com
 
   for (const style of [commerceStyle, auctionStyle]) {
     assert.match(style, /\.hero-search\s*\{[^}]*max-width\s*:\s*380px/);
-    assert.match(style, /\.hero-search input\s*\{[^}]*font-size\s*:\s*0\.95rem/);
-    assert.match(style, /\.filter-sidebar\s*\{[^}]*font-size\s*:\s*0\.82rem/);
     assert.match(
       style,
       /\.sort-select\s*\{[^}]*border\s*:\s*(?:none|0)[^}]*background-color\s*:\s*transparent[^}]*font-weight\s*:\s*500/,
     );
   }
+  assert.match(commerceStyle, /\.hero-search input\s*\{[^}]*font-size\s*:\s*0\.95rem/);
+  assert.match(commerceStyle, /\.filter-sidebar\s*\{[^}]*font-size\s*:\s*0\.82rem/);
+  assert.match(auctionStyle, /\.hero-search input\s*\{[^}]*font-size\s*:\s*1rem/);
+  assert.match(auctionStyle, /\.filter-sidebar\s*\{[^}]*font-size\s*:\s*0\.95rem/);
 
   assert.match(listSource, /<h2\s+class=["'][^"']*\bh4\b[^"']*\bfw-bold\b/);
   assert.match(listSource, /« 隱藏篩選條件/);
@@ -432,7 +434,7 @@ test("auction storefront matches the general commerce typography, search and com
   );
   assert.match(
     auctionStyle,
-    /\.filter-option\s*\{[^}]*display\s*:\s*flex[^}]*font-size\s*:\s*0\.82rem/,
+    /\.filter-option\s*\{[^}]*display\s*:\s*flex[^}]*font-size\s*:\s*0\.95rem/,
   );
   assert.match(
     auctionStyle,
@@ -440,15 +442,15 @@ test("auction storefront matches the general commerce typography, search and com
   );
   assert.match(
     auctionStyle,
-    /\.product-brand\s*\{[^}]*font-size\s*:\s*0\.875rem[^}]*font-weight\s*:\s*400/,
+    /\.product-brand\s*\{[^}]*font-size\s*:\s*0\.95rem[^}]*font-weight\s*:\s*400/,
   );
   assert.match(
     auctionStyle,
-    /\.product-card-body h3\s*\{[^}]*font-size\s*:\s*1rem[^}]*font-weight\s*:\s*500/,
+    /\.product-card-body h3\s*\{[^}]*font-size\s*:\s*1\.1rem[^}]*font-weight\s*:\s*500/,
   );
   assert.match(
     auctionStyle,
-    /\.price-block strong\s*\{[^}]*font-size\s*:\s*1rem[^}]*font-weight\s*:\s*600/,
+    /\.price-block strong\s*\{[^}]*font-size\s*:\s*1\.1rem[^}]*font-weight\s*:\s*600/,
   );
 });
 
