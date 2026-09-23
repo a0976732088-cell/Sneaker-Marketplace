@@ -16,6 +16,22 @@ const detailSource = await readFile(
   new URL("../src/views/auction/AuctionDetailView.vue", import.meta.url),
   "utf8",
 );
+const summarySource = await readFile(
+  new URL("../src/components/auction/detail/AuctionSummaryPanel.vue", import.meta.url),
+  "utf8",
+);
+const bidPanelSource = await readFile(
+  new URL("../src/components/auction/detail/AuctionBidPanel.vue", import.meta.url),
+  "utf8",
+);
+const sellerActionSource = await readFile(
+  new URL("../src/components/auction/detail/AuctionSellerActionPanel.vue", import.meta.url),
+  "utf8",
+);
+const bidHistorySource = await readFile(
+  new URL("../src/components/auction/detail/AuctionBidHistory.vue", import.meta.url),
+  "utf8",
+);
 const editSource = await readFile(
   new URL("../src/views/auction/AuctionEditView.vue", import.meta.url),
   "utf8",
@@ -115,8 +131,8 @@ async function loadDetailFromApi(detail, bidItems = []) {
 }
 
 const listCard = section(cardSource, "<template>", "</template>");
-const detailInfo = section(detailSource, "<!-- 競標資訊 -->", "<!-- 出價操作 -->");
-const bidHistory = section(detailSource, "<!-- 出價紀錄 -->", "</template>");
+const detailInfo = section(summarySource, "<template>", "</template>");
+const bidHistory = section(bidHistorySource, "<template>", "</template>");
 const legacyBidField = ["masked", "Bidder"].join("");
 const legacyFallback = ["匿名", "會員"].join("");
 
@@ -125,6 +141,9 @@ test("public and member auction views do not present DRAFT as a supported status
   assert.doesNotMatch(listSource, draftLabel);
   assert.doesNotMatch(cardSource, draftLabel);
   assert.doesNotMatch(detailSource, draftLabel);
+  for (const childSource of [summarySource, bidPanelSource, sellerActionSource, bidHistorySource]) {
+    assert.doesNotMatch(childSource, draftLabel);
+  }
   assert.doesNotMatch(editSource, draftLabel);
 });
 
@@ -161,9 +180,13 @@ test("auction detail displays API sellerName and preserves owner controls", asyn
   const expression = memberExpression(detailInfo, "auction", "sellerName");
   assert.equal(evaluate(expression, "auction", subject.auction.value), "陳小華");
   assert.equal(subject.canOwnerManageAuction.value, true);
-  assert.match(detailSource, /v-if="auction\.isOwner"/);
-  assert.match(detailSource, /v-if="canOwnerManageAuction"/);
-  assert.match(detailSource, /<form v-else @submit\.prevent="handlePlaceBid">/);
+  assert.match(detailSource, /<AuctionSummaryPanel\b[\s\S]*?:auction="auction"/);
+  assert.match(detailSource, /<AuctionSellerActionPanel\s+v-if="auction\.isOwner"/);
+  assert.match(detailSource, /:can-manage="canOwnerManageAuction"/);
+  assert.match(sellerActionSource, /v-if="canManage"/);
+  assert.match(detailSource, /@submit="handlePlaceBid"/);
+  assert.match(bidPanelSource, /v-if="auction\.isOwner"/);
+  assert.match(bidPanelSource, /<form v-else @submit\.prevent="\$emit\(\x27submit\x27\)">/);
   assert.doesNotMatch(detailInfo, /auction\.sellerId/);
 });
 
