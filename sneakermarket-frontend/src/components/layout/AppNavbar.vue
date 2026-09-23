@@ -535,8 +535,9 @@ onUnmounted(() => {
   place-items: center;
   border: 1px solid #d9dddf;
   border-radius: 50%;
-  background: #ffffff;
-  color: #202326;
+  background: #f1f3f5;
+  color: #495057;
+  border: 1px solid #dee2e6;
 }
 
 .account-avatar svg {
