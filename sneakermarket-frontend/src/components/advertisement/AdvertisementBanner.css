@@ -1,0 +1,117 @@
+.banner-ad {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 10 / 3;
+  border-radius: 12px;
+  background-color: #e9ecef;
+}
+
+.banner-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.banner-actions {
+  position: absolute;
+  z-index: 3;
+  left: clamp(24px, 5vw, 72px);
+  bottom: clamp(24px, 4vw, 48px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.banner-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 150px;
+  min-height: 52px;
+  padding: 12px 24px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.banner-action:hover { transform: translateY(-2px); }
+.banner-action:focus-visible { outline: 3px solid rgb(255 255 255 / 65%); outline-offset: 3px; }
+.banner-action-primary { color: #fff; background: #111; }
+.banner-action-auction-primary { color: #111; background: #fff; }
+.banner-action-primary:hover { color: #fff; background: #333; }
+.banner-action-secondary:hover { border-color: #111; color: #111; background: #fff; }
+
+.banner-fade-enter-active,
+.banner-fade-leave-active { transition: opacity 0.4s ease, transform 0.4s ease; }
+.banner-fade-enter-from { opacity: 0; transform: scale(1.02); }
+.banner-fade-leave-to { opacity: 0; transform: scale(0.99); }
+
+.banner-ad > img.static-banner-image { cursor: default; }
+
+.banner-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 42px;
+  height: 60px;
+  border: none;
+  color: white;
+  background-color: rgb(0 0 0 / 35%);
+  font-size: 36px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 0.2s ease;
+}
+
+.banner-ad:hover .banner-arrow { opacity: 1; pointer-events: auto; }
+.banner-arrow.left { left: 0; }
+.banner-arrow.right { right: 0; }
+
+.banner-dots {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  gap: 7px;
+  transform: translateX(-50%);
+}
+
+.banner-dots button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid rgb(209, 207, 207);
+  border-radius: 50%;
+  background-color: rgb(255 255 255 / 60%);
+}
+
+.banner-dots button.active { background-color: #858f9e; }
+
+@media (max-width: 576px) {
+  .banner-actions { right: 16px; bottom: 16px; left: 16px; gap: 8px; }
+
+  .banner-action {
+    flex: 1;
+    min-width: 0;
+    min-height: 42px;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
