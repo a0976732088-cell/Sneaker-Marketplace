@@ -61,21 +61,17 @@ onUnmounted(() => {
 
 <template>
   <section class="ad-admin-shell">
-    <!-- 管理員資訊區塊暫時隱藏 
-      <div class="sidebar-user"><div class="avatar">陳</div></div>
-     -->
-
     <main class="ad-workspace">
       <header class="workspace-header">
         <div>
-          <div class="eyebrow">ADVERTISEMENT CENTER</div>
+          <div class="eyebrow">ADVERTISEMENT ADMIN</div>
           <h1>廣告管理</h1>
           <p>建立、排程並追蹤平台上的每一則廣告活動。</p>
         </div>
 
         <div class="header-actions">
           <RouterLink
-            class="btn btn-primary d-inline-flex align-items-center justify-content-center"
+            class="btn preview-button d-inline-flex align-items-center justify-content-center"
             to="/ads/preview"
             >檢視廣告</RouterLink
           >
@@ -140,7 +136,10 @@ onUnmounted(() => {
         />
 
         <!-- 查詢 API 尚未完成時顯示載入狀態 -->
-        <div v-if="loadingAds" class="py-5 text-center text-secondary">
+        <div
+          v-if="loadingAds && filteredAds.length === 0"
+          class="py-5 text-center text-secondary"
+        >
           <span
             class="spinner-border spinner-border-sm me-2"
             aria-hidden="true"

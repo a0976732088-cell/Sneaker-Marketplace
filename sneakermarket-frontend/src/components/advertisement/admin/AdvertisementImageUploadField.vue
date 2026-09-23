@@ -123,13 +123,13 @@ const emit = defineEmits(["image-change"]);
 }
 
 .image-upload-control:hover {
-  border-color: var(--coral);
-  background: #fff7f6;
+  border-color: #111827;
+  background: #f3f3f3;
 }
 
 .image-upload-input:focus + .image-upload-control {
   border-color: var(--coral);
-  box-shadow: 0 0 0 3px #ff5c4d1a;
+  box-shadow: 0 0 0 3px #9b8c8a1a;
 }
 
 .image-upload-icon {
@@ -139,8 +139,8 @@ const emit = defineEmits(["image-change"]);
   flex: 0 0 34px;
   place-items: center;
   border-radius: 50%;
-  color: var(--coral);
-  background: #fff0ee;
+  color: #fff;
+  background: #111827;
   font-size: 20px;
   font-weight: 800;
 }

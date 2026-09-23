@@ -2,7 +2,7 @@
   --ink: #111827;
   --muted: #718096;
   --line: #e8ebf0;
-  --coral: #ff5c4d;
+  --coral: #000000;
 
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -14,126 +14,6 @@
 
   color: var(--ink);
   font-family: Inter, "Noto Sans TC", system-ui, sans-serif;
-}
-.admin-sidebar {
-  display: flex;
-  flex-direction: column;
-  padding: 28px 18px 22px;
-  color: #fff;
-  background: #111827;
-}
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 0 8px 28px;
-  border-bottom: 1px solid #273142;
-}
-.brand-mark {
-  display: grid;
-  width: 39px;
-  height: 39px;
-  place-items: center;
-  border-radius: 9px;
-  color: #fff;
-  background: var(--coral);
-  font-size: 12px;
-  font-weight: 900;
-  font-style: italic;
-  transform: skew(-7deg);
-}
-.sidebar-brand strong {
-  display: block;
-  font-size: 13px;
-  line-height: 1.05;
-  letter-spacing: 0.12em;
-}
-.sidebar-brand small {
-  display: block;
-  margin-top: 5px;
-  color: #7e8ba2;
-  font-size: 8px;
-  letter-spacing: 0.16em;
-}
-.sidebar-nav {
-  flex: 1;
-  padding-top: 20px;
-}
-.sidebar-nav p {
-  margin: 18px 10px 7px;
-  color: #667085;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-}
-.sidebar-nav a {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 10px 12px;
-  margin: 3px 0;
-  border-radius: 7px;
-  color: #9ca7b9;
-  font-size: 13px;
-  font-weight: 600;
-  transition: 0.18s;
-}
-.sidebar-nav a:hover {
-  color: #fff;
-  background: #1d2737;
-}
-.sidebar-nav a.active {
-  color: #fff;
-  background: #273142;
-  box-shadow: inset 3px 0 var(--coral);
-}
-.sidebar-nav i {
-  display: inline-grid;
-  width: 19px;
-  place-items: center;
-  color: #8b98ab;
-  font-size: 17px;
-  font-style: normal;
-}
-.sidebar-nav .active i {
-  color: var(--coral);
-}
-.sidebar-user {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 16px 6px 0;
-  border-top: 1px solid #273142;
-}
-.avatar {
-  display: grid;
-  width: 35px;
-  height: 35px;
-  place-items: center;
-  flex: 0 0 35px;
-  border-radius: 50%;
-  background: #ffdbb5;
-  color: #823f13;
-  font-size: 12px;
-  font-weight: 800;
-}
-.sidebar-user strong,
-.sidebar-user small {
-  display: block;
-}
-.sidebar-user strong {
-  font-size: 11px;
-}
-.sidebar-user small {
-  margin-top: 2px;
-  color: #748197;
-  font-size: 9px;
-}
-.sidebar-user button {
-  margin-left: auto;
-  border: 0;
-  color: #778397;
-  background: none;
 }
 .ad-workspace {
   display: flex;
@@ -151,54 +31,34 @@
   margin-bottom: 26px;
 }
 .eyebrow {
-  margin-bottom: 7px;
-  color: var(--coral);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.2em;
+  margin-bottom: 6px;
+  color: #67766d;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
 }
 .workspace-header h1 {
-  margin: 0;
-  font-size: clamp(27px, 3vw, 36px);
-  font-weight: 800;
-  letter-spacing: -0.045em;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
 }
 .workspace-header p {
-  margin: 7px 0 0;
-  color: var(--muted);
-  font-size: 13px;
+  margin-top: 8px;
+  font-size: 16px;
+  color: #73766f;
 }
 .header-actions {
   display: flex;
   gap: 10px;
 }
-.bell {
-  position: relative;
-  width: 42px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  font-size: 20px;
-}
-.bell b {
-  position: absolute;
-  top: 9px;
-  right: 9px;
-  width: 6px;
-  height: 6px;
-  border: 1px solid #fff;
-  border-radius: 50%;
-  background: var(--coral);
-}
 .create-button {
   padding: 11px 17px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 4px;
   color: #fff;
   background: var(--coral);
-  box-shadow: 0 8px 20px #ff5c4d33;
-  font-size: 12px;
-  font-weight: 800;
+  box-shadow: 0 8px 20px #00000033;
+  font-size: 16px;
 }
 .create-button span {
   font-size: 17px;
@@ -251,19 +111,19 @@
   display: block;
   margin-bottom: 4px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 600;
 }
 .metric-grid strong {
   display: block;
-  font-size: 23px;
+  font-size: 27px;
   line-height: 1;
   letter-spacing: -0.03em;
 }
 .metric-grid strong small {
   display: inline;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 16px;
 }
 .metric-grid em {
   position: absolute;
@@ -285,19 +145,6 @@
   background: #fff;
   box-shadow: 0 4px 18px #11182708;
 }
-.outline-button {
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  color: #536071;
-  background: #fff;
-  font-size: 10px;
-  font-weight: 600;
-}
-.outline-button {
-  margin-left: auto;
-  min-height: 36px;
-}
 
 .admin-toast {
   position: fixed;
@@ -309,7 +156,7 @@
   color: #fff;
   background: #111827;
   box-shadow: 0 10px 30px #0003;
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 700;
 }
 .admin-toast.success {
@@ -333,18 +180,8 @@
   .metric-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  .ad-admin-shell {
-    grid-template-columns: 190px minmax(0, 1fr);
-  }
 }
 @media (max-width: 760px) {
-  .ad-admin-shell {
-    display: block;
-    margin: -1.5rem -12px;
-  }
-  .admin-sidebar {
-    display: none;
-  }
   .ad-workspace {
     padding: 24px 15px 36px;
   }
@@ -352,8 +189,7 @@
     align-items: flex-end;
   }
   .workspace-header p,
-  .eyebrow,
-  .bell {
+  .eyebrow {
     display: none;
   }
   .metric-grid {
@@ -372,44 +208,17 @@
   .metric-grid em {
     top: 13px;
   }
-  .outline-button {
-    margin-left: 0;
-  }
 }
 
-/* 側欄已隱藏，廣告管理主內容改為單欄滿寬 */
-.ad-admin-shell {
-  grid-template-columns: minmax(0, 1fr);
+.preview-button {
+  border: 1px solid #111827;
+  color: #000000;
+  background: #ffffff;
+  border-radius: 4px;
 }
 
-.ad-workspace {
-  width: 100%;
-}
-
-/*
- * 廣告管理頁字體尺寸統一放大。
- * 集中放在樣式最後方，方便日後直接從這一區調整整頁文字大小。
- */
-.eyebrow,
-.metric-grid em {
-  font-size: 12px;
-}
-
-.workspace-header p,
-.create-button,
-.metric-grid article div > span,
-.metric-grid strong small,
-.outline-button,
-.secondary-button,
-.primary-button,
-.admin-toast {
-  font-size: 14px;
-}
-
-.metric-grid strong {
-  font-size: 27px;
-}
-
-.workspace-header h1 {
-  font-size: clamp(25px, 2vw, 42px);
+.preview-button:hover {
+  border-color: #000000;
+  color: #000000;
+  background: #ffffff;
 }
