@@ -9,6 +9,8 @@ import AdvertisementSmallBlock from "./AdvertisementSmallBlock.vue";
 import { useAdvertisementPopup } from "@/composables/advertisement/useAdvertisementPopup";
 import { usePublicAdvertisements } from "@/composables/advertisement/usePublicAdvertisements";
 import { useAdvertisementBannerCarousel } from "@/composables/advertisement/useAdvertisementBannerCarousel";
+import { useAdBlockDetection } from "@/composables/advertisement/useAdBlockDetection";
+import AdBlockNotice from "./AdBlockNotice.vue";
 
 const props = defineProps({
   placements: {
@@ -53,7 +55,7 @@ const { ads, hotAuction, loading, errorMessage, loadAdvertisements } =
   usePublicAdvertisements(hasPlacement);
 const { trackAdvertisementClick, disposeAdvertisementTracking } =
   useAdvertisementTracking();
-
+const { adBlockStatus, detectAdBlock } = useAdBlockDetection();
 const router = useRouter();
 
 function goToAdvertisementTarget(ad) {
@@ -207,6 +209,10 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <AdBlockNotice
+    :visible="adBlockStatus === 'detected'"
+    @retry="detectAdBlock"
+  />
   <section class="advertisement-preview">
     <div v-if="loading" class="text-center py-5">廣告讀取中……</div>
 

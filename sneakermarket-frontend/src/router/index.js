@@ -120,13 +120,6 @@ const routes = [
   // Advertisement - 前台
   // =====================================================
   {
-    path: "/ads",
-
-    name: "advertisement",
-
-    component: () => import("@/views/advertisement/AdvertisementHomeView.vue"),
-  },
-  {
     path: "/ads/storefront",
 
     name: "advertisement-storefront",
