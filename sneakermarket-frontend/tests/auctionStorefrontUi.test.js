@@ -12,6 +12,18 @@ async function readSource(url) {
 const listSource = await readSource(
   new URL("../src/views/auction/AuctionListView.vue", import.meta.url),
 );
+const heroSource = await readSource(
+  new URL("../src/components/auction/list/AuctionStorefrontHero.vue", import.meta.url),
+);
+const filterSource = await readSource(
+  new URL("../src/components/auction/list/AuctionFilterSidebar.vue", import.meta.url),
+);
+const cardSource = await readSource(
+  new URL("../src/components/auction/list/AuctionProductCard.vue", import.meta.url),
+);
+const paginationSource = await readSource(
+  new URL("../src/components/auction/list/AuctionPagination.vue", import.meta.url),
+);
 const auctionServiceSource = await readSource(
   new URL("../src/service/auctionService.js", import.meta.url),
 );
@@ -184,7 +196,7 @@ test("public auction list sends every supported filter through server-side pagin
 
 test("public status filter excludes CANCELLED and keeps the four public statuses", () => {
   const statusFilter = section(
-    listSource,
+    filterSource,
     "<!-- 狀態 -->",
     "<!-- 商品狀況 -->",
   );
@@ -195,7 +207,7 @@ test("public status filter excludes CANCELLED and keeps the four public statuses
   assert.doesNotMatch(statusFilter, /CANCELLED/);
   assert.doesNotMatch(statusFilter, /已取消/);
   assert.match(listSource, /const\s+sort\s*=\s*ref\s*\(\s*["']endAt,asc["']\s*\)/);
-  assert.match(listSource, /CANCELLED\s*:\s*["']已取消["']/);
+  assert.match(cardSource, /CANCELLED\s*:\s*["']已取消["']/);
 });
 
 test("facet selections query immediately while price remains explicit and multi-value", async () => {
@@ -308,8 +320,43 @@ test("auction service serializes plural filters as repeated Spring query paramet
   assert.doesNotMatch(requestUrl, /%5B%5D|\[\]/);
 });
 
+test("storefront Hero keeps the search form and delegates state and submit to the view", () => {
+  const heroTag = listSource.match(/<AuctionStorefrontHero\b[^>]*>/)?.[0] ?? "";
+  assert.match(heroTag, /v-model=["']keyword["']/);
+  assert.match(heroTag, /:loading=["']loading["']/);
+  assert.match(heroTag, /@search=["']searchAuctions["']/);
+  assert.match(heroSource, /<h1\s+class=["'][^"']*\bdisplay-5\b[^"']*\bfw-bold\b/);
+  assert.match(heroSource, /class=["'][^"']*\bd-flex\b[^"']*\bgap-2\b[^"']*\bhero-search\b/);
+  assert.match(heroSource, /@submit\.prevent=["']emit\('search'\)["']/);
+  assert.match(heroSource, /v-model=["']keywordModel["']/);
+  assert.match(heroSource, /const\s+keywordModel\s*=\s*computed\s*\(/);
+  assert.match(heroSource, /get:\s*\(\)\s*=>\s*props\.modelValue/);
+  assert.match(heroSource, /set:\s*\(value\)\s*=>\s*emit\(["']update:modelValue["'],\s*value\)/);
+  assert.doesNotMatch(heroSource, /@input\s*=/);
+  assert.match(heroSource, /:disabled=["']loading["']/);
+});
+
+test("pagination remains zero-based and sends only page changes to the view", () => {
+  const paginationTag = listSource.match(/<AuctionPagination\b[^>]*>/)?.[0] ?? "";
+  for (const [prop, value] of [
+    ["current-page", "currentPage"],
+    ["total-pages", "totalPages"],
+    ["total-elements", "totalElements"],
+    ["loading", "loading"],
+  ]) {
+    assert.match(paginationTag, new RegExp(':' + prop + '=["\']' + value + '["\']'));
+  }
+  assert.match(paginationTag, /@change=["']changePage["']/);
+  assert.match(paginationSource, /v-if=["']totalPages > 0["']/);
+  assert.match(paginationSource, /currentPage \+ 1/);
+  assert.match(paginationSource, /:disabled=["']loading \|\| currentPage === 0["']/);
+  assert.match(paginationSource, /:disabled=["']loading \|\| currentPage >= totalPages - 1["']/);
+  assert.match(paginationSource, /emit\('change', currentPage - 1\)/);
+  assert.match(paginationSource, /emit\('change', currentPage \+ 1\)/);
+});
+
 test("auction list size checkboxes expose the supported US sizes in order", () => {
-  const sizeFilter = section(listSource, "<!-- 尺寸 -->", "<!-- 價格 -->");
+  const sizeFilter = section(filterSource, "<!-- 尺寸 -->", "<!-- 價格 -->");
   const checkboxTags = [
     ...sizeFilter.matchAll(/<input\b([^>]*)\/>/g),
   ].map((match) => match[1]);
@@ -335,7 +382,7 @@ test("auction list size checkboxes expose the supported US sizes in order", () =
     assert.match(attributes, /\btype\s*=\s*["']checkbox["']/);
     assert.match(
       attributes,
-      /toggleFacetSelection\s*\(\s*selectedShoeSizes\s*,/,
+      /\$emit\s*\(\s*['"]toggle-facet['"]\s*,\s*selectedShoeSizes\s*,/,
     );
   }
   assert.deepEqual(
@@ -348,8 +395,18 @@ test("auction list size checkboxes expose the supported US sizes in order", () =
 });
 
 test("auction storefront keeps the commerce layout with readable search and filter text", () => {
-  const auctionStyle = section(
-    listSource,
+  const heroStyle = section(
+    heroSource,
+    /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
+    "</style>",
+  );
+  const filterStyle = section(
+    filterSource,
+    /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
+    "</style>",
+  );
+  const cardStyle = section(
+    cardSource,
     /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
     "</style>",
   );
@@ -358,14 +415,13 @@ test("auction storefront keeps the commerce layout with readable search and filt
     /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
     "</style>",
   );
-  const auctionHero = section(listSource, "<!-- Hero -->", "<!-- 競標商品區 -->");
 
-  assert.match(auctionHero, /<h1\s+class=["'][^"']*\bdisplay-5\b[^"']*\bfw-bold\b/);
-  assert.match(auctionHero, /class=["'][^"']*\bd-flex\b[^"']*\bgap-2\b[^"']*\bhero-search\b/);
-  assert.match(auctionHero, /class=["'][^"']*\bbtn-light\b[^"']*\bpx-4\b[^"']*\bhero-search-btn\b/);
-
-  for (const style of [commerceStyle, auctionStyle]) {
+  assert.match(heroSource, /class=["'][^"']*\bd-flex\b[^"']*\bgap-2\b[^"']*\bhero-search\b/);
+  assert.match(heroSource, /class=["'][^"']*\bbtn-light\b[^"']*\bpx-4\b[^"']*\bhero-search-btn\b/);
+  for (const style of [commerceStyle, heroStyle]) {
     assert.match(style, /\.hero-search\s*\{[^}]*max-width\s*:\s*380px/);
+  }
+  for (const style of [commerceStyle, filterStyle]) {
     assert.match(
       style,
       /\.sort-select\s*\{[^}]*border\s*:\s*(?:none|0)[^}]*background-color\s*:\s*transparent[^}]*font-weight\s*:\s*500/,
@@ -373,16 +429,25 @@ test("auction storefront keeps the commerce layout with readable search and filt
   }
   assert.match(commerceStyle, /\.hero-search input\s*\{[^}]*font-size\s*:\s*0\.95rem/);
   assert.match(commerceStyle, /\.filter-sidebar\s*\{[^}]*font-size\s*:\s*0\.82rem/);
-  assert.match(auctionStyle, /\.hero-search input\s*\{[^}]*font-size\s*:\s*1rem/);
-  assert.match(auctionStyle, /\.filter-sidebar\s*\{[^}]*font-size\s*:\s*0\.95rem/);
+  assert.match(heroStyle, /\.hero-search input\s*\{[^}]*font-size\s*:\s*1rem/);
+  assert.match(filterStyle, /\.filter-sidebar\s*\{[^}]*font-size\s*:\s*0\.95rem/);
 
-  assert.match(listSource, /<h2\s+class=["'][^"']*\bh4\b[^"']*\bfw-bold\b/);
-  assert.match(listSource, /« 隱藏篩選條件/);
-  assert.match(listSource, /» 顯示篩選條件/);
+  assert.match(filterSource, /<h2\s+class=["'][^"']*\bh4\b[^"']*\bfw-bold\b/);
+  assert.match(filterSource, /« 隱藏篩選條件/);
+  assert.match(filterSource, /» 顯示篩選條件/);
   assert.match(
-    listSource,
+    filterSource,
     /id=["']auction-sort["'][\s\S]*?class=["'][^"']*\bform-select-sm\b[^"']*\bw-auto\b/,
   );
+  for (const option of [
+    'value="endAt,asc"',
+    'value="createdAt,desc"',
+    'value="currentPrice,asc"',
+    'value="currentPrice,desc"',
+    'value="bidCount,desc"',
+  ]) {
+    assert.ok(filterSource.includes(option), 'missing sort ' + option);
+  }
 
   const checkboxGroups = [
     ["<!-- 品牌 -->", "<!-- 狀態 -->", "selectedBrandIds"],
@@ -391,101 +456,128 @@ test("auction storefront keeps the commerce layout with readable search and filt
     ["<!-- 尺寸 -->", "<!-- 價格 -->", "selectedShoeSizes"],
   ];
   for (const [start, end, model] of checkboxGroups) {
-    const filter = section(listSource, start, end);
+    const filter = section(filterSource, start, end);
     assert.match(filter, /type=["']checkbox["']/);
-    assert.match(filter, new RegExp(`:checked=["']${model}\\.includes\\(`));
+    assert.match(filter, new RegExp(':checked=["\']' + model + '\\.includes\\('));
     assert.match(
       filter,
-      new RegExp(`toggleFacetSelection\\s*\\(\\s*${model}\\s*,`),
+      new RegExp("\\$emit\\s*\\(\\s*['\"]toggle-facet['\"]\\s*,\\s*" + model + "\\s*,"),
     );
     assert.doesNotMatch(filter, /<select\b/);
   }
 
   const sidebar = section(
-    listSource,
+    filterSource,
     "<!-- 左側篩選 -->",
-    "<!-- 右側商品列表 -->",
+    "<slot",
   );
   assert.doesNotMatch(sidebar, /<select\b/);
-
-  assert.match(listSource, /class=["'][^"']*\brow\b[^"']*\bg-4\b[^"']*\bcatalog-layout\b/);
-  assert.match(listSource, /<aside[\s\S]*?class=["'][^"']*\bcol-md-2\b/);
+  assert.match(filterSource, /class=["'][^"']*\brow\b[^"']*\bg-4\b[^"']*\bcatalog-layout\b/);
+  assert.match(filterSource, /<aside[\s\S]*?class=["'][^"']*\bcol-md-2\b/);
   assert.match(listSource, /<main[\s\S]*?col-12 col-md-10 auction-results/);
-  assert.match(listSource, /class=["']category-list["']/);
-  assert.match(listSource, /v-for=["']category in categories["']/);
-  assert.match(listSource, /selectedCategoryIds\.includes\(category\.id\)/);
-  assert.match(
-    listSource,
-    /toggleFacetSelection\s*\(\s*selectedCategoryIds\s*,\s*category\.id\s*\)/,
-  );
-  assert.match(listSource, /<details\s+class=["']filter-group(?: price-filter)?["']/);
-  assert.match(listSource, /<form\s+@submit\.prevent=["']applyPriceFilters["']/);
-  assert.match(listSource, /套用金額篩選/);
-  assert.match(listSource, /清除全部篩選/);
-  assert.match(listSource, /@click=["']clearFilters["']/);
+  assert.match(filterSource, /class=["']category-list["']/);
+  assert.match(filterSource, /v-for=["']category in categories["']/);
+  assert.match(filterSource, /selectedCategoryIds\.includes\(category\.id\)/);
+  assert.match(filterSource, /\$emit\s*\(\s*['"]toggle-facet['"]\s*,\s*selectedCategoryIds\s*,\s*category\.id\s*\)/);
+  assert.match(filterSource, /<details\s+class=["']filter-group(?: price-filter)?["']/);
+  assert.match(filterSource, /<form\s+@submit\.prevent=["']\$emit\('apply-price'\)["']/);
+  assert.match(filterSource, /v-model=["']minPriceModel["']/);
+  assert.match(filterSource, /v-model=["']maxPriceModel["']/);
+  assert.match(filterSource, /套用金額篩選/);
+  assert.match(filterSource, /清除全部篩選/);
+  assert.match(filterSource, /@click=["']\$emit\('clear-filters'\)["']/);
 
   assert.match(
-    auctionStyle,
+    filterStyle,
     /\.filter-group\s*\{[^}]*padding\s*:\s*0\s+0\s+0\.5rem[^}]*border-bottom\s*:\s*1px\s+solid\s+#dee2e6/,
   );
   assert.match(
-    auctionStyle,
+    filterStyle,
     /\.apply-filter-button\s*\{[^}]*border-radius\s*:\s*0\.25rem/,
   );
   assert.match(
-    auctionStyle,
+    filterStyle,
     /\.filter-option\s*\{[^}]*display\s*:\s*flex[^}]*font-size\s*:\s*0\.95rem/,
   );
   assert.match(
-    auctionStyle,
+    filterStyle,
     /\.filter-option input\[type=["']checkbox["']\]\s*\{[^}]*accent-color\s*:\s*#111/,
   );
   assert.match(
-    auctionStyle,
+    cardStyle,
     /\.product-brand\s*\{[^}]*font-size\s*:\s*0\.95rem[^}]*font-weight\s*:\s*400/,
   );
   assert.match(
-    auctionStyle,
+    cardStyle,
     /\.product-card-body h3\s*\{[^}]*font-size\s*:\s*1\.1rem[^}]*font-weight\s*:\s*500/,
   );
   assert.match(
-    auctionStyle,
+    cardStyle,
     /\.price-block strong\s*\{[^}]*font-size\s*:\s*1\.1rem[^}]*font-weight\s*:\s*600/,
   );
 });
 
+test("view wires filter props and UI events to its existing handlers", () => {
+  const advertisement = section(
+    listSource,
+    "<!-- 競標商城廣告：位置與一般商城一致 -->",
+    "<!-- Hero -->",
+  );
+  assert.match(listSource, /import\s+AdvertisementDisplay\s+from\s+["'][^"']+["']/);
+  assert.match(advertisement, /<!--\s*<AdvertisementDisplay\b[\s\S]*?\/>\s*-->/);
+  for (const prop of [
+    ':placements="[\'BANNER\', \'SMALL_BLOCK\']"',
+    ':banner-order="2"',
+    ':static-banner="true"',
+    ':small-block-order="2"',
+  ]) {
+    assert.ok(advertisement.includes(prop), 'missing advertisement prop ' + prop);
+  }
+
+  const filterTag = listSource.match(/<AuctionFilterSidebar\b[^>]*>/)?.[0] ?? "";
+  for (const binding of [
+    ':brands="brands"',
+    ':categories="categories"',
+    ':selected-brand-ids="selectedBrandIds"',
+    ':selected-category-ids="selectedCategoryIds"',
+    ':selected-statuses="selectedStatuses"',
+    ':selected-conditions="selectedConditions"',
+    ':selected-shoe-sizes="selectedShoeSizes"',
+    ':applied-min-price="appliedMinPrice"',
+    ':applied-max-price="appliedMaxPrice"',
+    ':loading="loading"',
+  ]) {
+    assert.ok(filterTag.includes(binding), 'missing filter binding ' + binding);
+  }
+  assert.match(filterTag, /v-model:min-price=["']minPrice["']/);
+  assert.match(filterTag, /v-model:max-price=["']maxPrice["']/);
+  assert.match(filterTag, /v-model:sort=["']sort["']/);
+  assert.match(filterTag, /@sort-change=["']refreshAuctionsFromFirstPage["']/);
+  assert.match(filterTag, /@toggle-facet=["']toggleFacetSelection["']/);
+  assert.match(filterTag, /@clear-facet=["']clearFacetSelection["']/);
+  assert.match(filterTag, /@apply-price=["']applyPriceFilters["']/);
+  assert.match(filterTag, /@clear-filters=["']clearFilters["']/);
+  assert.match(filterSource, /<slot\s*\/>/);
+});
+
 test("auction cards use the summary image, placeholder and whole-card detail navigation without detail N+1", () => {
-  const card = section(
-    listSource,
-    /<RouterLink\b[^>]*\bv-for\s*=\s*["']auction\s+in\s+auctions["']/,
-    "<!-- 分頁 -->",
-  );
+  const link = listSource.match(/<RouterLink\b[^>]*\bv-for\s*=\s*["']auction\s+in\s+auctions["'][\s\S]*?<\/RouterLink>/)?.[0] ?? "";
+  assert.match(link, /name\s*:\s*["']auction-detail["']/);
+  assert.match(link, /id\s*:\s*auction\.auctionId/);
+  const cardTag = link.match(/<AuctionProductCard\b[^>]*\/>/)?.[0] ?? "";
+  assert.match(cardTag, /:auction=["']auction["']/);
+  assert.match(cardTag, /:current-time=["']currentTime["']/);
+  assert.match(cardTag, /:image-failed=["']failedAuctionImageUrls\.has\(auction\.imageUrl\)["']/);
+  assert.match(cardTag, /@image-error=["']markAuctionImageFailed["']/);
 
-  assert.match(card, /\bv-for\s*=\s*["']auction\s+in\s+auctions["']/);
-  assert.match(
-    card,
-    /auction\.imageUrl\s*&&\s*!failedAuctionImageUrls\.has\(auction\.imageUrl\)/,
-  );
-  assert.match(card, /:src\s*=\s*["']resolveAuctionImageUrl\(auction\.imageUrl\)["']/);
-  assert.match(card, /@error\s*=\s*["']markAuctionImageFailed\(auction\.imageUrl\)["']/);
-
-  const cardPlaceholderTag =
-    card.match(
-      /<div\b(?=[^>]*\bclass\s*=\s*["']product-image product-image-empty["'])[^>]*>/,
-    )?.[0] ?? "";
-  assert.match(cardPlaceholderTag, /\bv-else\b/);
-  assert.match(card, /尚無圖片/);
-  assert.match(card, /name\s*:\s*["']auction-detail["']/);
-  assert.match(card, /id\s*:\s*auction\.auctionId/);
-  assert.match(
-    card,
-    /<RouterLink\b[^>]*>[\s\S]*?<article\b(?=[^>]*\bclass\s*=\s*["']auction-product-card["'])[^>]*>[\s\S]*?<\/article>\s*<\/RouterLink>/,
-  );
-  assert.doesNotMatch(
-    listSource,
-    /\bgetAuctionDetail\s*\(/,
-    "the list must not fetch one detail response per card",
-  );
+  assert.match(cardSource, /auction\.imageUrl\s*&&\s*!imageFailed/);
+  assert.match(cardSource, /:src\s*=\s*["']resolveAuctionImageUrl\(auction\.imageUrl\)["']/);
+  assert.match(cardSource, /@error\s*=\s*["']\$emit\('image-error', auction\.imageUrl\)["']/);
+  const placeholderTag = cardSource.match(/<div\b(?=[^>]*\bclass\s*=\s*["']product-image product-image-empty["'])[^>]*>/)?.[0] ?? "";
+  assert.match(placeholderTag, /\bv-else\b/);
+  assert.match(cardSource, /尚無圖片/);
+  assert.match(cardSource, /<article\b(?=[^>]*\bclass\s*=\s*["']auction-product-card["'])/);
+  assert.doesNotMatch(listSource + cardSource, /\bgetAuctionDetail\s*\(/);
 });
 
 test("auction grid keeps three desktop, two tablet and one mobile columns", () => {
@@ -503,14 +595,11 @@ test("auction grid keeps three desktop, two tablet and one mobile columns", () =
   const compactStart = style.search(
     /@media\s*\(\s*max-width\s*:\s*479\.98px\s*\)/,
   );
-
   assert.ok(tabletStart > 0, "missing tablet breakpoint");
   assert.ok(mobileStart > tabletStart, "missing mobile breakpoint after tablet");
-
   const desktopCss = style.slice(0, tabletStart);
   const tabletCss = style.slice(tabletStart, mobileStart);
   const mobileCss = style.slice(mobileStart, compactStart > mobileStart ? compactStart : undefined);
-
   assert.match(
     desktopCss,
     /\.auction-grid\s*\{[^}]*grid-template-columns\s*:\s*repeat\s*\(\s*3\s*,\s*minmax\s*\(\s*0\s*,\s*1fr\s*\)\s*\)/,
