@@ -8,6 +8,8 @@ const serviceSource = await readFile(new URL("../src/service/auctionService.js",
 const listSource = await readFile(new URL("../src/views/auction/AuctionOrderListView.vue", import.meta.url), "utf8");
 const checkoutSource = await readFile(new URL("../src/views/auction/AuctionOrderCheckoutView.vue", import.meta.url), "utf8");
 const detailSource = await readFile(new URL("../src/views/auction/AuctionOrderDetailView.vue", import.meta.url), "utf8");
+const checkoutPaymentSource = await readFile(new URL("../src/components/auction/checkout/AuctionCheckoutPaymentSection.vue", import.meta.url), "utf8");
+const checkoutSummarySource = await readFile(new URL("../src/components/auction/checkout/AuctionCheckoutOrderSummary.vue", import.meta.url), "utf8");
 
 function evaluateAuctionService() {
   const requests = [];
@@ -162,12 +164,17 @@ test("seller rows link every order to the read-only detail page", () => {
 });
 
 test("checkout and detail keep money time image and member access utilities scoped to auctions", () => {
+  assert.match(checkoutSource, /AuctionCheckoutPaymentSection/);
+  assert.match(checkoutSource, /AuctionCheckoutOrderSummary/);
+  assert.match(checkoutPaymentSource, /import \{ formatTwd \} from "@\/utils\/auctionMoney"/);
+  assert.match(checkoutSummarySource, /import \{ formatTwd \} from "@\/utils\/auctionMoney"/);
+  assert.match(checkoutSummarySource, /import \{ formatAuctionTime \} from "@\/utils\/auctionTime"/);
   for (const source of [checkoutSource, detailSource]) {
-    assert.match(source, /formatTwd/);
-    assert.match(source, /formatAuctionTime/);
     assert.match(source, /resolveAuctionImageUrl/);
     assert.match(source, /handleAuctionAccessError/);
   }
   assert.match(checkoutSource, /parseAuctionTime/);
+  assert.match(detailSource, /formatTwd/);
+  assert.match(detailSource, /formatAuctionTime/);
   assert.doesNotMatch(detailSource, /payAuctionOrder|updateAuctionOrderCheckout/);
 });

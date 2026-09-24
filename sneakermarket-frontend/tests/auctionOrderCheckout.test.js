@@ -30,6 +30,14 @@ const checkoutSource = await readFile(
   new URL("../src/views/auction/AuctionOrderCheckoutView.vue", import.meta.url),
   "utf8",
 );
+const [shippingSource, cvsPickerSource, paymentSource, summarySource] = await Promise.all(
+  [
+    "../src/components/auction/checkout/AuctionCheckoutShippingSection.vue",
+    "../src/components/auction/checkout/AuctionCvsStorePicker.vue",
+    "../src/components/auction/checkout/AuctionCheckoutPaymentSection.vue",
+    "../src/components/auction/checkout/AuctionCheckoutOrderSummary.vue",
+  ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
+);
 const checkoutScript = checkoutSource
   .match(/<script setup>([\s\S]*?)<\/script>/)[1]
   .replace(/import\s+[\s\S]*?\s+from\s+["'][^"']+["'];\s*/g, "");
@@ -1073,52 +1081,137 @@ test("deadline crossing disables checkout and refreshes detail only once", async
 });
 
 test("checkout exposes only the selected payment form and has accessible controls", () => {
-  assert.match(checkoutSource, /v-if="isCreditCard"/);
-  assert.match(checkoutSource, /v-else-if="isTransfer"/);
-  assert.match(checkoutSource, /v-else-if="isLinePay"/);
-  assert.match(checkoutSource, /將開啟 LINE Pay 付款視窗/);
-  assert.match(checkoutSource, /等待 LINE Pay 完成付款/);
+  assert.match(paymentSource, /v-if="isCreditCard"/);
+  assert.match(paymentSource, /v-else-if="isTransfer"/);
+  assert.match(paymentSource, /v-else-if="isLinePay"/);
+  assert.match(paymentSource, /將開啟 LINE Pay 付款視窗/);
+  assert.match(paymentSource, /等待 LINE Pay 完成付款/);
   assert.match(checkoutSource, /使用 LINE Pay 付款/);
-  assert.match(checkoutSource, /目前付款方式無法處理/);
-  assert.match(checkoutSource, /autocomplete="cc-name"/);
-  assert.match(checkoutSource, /autocomplete="cc-number"/);
-  assert.match(checkoutSource, /autocomplete="cc-exp"/);
-  assert.match(checkoutSource, /autocomplete="cc-csc"/);
-  assert.match(checkoutSource, /:aria-invalid=/);
-  assert.match(checkoutSource, /Demo／模擬轉帳資訊/);
-  assert.match(checkoutSource, /AUCTION_TRANSFER_ACCOUNT\.accountNumber/);
-  assert.match(checkoutSource, /v-if="!isCvsShipping"/);
-  assert.match(checkoutSource, /AUCTION_CVS_STORE_OPTIONS/);
-  assert.match(checkoutSource, /目前取貨門市/);
-  assert.match(checkoutSource, /未選擇門市/);
-  assert.match(checkoutSource, /hasSelectedCvsStore \? "更換門市" : "選擇門市"/);
-  assert.match(checkoutSource, /門市代碼：/);
-  assert.equal(checkoutSource.match(/查看地圖/g)?.length, 2);
+  assert.match(paymentSource, /目前付款方式無法處理/);
+  assert.match(paymentSource, /autocomplete="cc-name"/);
+  assert.match(paymentSource, /autocomplete="cc-number"/);
+  assert.match(paymentSource, /autocomplete="cc-exp"/);
+  assert.match(paymentSource, /autocomplete="cc-csc"/);
+  assert.match(paymentSource, /:aria-invalid=/);
+  assert.match(paymentSource, /Demo／模擬轉帳資訊/);
+  assert.match(paymentSource, /AUCTION_TRANSFER_ACCOUNT\.accountNumber/);
+  assert.match(shippingSource, /v-if="!isCvsShipping"/);
+  assert.match(cvsPickerSource, /AUCTION_CVS_STORE_OPTIONS/);
+  assert.match(shippingSource, /目前取貨門市/);
+  assert.match(shippingSource, /未選擇門市/);
+  assert.match(shippingSource, /hasSelectedCvsStore \? "更換門市" : "選擇門市"/);
+  assert.match(shippingSource, /門市代碼：/);
+  assert.match(cvsPickerSource, /門市代碼：/);
+  assert.equal((shippingSource + cvsPickerSource).match(/查看地圖/g)?.length, 2);
   assert.match(
-    checkoutSource,
-    /v-if="hasSelectedCvsStore"[\s\S]*?@click="openStoreMap\(cvsSelection\)"/,
+    shippingSource,
+    /v-if="hasSelectedCvsStore"[\s\S]*?@click="emit\('open-store-map', cvsSelection\)"/,
   );
-  assert.match(checkoutSource, /@click="openStoreMap\(store\)"/);
-  assert.match(checkoutSource, /v-if="isCvsPickerOpen"/);
-  assert.match(checkoutSource, /role="dialog"/);
-  assert.match(checkoutSource, /aria-modal="true"/);
-  assert.match(checkoutSource, /關閉門市選擇/);
-  assert.match(checkoutSource, />\s*取消\s*</);
-  assert.match(checkoutSource, /TAIWAN_CITIES/);
-  assert.match(checkoutSource, /選擇超商品牌/);
-  assert.match(checkoutSource, /搜尋門市/);
-  assert.match(checkoutSource, /門市名稱、店號或地址/);
-  assert.match(checkoutSource, /請先選擇縣市或輸入門市關鍵字/);
-  assert.match(checkoutSource, /符合門市過多，請縮小搜尋範圍。/);
-  assert.match(checkoutSource, /最多 100 筆/);
-  assert.match(checkoutSource, /重新載入門市/);
-  assert.match(checkoutSource, /選擇此門市/);
-  assert.match(checkoutSource, /請先選擇超商取貨門市/);
+  assert.match(cvsPickerSource, /@click="emit\('open-map', store\)"/);
+  assert.match(cvsPickerSource, /v-if="open"/);
+  assert.match(cvsPickerSource, /role="dialog"/);
+  assert.match(cvsPickerSource, /aria-modal="true"/);
+  assert.match(cvsPickerSource, /關閉門市選擇/);
+  assert.match(cvsPickerSource, />\s*取消\s*</);
+  assert.match(cvsPickerSource, /TAIWAN_CITIES/);
+  assert.match(cvsPickerSource, /選擇超商品牌/);
+  assert.match(cvsPickerSource, /搜尋門市/);
+  assert.match(cvsPickerSource, /門市名稱、店號或地址/);
+  assert.match(cvsPickerSource, /請先選擇縣市或輸入門市關鍵字/);
+  assert.match(cvsPickerSource, /符合門市過多，請縮小搜尋範圍。/);
+  assert.match(cvsPickerSource, /最多 100 筆/);
+  assert.match(cvsPickerSource, /重新載入門市/);
+  assert.match(cvsPickerSource, /選擇此門市/);
+  assert.match(shippingSource, /請先選擇超商取貨門市/);
+  assert.match(summarySource, /訂單摘要/);
+  assert.match(summarySource, /formatTwd\(order\.totalAmount\)/);
+  assert.match(summarySource, /remainingPaymentTimeText/);
+  assert.match(summarySource, /emit\('image-error'\)/);
   assert.match(checkoutSource, /window\.open\(/);
   assert.match(checkoutSource, /paymentWindow\.location\.href = paymentUrl\.trim\(\)/);
-  assert.doesNotMatch(checkoutSource, /window\.location\.assign|query\?\.linePay/);
+  const allCheckoutSources = [checkoutSource, shippingSource, cvsPickerSource, paymentSource, summarySource].join("\n");
+  assert.doesNotMatch(allCheckoutSources, /window\.location\.assign|query\?\.linePay/);
   assert.doesNotMatch(
-    checkoutSource,
+    allCheckoutSources,
     /\/cvs\/store-map|localStorage|sessionStorage|console\.log/,
   );
+});
+
+test("checkout wires all four UI components to Parent state and handlers", () => {
+  function openingTag(componentName) {
+    const match = checkoutSource.match(new RegExp("<" + componentName + "\\b([^>]*)>"));
+    assert.ok(match, componentName + " must be mounted");
+    return match[1];
+  }
+
+  function expectBindings(componentName, bindings) {
+    const tag = openingTag(componentName);
+    for (const binding of bindings) {
+      assert.ok(tag.includes(binding), componentName + " missing " + binding);
+    }
+  }
+
+  expectBindings("AuctionCheckoutShippingSection", [
+    ':order="order"',
+    ':shipping-form="shippingForm"',
+    ':shipping-errors="shippingErrors"',
+    ':is-cvs-shipping="isCvsShipping"',
+    ':can-operate-checkout="canOperateCheckout"',
+    ':is-busy="isBusy"',
+    ':deadline-notice="deadlineNotice"',
+    ':route-notice="routeNotice"',
+    ':has-selected-cvs-store="hasSelectedCvsStore"',
+    ':cvs-selection="cvsSelection"',
+    '@fill-from-member="fillFromMember"',
+    '@open-cvs-picker="openCvsPicker"',
+    '@open-store-map="openStoreMap"',
+  ]);
+  assert.match(checkoutSource, /<AuctionCheckoutShippingSection[\s\S]*?<template #cvs-picker>[\s\S]*?<AuctionCvsStorePicker/);
+
+  expectBindings("AuctionCvsStorePicker", [
+    ':open="isCvsPickerOpen"',
+    ':selected-store-type="selectedCvsStoreType"',
+    ':filters="cvsStoreFilters"',
+    ':is-loading="isLoadingCvsStores"',
+    ':is-selecting="isSelectingCvsStore"',
+    ':load-error="cvsStoreLoadError"',
+    ':selection-error="cvsStoreSelectionError"',
+    ':has-search-criteria="hasCvsSearchCriteria"',
+    ':filtered-stores="filteredCvsStores"',
+    ':has-too-many-stores="hasTooManyCvsStores"',
+    ':is-current-store="isCurrentCvsStore"',
+    '@close="closeCvsPicker()"',
+    '@change-store-type="changeCvsStoreType"',
+    '@reload="reloadCvsStores"',
+    '@select-store="chooseCvsStore"',
+    '@open-map="openStoreMap"',
+  ]);
+
+  expectBindings("AuctionCheckoutPaymentSection", [
+    ':order="order"',
+    ':is-credit-card="isCreditCard"',
+    ':is-transfer="isTransfer"',
+    ':is-line-pay="isLinePay"',
+    ':can-operate-checkout="canOperateCheckout"',
+    ':is-busy="isBusy"',
+    ':card-form="cardForm"',
+    ':card-errors="cardErrors"',
+    ':transfer-form="transferForm"',
+    ':transfer-errors="transferErrors"',
+    ':is-waiting-for-line-pay="isWaitingForLinePay"',
+    '@card-number-input="handleCardNumberInput"',
+    '@card-expiry-input="handleCardExpiryInput"',
+    '@card-cvv-input="handleCardCvvInput"',
+    '@account-last-five-input="handleAccountLastFiveInput"',
+  ]);
+
+  expectBindings("AuctionCheckoutOrderSummary", [
+    ':order="order"',
+    ':product-image-url="productImageUrl"',
+    ':product-meta="productMeta"',
+    ':can-operate-checkout="canOperateCheckout"',
+    ':remaining-payment-time-text="remainingPaymentTimeText"',
+    ':deadline-notice="deadlineNotice"',
+    '@image-error="imageLoadFailed = true"',
+  ]);
 });
