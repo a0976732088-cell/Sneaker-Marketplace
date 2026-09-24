@@ -42,8 +42,6 @@
         />
       </div>
     </div>
-
-    <p class="panel-quote">每一個日期，都有一個值得穿上好鞋出門的理由。</p>
   </aside>
 </template>
 

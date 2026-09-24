@@ -6,7 +6,10 @@
       <div class="list-controls">
         <CalendarViewTabs v-model="currentView" />
 
-        <div v-if="currentView === 'list'" class="month-controls">
+        <div
+          v-if="currentView === 'list' || currentView === 'map'"
+          class="month-controls"
+        >
           <span>{{ currentYear }} 年 {{ currentMonth + 1 }} 月</span>
           <button type="button" aria-label="上一個月" @click="changeMonth(-1)">
             ‹
@@ -28,7 +31,9 @@
 
     <div
       class="content-grid"
-      :class="{ 'single-column': currentView === 'month' }"
+      :class="{
+        'single-column': currentView === 'month' || currentView === 'map',
+      }"
     >
       <main class="main-content">
         <CalendarListView
@@ -43,10 +48,12 @@
           @toggle-follow="toggleFollow"
         />
 
-        <div v-else-if="currentView === 'map'" class="map-message">
-          <h2>地圖瀏覽</h2>
-          <p>目前活動資料尚未提供地點座標，地圖功能會在資料備齊後開放。</p>
-        </div>
+        <CalendarMapView
+          v-else-if="currentView === 'map'"
+          v-show="!loading"
+          :events="events"
+          @open-detail="openDetail"
+        />
         <MemberMonthView
           v-else-if="followStatus === 'ready'"
           v-show="!calendarLoading"
@@ -70,29 +77,31 @@
         </div>
       </main>
 
-      <MemberCalendarPanel
-        v-if="currentView !== 'month' && followStatus === 'ready'"
-        v-show="!calendarLoading"
-        :events="followedCalendarEvents"
-        :selected-day-events="followedSelectedDayEvents"
-        :current-year="calendarYear"
-        :current-month="calendarMonth"
-        :selected-date="calendarSelectedDate"
-        :followed-ids="followedIds"
-        :follow-loading-ids="followLoadingIds"
-        @change-month="changeCalendarMonth"
-        @select-date="selectCalendarDate"
-        @open-detail="openDetail"
-        @toggle-follow="toggleFollow"
-      />
-      <div
-        v-if="currentView !== 'month' && followStatus === 'guest'"
-        class="member-login-prompt"
-      >
-        <h2>會員行事曆</h2>
-        <p>登入後，這裡會顯示你關注的活動。</p>
-        <RouterLink to="/login">登入會員</RouterLink>
-      </div>
+      <aside v-if="currentView === 'list'" class="member-calendar-column">
+        <MemberCalendarPanel
+          v-if="followStatus === 'ready'"
+          v-show="!calendarLoading"
+          :events="followedCalendarEvents"
+          :selected-day-events="followedSelectedDayEvents"
+          :current-year="calendarYear"
+          :current-month="calendarMonth"
+          :selected-date="calendarSelectedDate"
+          :followed-ids="followedIds"
+          :follow-loading-ids="followLoadingIds"
+          @change-month="changeCalendarMonth"
+          @select-date="selectCalendarDate"
+          @open-detail="openDetail"
+          @toggle-follow="toggleFollow"
+        />
+
+        <div v-if="followStatus === 'guest'" class="member-login-prompt">
+          <h2>會員行事曆</h2>
+          <p>登入後，這裡會顯示你關注的活動。</p>
+          <RouterLink to="/login">登入會員</RouterLink>
+        </div>
+
+        <GoogleCalendarConnectionCard />
+      </aside>
     </div>
 
     <CalendarEventDetailModal
@@ -109,10 +118,12 @@ import CalendarHero from "@/components/calendar/CalendarHero.vue";
 import CalendarViewTabs from "@/components/calendar/CalendarViewTabs.vue";
 import CalendarListView from "@/components/calendar/CalendarListView.vue";
 import MemberCalendarPanel from "@/components/calendar/MemberCalendarPanel.vue";
+import GoogleCalendarConnectionCard from "@/components/calendar/GoogleCalendarConnectionCard.vue";
 import CalendarEventDetailModal from "@/components/calendar/CalendarEventDetailModal.vue";
 import { useCalendarEvents } from "@/composables/calendar/useCalendarEvents";
 import { useEventFollows } from "@/composables/calendar/useEventFollows";
 import MemberMonthView from "@/components/calendar/MemberMonthView.vue";
+import CalendarMapView from "@/components/calendar/CalendarMapView.vue";
 
 const currentView = ref("list");
 const selectedModalEvent = ref(null);
@@ -235,6 +246,13 @@ function openDetail(event) {
   min-width: 0;
 }
 
+.member-calendar-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .status-message {
   margin: 0;
   padding: 12px 16px;
@@ -246,22 +264,6 @@ function openDetail(event) {
 .status-message.error {
   background: #f8e9e5;
   color: #8c3b32;
-}
-
-.map-message {
-  padding: 20px;
-  border: 1px solid #e8eaeb;
-  border-radius: 18px;
-  background: #fff;
-}
-
-.map-message h2 {
-  font-size: 20px;
-}
-
-.map-message p {
-  color: #697079;
-  line-height: 1.7;
 }
 
 @media (max-width: 1100px) {
