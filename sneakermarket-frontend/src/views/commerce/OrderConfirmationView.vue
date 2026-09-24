@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import httpClient from '@/service/httpClient'
 import { getCurrentMember } from '@/service/authService'
 import CheckoutSteps from '@/components/commerce/CheckoutSteps.vue'
+import { resolveProductImageUrl } from '@/utils/productImageUrl'
 
 const route = useRoute()
 const router = useRouter()
@@ -303,7 +304,7 @@ onUnmounted(() => {
                 <div class="product-image">
                   <img
                     v-if="item.imageUrl"
-                    :src="item.imageUrl"
+                    :src="resolveProductImageUrl(item.imageUrl)"
                     :alt="item.productName"
                   />
 

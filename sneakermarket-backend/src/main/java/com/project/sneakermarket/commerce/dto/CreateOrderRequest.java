@@ -15,4 +15,5 @@ public class CreateOrderRequest {
     private String cvsStoreId;
     private String cvsStoreName;
     private String cvsAddress;
+    private String paymentMethod;
 }

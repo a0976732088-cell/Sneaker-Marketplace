@@ -5,6 +5,7 @@ import { getCurrentMember } from '@/service/authService'
 import { useRouter } from 'vue-router'
 import CheckoutSteps from '@/components/commerce/CheckoutSteps.vue'
 import StoreMap from '@/views/commerce/StoreMap.vue'
+import { resolveProductImageUrl } from '@/utils/productImageUrl'
 
 const router = useRouter()
 
@@ -27,6 +28,9 @@ const shippingMethod = ref('HOME_DELIVERY') // HOME_DELIVERY 或 CVS
 const cvsStoreId = ref('')
 const cvsStoreName = ref('')
 const cvsStoreAddress = ref('')
+
+// ===== 付款方式 =====
+const paymentMethod = ref('ECPAY_CREDIT_CARD') // ECPAY_CREDIT_CARD 或 LINE_PAY
 
 // 地圖選好門市後，把資料寫回同一組變數
 function handleStoreSelected(store) {
@@ -142,9 +146,19 @@ async function checkout() {
       cvsStoreId: cvsStoreId.value || null,
       cvsStoreName: cvsStoreName.value || null,
       cvsAddress: cvsStoreAddress.value || null,
-      couponId: couponId.value || null
+      couponId: couponId.value || null,
+      paymentMethod: paymentMethod.value
     })
-    window.location.href = `http://localhost:8080/api/payment/checkout/${response.data.orderId}`
+
+    const orderId = response.data.orderId
+
+    if (paymentMethod.value === 'LINE_PAY') {
+      // 先跟後端要 LINE Pay 付款頁網址，再整頁跳過去
+      const payResponse = await httpClient.post(`/orders/${orderId}/linepay/request`)
+      window.location.href = payResponse.data.paymentUrl
+    } else {
+      window.location.href = `http://localhost:8080/api/payment/checkout/${orderId}`
+    }
   } catch (error) {
     alert(error.response?.data?.message || '結帳失敗，請稍後再試')
     submitting.value = false
@@ -154,7 +168,7 @@ async function checkout() {
 
 <template>
   <div v-if="submitting" class="text-center py-5 text-secondary">
-    信用卡付款中...
+    {{ paymentMethod === 'LINE_PAY' ? '正在前往 LINE Pay...' : '信用卡付款中...' }}
   </div>
 
   <div v-else>
@@ -229,8 +243,21 @@ async function checkout() {
           <div v-else class="text-secondary small">目前沒有可使用的優惠券</div>
         </div>
 
+        <div class="mb-3">
+          <label class="form-label d-block">付款方式</label>
+          <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" id="payEcpay" value="ECPAY_CREDIT_CARD" v-model="paymentMethod" autocomplete="off">
+            <label class="btn btn-outline-dark" for="payEcpay">信用卡（綠界）</label>
+
+            <input type="radio" class="btn-check" id="payLinePay" value="LINE_PAY" v-model="paymentMethod" autocomplete="off">
+            <label class="btn btn-outline-dark" for="payLinePay">LINE Pay</label>
+          </div>
+        </div>
+
         <div class="border rounded p-3 mb-3 bg-light text-secondary small">
-          點選「下訂單」後，將跳轉至綠界金流輸入信用卡資訊
+          {{ paymentMethod === 'LINE_PAY'
+            ? '點選「下訂單」後，將跳轉至 LINE Pay 完成付款'
+            : '點選「下訂單」後，將跳轉至綠界金流輸入信用卡資訊' }}
         </div>
 
         <div v-if="formError" class="alert alert-danger py-2">
@@ -248,7 +275,7 @@ async function checkout() {
 
           <template v-else>
             <div v-for="item in selectedItems" :key="item.cartItemId" class="d-flex gap-2 mb-3">
-              <img :src="item.imageUrl" alt="" style="width: 64px; height: 64px; object-fit: cover;">
+              <img :src="resolveProductImageUrl(item.imageUrl)" alt="" style="width: 120px; height: 120px; object-fit: cover;">
               <div class="flex-grow-1">
                 <p class="mb-0">{{ item.productName }}</p>
                 <p class="mb-0 text-secondary small">{{ item.size }} / {{ item.color }}</p>

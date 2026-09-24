@@ -115,7 +115,22 @@ const routes = [
 
     component: () => import("@/views/commerce/OrderConfirmationView.vue"),
   },
+  
+  {
+    path: "/linepay/confirm/:orderId",
 
+    name: "linepay-confirm",
+
+    component: () => import("@/views/commerce/LinePayResultView.vue"),
+  },
+
+  {
+    path: "/linepay/cancel/:orderId",
+
+    name: "linepay-cancel",
+
+    component: () => import("@/views/commerce/LinePayResultView.vue"),
+  },  
   // =====================================================
   // Advertisement - 前台
   // =====================================================

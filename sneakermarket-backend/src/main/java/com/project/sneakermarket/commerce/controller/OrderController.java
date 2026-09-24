@@ -56,7 +56,8 @@ public class OrderController {
                 request.getShippingMethod(),
                 request.getCvsStoreId(),
                 request.getCvsStoreName(),
-                request.getCvsAddress()
+                request.getCvsAddress(),
+                request.getPaymentMethod()
         );
     }
 

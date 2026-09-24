@@ -145,7 +145,8 @@ public class OrderService {
                                            String shippingMethod,
                                            String cvsStoreId,
                                            String cvsStoreName,
-                                           String cvsAddress) {
+                                           String cvsAddress,
+                                           String paymentMethod) {
 
         Cart cart = cartRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new RuntimeException("找不到這個購物車"));
@@ -187,7 +188,7 @@ public class OrderService {
         order.setDiscountAmount(discount);
         order.setShippingFee(BigDecimal.valueOf(100));
         order.setTotalAmount(subtotal.add(BigDecimal.valueOf(100)).subtract(discount));
-        order.setPaymentMethod("ECPAY_CREDIT_CARD");
+        order.setPaymentMethod("LINE_PAY".equals(paymentMethod) ? "LINE_PAY" : "ECPAY_CREDIT_CARD");
         order.setStatus("PENDING");
         order.setReceiverName(receiverName);
         order.setReceiverPhone(receiverPhone);
@@ -238,7 +239,7 @@ public class OrderService {
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("找不到這張訂單"));
-
+        if ("PAID".equals(order.getStatus())) return;
         order.setStatus("PAID");
         order.setPaidAt(LocalDateTime.now());
 

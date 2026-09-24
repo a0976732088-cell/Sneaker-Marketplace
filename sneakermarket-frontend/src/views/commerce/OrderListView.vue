@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import httpClient from '@/service/httpClient'
+import { resolveProductImageUrl } from '@/utils/productImageUrl'
 
 const router = useRouter()
 const loading = ref(true)
@@ -284,7 +285,7 @@ onMounted(() => {
             <div class="order-thumb">
               <img
                 v-if="order.firstImageUrl"
-                :src="order.firstImageUrl"
+                :src="resolveProductImageUrl(order.firstImageUrl)"
                 :alt="order.firstProductName"
               />
               <div v-else class="no-image">
