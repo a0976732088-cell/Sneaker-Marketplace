@@ -33,6 +33,21 @@ const commerceSource = await readSource(
 const detailSource = await readSource(
   new URL("../src/views/auction/AuctionDetailView.vue", import.meta.url),
 );
+const summarySource = await readSource(
+  new URL("../src/components/auction/detail/AuctionSummaryPanel.vue", import.meta.url),
+);
+const bidPanelSource = await readSource(
+  new URL("../src/components/auction/detail/AuctionBidPanel.vue", import.meta.url),
+);
+const sellerActionSource = await readSource(
+  new URL("../src/components/auction/detail/AuctionSellerActionPanel.vue", import.meta.url),
+);
+const informationSource = await readSource(
+  new URL("../src/components/auction/detail/AuctionDetailInformation.vue", import.meta.url),
+);
+const historySource = await readSource(
+  new URL("../src/components/auction/detail/AuctionBidHistory.vue", import.meta.url),
+);
 const gallerySource = await readSource(
   new URL("../src/components/auction/AuctionImageGallery.vue", import.meta.url),
 );
@@ -614,84 +629,150 @@ test("auction grid keeps three desktop, two tablet and one mobile columns", () =
   );
 });
 
-test("auction detail retains gallery, countdown and complete public commerce sections", () => {
+test("auction detail retains gallery, tabs and parent-controlled panel wiring", () => {
   assert.match(detailSource, /import\s+AuctionImageGallery\s+from\s+["'][^"']+["']/);
-  assert.match(detailSource, /import\s+AuctionCountdown\s+from\s+["'][^"']+["']/);
+  for (const component of [
+    "AuctionSummaryPanel",
+    "AuctionBidPanel",
+    "AuctionSellerActionPanel",
+    "AuctionDetailInformation",
+    "AuctionBidHistory",
+  ]) {
+    assert.match(
+      detailSource,
+      new RegExp("import\\s+" + component + "\\s+from\\s+[\"'][^\"']+[\"']"),
+    );
+  }
 
-  const galleryTag = detailSource.match(/<AuctionImageGallery\b[^>]*>/)?.[0] ?? "";
-  assert.match(galleryTag, /:image-urls\s*=\s*["']auction\.imageUrls["']/);
-  assert.match(galleryTag, /:product-name\s*=\s*["']auction\.productName["']/);
+  const galleryTag = detailSource.match(/<AuctionImageGallery\b[\s\S]*?\/>/)?.[0] ?? "";
+  assert.match(galleryTag, /:image-urls="auction\.imageUrls"/);
+  assert.match(galleryTag, /:product-name="auction\.productName"/);
 
-  const countdownTag = detailSource.match(/<AuctionCountdown\b[^>]*>/)?.[0] ?? "";
-  assert.match(countdownTag, /:end-at\s*=\s*["']auction\.endAt["']/);
-  assert.match(countdownTag, /:status\s*=\s*["']auction\.status["']/);
+  const summaryTag = detailSource.match(/<AuctionSummaryPanel\b[\s\S]*?\/>/)?.[0] ?? "";
+  assert.match(summaryTag, /:auction="auction"/);
+  assert.match(summaryTag, /:format-condition="formatCondition"/);
 
-  assertIncludesAll(
-    detailSource,
-    [
-      "auction.productName",
-      "auction.brandName",
-      "auction.categoryName",
-      "auction.model",
-      "auction.size",
-      "auction.condition",
-      "auction.currentPrice",
-      "auction.startPrice",
-      "auction.bidCount",
-      "auction.minIncrement",
-      "auction.nextMinimumBid",
-      "auction.startAt",
-      "auction.endAt",
-      "auction.description",
-      "auction.defectNote",
-      "auction.authenticityNote",
-      "auction.location",
-    ],
-    "product and auction information",
-  );
-  assertIncludesAll(
-    detailSource,
-    [
-      "auction.shippingMethod",
-      "auction.shippingFee",
-      "auction.paymentMethod",
-      "auction.allowMeetup",
-      "auction.allowReturn",
-      "auction.warrantyNote",
-    ],
-    "transaction information",
-  );
-  assertIncludesAll(
-    detailSource,
-    [
-      "candidateBid",
-      "canPlaceBid",
-      "submittingBid",
-      "bidSuccessMessage",
-      "bidErrorMessage",
-      "bid.bidderName",
-      "bid.bidAmount",
-      "bid.createdAt",
-    ],
-    "bid controls and history",
-  );
-  assert.match(detailSource, /@submit\.prevent\s*=\s*["']handlePlaceBid["']/);
-  assertIncludesAll(
-    detailSource,
-    [
-      "ownerManageMessage",
-    ],
-    "seller controls",
-  );
-  assert.match(detailSource, /v-if\s*=\s*["']auction\.isOwner["']/);
-  assert.match(detailSource, /v-if\s*=\s*["']canOwnerManageAuction["']/);
-  assert.match(detailSource, /name\s*:\s*["']auction-edit["']/);
-  assert.match(detailSource, /@click\s*=\s*["']handleCancelAuction["']/);
+  const bidTag = detailSource.match(/<AuctionBidPanel\b[\s\S]*?\/>/)?.[0] ?? "";
+  for (const binding of [
+    ':auction="auction"',
+    ':candidate-bid="candidateBid"',
+    ':submitting="submittingBid"',
+    ':can-place-bid="canPlaceBid"',
+    ':availability-message="bidAvailabilityMessage"',
+    ':candidate-at-minimum="isCandidateAtMinimum"',
+    ':success-message="bidSuccessMessage"',
+    ':error-message="bidErrorMessage"',
+    '@increase="increaseCandidateBid"',
+    '@decrease="decreaseCandidateBid"',
+    '@submit="handlePlaceBid"',
+  ]) {
+    assert.ok(bidTag.includes(binding), "missing bid binding " + binding);
+  }
+
+  const sellerTag = detailSource.match(/<AuctionSellerActionPanel\b[\s\S]*?\/>/)?.[0] ?? "";
+  for (const binding of [
+    'v-if="auction.isOwner"',
+    ':auction="auction"',
+    ':can-manage="canOwnerManageAuction"',
+    ':manage-message="ownerManageMessage"',
+    ':cancelling="cancelling"',
+    '@cancel="handleCancelAuction"',
+  ]) {
+    assert.ok(sellerTag.includes(binding), "missing seller binding " + binding);
+  }
+
+  const informationTag = detailSource.match(/<AuctionDetailInformation\b[\s\S]*?\/>/)?.[0] ?? "";
+  assert.match(informationTag, /:auction="auction"/);
+  assert.match(informationTag, /:format-condition="formatCondition"/);
+  assert.match(detailSource, /<AuctionBidHistory\s+:bids="bids"\s*\/>/);
+
+  assert.match(detailSource, /role="tablist"\s+aria-label="競標詳細內容"/);
+  assert.equal([...detailSource.matchAll(/@keydown="handleDetailTabKeydown"/g)].length, 2);
+  assert.equal([...detailSource.matchAll(/role="tabpanel"/g)].length, 2);
+  for (const key of ["ArrowLeft", "ArrowRight", "Home", "End"]) {
+    assert.ok(detailSource.includes('event.key === "' + key + '"'), "missing key " + key);
+  }
+  assert.match(detailSource, /v-if="auction && statusSyncMessage"/);
+  assert.match(detailSource, /v-if="loading"/);
+  assert.match(detailSource, /v-else-if="errorMessage"/);
+  assert.match(detailSource, /name: 'auction'/);
+});
+
+test("auction detail panels retain the complete public commerce presentation", () => {
+  assert.match(summarySource, /import\s+AuctionCountdown\s+from\s+["'][^"']+["']/);
+  const countdownTag = summarySource.match(/<AuctionCountdown\b[^>]*>/)?.[0] ?? "";
+  assert.match(countdownTag, /:end-at="auction\.endAt"/);
+  assert.match(countdownTag, /:status="auction\.status"/);
+
+  assertIncludesAll(summarySource, [
+    "auction.productName",
+    "auction.brandName",
+    "auction.categoryName",
+    "auction.model",
+    "auction.size",
+    "auction.condition",
+    "auction.sellerName",
+    "auction.currentPrice",
+    "auction.startPrice",
+    "auction.bidCount",
+    "auction.minIncrement",
+    "auction.nextMinimumBid",
+    "auction.startAt",
+    "auction.endAt",
+  ], "summary");
+  for (const [status, label] of [
+    ["SCHEDULED", "尚未開始"],
+    ["ACTIVE", "競標中"],
+    ["SOLD", "已結標"],
+    ["UNSOLD", "流標"],
+    ["CANCELLED", "已取消"],
+    ["REMOVED", "廢標"],
+  ]) {
+    assert.ok(summarySource.includes(status + ': "' + label + '"'), "missing status " + status);
+  }
+
+  assertIncludesAll(informationSource, [
+    "auction.description",
+    "auction.condition",
+    "auction.defectNote",
+    "auction.authenticityNote",
+    "auction.location",
+    "auction.shippingMethod",
+    "auction.shippingFee",
+    "auction.paymentMethod",
+    "auction.allowMeetup",
+    "auction.allowReturn",
+    "auction.warrantyNote",
+  ], "product and transaction information");
+
+  assert.match(bidPanelSource, /v-if="auction\.isOwner"/);
+  assert.match(bidPanelSource, /<form v-else @submit\.prevent="\$emit\('submit'\)">/);
+  assert.match(bidPanelSource, /@click="\$emit\('increase'\)"/);
+  assert.match(bidPanelSource, /@click="\$emit\('decrease'\)"/);
+  assertIncludesAll(bidPanelSource, [
+    "candidateBid",
+    "canPlaceBid",
+    "submitting",
+    "candidateAtMinimum",
+    "availabilityMessage",
+    "successMessage",
+    "errorMessage",
+  ], "bid controls");
+  assert.match(sellerActionSource, /v-if="canManage"/);
+  assert.match(sellerActionSource, /name: 'auction-edit'/);
+  assert.match(sellerActionSource, /id: auction\.auctionId/);
+  assert.match(sellerActionSource, /@click="emit\('cancel'\)"/);
+  assert.match(sellerActionSource, /:disabled="cancelling"/);
+
+  assert.match(historySource, /v-if="bids\.length === 0"/);
+  assert.match(historySource, /bid\.bidderName \|\| "會員資料未提供"/);
+  assert.match(historySource, /formatTwd\(bid\.bidAmount\)/);
+  assert.match(historySource, /formatAuctionTime\(bid\.createdAt\)/);
 });
 
 test("auction detail combines shipping and meetup into one delivery presentation", () => {
   const transactionSection = section(
-    detailSource,
+    informationSource,
     "<!-- 交易資訊 -->",
     "</section>",
   );
@@ -705,28 +786,22 @@ test("auction detail combines shipping and meetup into one delivery presentation
   assert.match(transactionSection, /auction\.shippingFee/);
   assert.match(transactionSection, /auction\.allowReturn/);
 
-  const detailScript = scriptSetup(detailSource);
-  const formatterStart = detailScript.indexOf("function formatDeliveryMethod");
-  const formatterEnd = detailScript.indexOf("\n}\n", formatterStart);
+  const informationScript = scriptSetup(informationSource);
+  const formatterStart = informationScript.indexOf("function formatDeliveryMethod");
+  const formatterEnd = informationScript.indexOf("\n}\n", formatterStart);
   assert.notEqual(formatterStart, -1, "missing delivery formatter");
   assert.notEqual(formatterEnd, -1, "missing delivery formatter boundary");
 
   const context = {};
   vm.runInNewContext(
-    detailScript.slice(formatterStart, formatterEnd + 2) +
+    informationScript.slice(formatterStart, formatterEnd + 2) +
       "\nglobalThis.formatDeliveryMethod = formatDeliveryMethod;",
     context,
   );
 
   assert.equal(context.formatDeliveryMethod("宅配", false), "宅配");
-  assert.equal(
-    context.formatDeliveryMethod("宅配", true),
-    "宅配／可協調面交",
-  );
-  assert.equal(
-    context.formatDeliveryMethod("黑貓宅配", true),
-    "黑貓宅配／可協調面交",
-  );
+  assert.equal(context.formatDeliveryMethod("宅配", true), "宅配／可協調面交");
+  assert.equal(context.formatDeliveryMethod("黑貓宅配", true), "黑貓宅配／可協調面交");
 });
 
 test("image gallery keeps thumbnail selection, backend URL resolution and placeholders", () => {

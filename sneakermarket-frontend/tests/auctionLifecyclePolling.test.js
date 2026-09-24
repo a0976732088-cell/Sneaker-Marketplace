@@ -10,6 +10,13 @@ const source = await readFile(
   new URL("../src/views/auction/AuctionDetailView.vue", import.meta.url),
   "utf8",
 );
+const summarySource = await readFile(
+  new URL("../src/components/auction/detail/AuctionSummaryPanel.vue", import.meta.url),
+  "utf8",
+);
+const statusFormatterSource = summarySource.match(/function formatStatus\(status\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(statusFormatterSource, "SummaryPanel must retain the public status formatter");
+const formatStatus = vm.runInNewContext(statusFormatterSource + "\nformatStatus", {});
 const script = source
   .match(/<script setup>([\s\S]*?)<\/script>/)[1]
   .replace(/^import[\s\S]*?from\s+["'][^"']+["'];/gm, "");
@@ -49,7 +56,7 @@ function harness(statusResponse) {
       `
     globalThis.subject = {
       auction, bids, canPlaceBid, refreshAuctionStatus,
-      startStatusPolling, formatStatus, isOlderStatus
+      startStatusPolling, isOlderStatus
     };
   `,
     context,
@@ -93,7 +100,7 @@ for (const [status, label, bidCount] of [
     h.subject.startStatusPolling();
     await h.tick();
     assert.equal(h.subject.auction.value.status, status);
-    assert.equal(h.subject.formatStatus(status), label);
+    assert.equal(formatStatus(status), label);
     assert.equal(h.subject.canPlaceBid.value, false);
     assert.equal(h.cleared(), 1);
     assert.equal(h.historyRequests(), bidCount > 0 ? 1 : 0);

@@ -55,7 +55,7 @@ const routes = [
   // Coupon
   // =====================================================
   {
-    path: "/coupons",
+    path: "/member/coupons",
 
     name: "coupons",
 
@@ -100,14 +100,14 @@ const routes = [
   // =====================================================
   // 商城模組自己的「我的訂單」列表頁，呼叫商城模組自己的 GET /orders/me
   {
-  path: "/orders",
+    path: "/orders",
 
-  name: "order-list",
+    name: "order-list",
 
-  component: () => import("@/views/commerce/OrderListView.vue"),
+    component: () => import("@/views/commerce/OrderListView.vue"),
   },
   // =====================================================
-  
+
   {
     path: "/orders/:id",
 
@@ -119,13 +119,6 @@ const routes = [
   // =====================================================
   // Advertisement - 前台
   // =====================================================
-  {
-    path: "/ads",
-
-    name: "advertisement",
-
-    component: () => import("@/views/advertisement/AdvertisementHomeView.vue"),
-  },
   {
     path: "/ads/storefront",
 
