@@ -346,6 +346,19 @@ class AuctionAccessTests {
         mvc.perform(get("/api/auctions/12")).andExpect(status().isOk());
         verify(queries).getAuctionDetail(12L, null);
     }
+    @Test
+    void cancelledPublicDetailUsesTheExistingNotFoundResponse() throws Exception {
+        when(queries.getAuctionDetail(12L, null))
+                .thenThrow(new ResourceNotFoundException("找不到指定的競標資料"));
+
+        var result = mvc.perform(get("/api/auctions/12"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andReturn();
+
+        assertNull(result.getRequest().getSession(false));
+    }
+
 
     @Test
     void anonymousCanGetPublicStatusWithoutCreatingSession() throws Exception {

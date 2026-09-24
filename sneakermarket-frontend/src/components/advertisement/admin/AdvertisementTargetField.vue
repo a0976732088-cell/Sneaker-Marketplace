@@ -300,7 +300,7 @@ function getTargetLabel(targetType) {
 .select-target-button {
   border: 0;
   color: #fff;
-  background: #2563eb;
+  background: #111827;
 }
 
 .clear-target-button {

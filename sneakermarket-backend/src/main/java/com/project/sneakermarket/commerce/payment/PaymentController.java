@@ -1,7 +1,6 @@
-package com.project.sneakermarket.commerce.controller;
+package com.project.sneakermarket.commerce.payment;
 
 import com.project.sneakermarket.commerce.dto.OrderDetailResponse;
-import com.project.sneakermarket.commerce.payment.ECPayCheckMacValueUtil;
 import com.project.sneakermarket.commerce.service.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -55,10 +54,10 @@ public class PaymentController {
         params.put("MerchantTradeDate", merchantTradeDate);
         params.put("PaymentType", "aio");
         params.put("TotalAmount", String.valueOf(order.getTotalAmount().intValue()));
-        params.put("TradeDesc", "SneakerMarket訂單付款");
+        params.put("TradeDesc", "酷客 Kicks 訂單付款");
         params.put("ItemName", "訂單" + order.getOrderNumber());
         params.put("ReturnURL", returnUrl);
-        params.put("ClientBackURL", CLIENT_BACK_URL_PREFIX + orderId);
+        params.put("ClientBackURL", CLIENT_BACK_URL_PREFIX + orderId + "?fromPayment=true");
         params.put("ChoosePayment", "Credit");
         params.put("EncryptType", "1");
 
@@ -79,7 +78,7 @@ public class PaymentController {
 
     @PostMapping("/api/payment/notify")
     public String notify(@RequestParam Map<String, String> allParams) {
-
+        System.out.println(allParams);
         String receivedCheckMacValue = allParams.get("CheckMacValue");
         String computed = ECPayCheckMacValueUtil.generate(allParams, hashKey, hashIv);
 
@@ -93,6 +92,9 @@ public class PaymentController {
         if ("1".equals(rtnCode) && merchantTradeNo != null && merchantTradeNo.startsWith("SM")) {
             Long orderId = Long.parseLong(merchantTradeNo.substring(2));
             orderService.confirmPayment(orderId);
+        }else if (merchantTradeNo != null && merchantTradeNo.startsWith("SM")) {
+            Long orderId = Long.parseLong(merchantTradeNo.substring(2));
+            orderService.cancelOrder(orderId);
         }
 
         return "1|OK";

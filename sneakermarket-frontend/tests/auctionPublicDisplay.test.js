@@ -8,6 +8,10 @@ const listSource = await readFile(
   new URL("../src/views/auction/AuctionListView.vue", import.meta.url),
   "utf8",
 );
+const cardSource = await readFile(
+  new URL("../src/components/auction/list/AuctionProductCard.vue", import.meta.url),
+  "utf8",
+);
 const detailSource = await readFile(
   new URL("../src/views/auction/AuctionDetailView.vue", import.meta.url),
   "utf8",
@@ -110,7 +114,7 @@ async function loadDetailFromApi(detail, bidItems = []) {
   return context.subject;
 }
 
-const listCard = section(listSource, 'v-for="auction in auctions"', "<!-- 分頁 -->");
+const listCard = section(cardSource, "<template>", "</template>");
 const detailInfo = section(detailSource, "<!-- 競標資訊 -->", "<!-- 出價操作 -->");
 const bidHistory = section(detailSource, "<!-- 出價紀錄 -->", "</template>");
 const legacyBidField = ["masked", "Bidder"].join("");
@@ -119,12 +123,14 @@ const legacyFallback = ["匿名", "會員"].join("");
 test("public and member auction views do not present DRAFT as a supported status", () => {
   const draftLabel = /DRAFT\s*:\s*["']草稿["']/;
   assert.doesNotMatch(listSource, draftLabel);
+  assert.doesNotMatch(cardSource, draftLabel);
   assert.doesNotMatch(detailSource, draftLabel);
   assert.doesNotMatch(editSource, draftLabel);
 });
 
 test("auction list binds the seller label to sellerName from its API response", async () => {
   const [auction] = await loadListFromApi([{ sellerName: "王小明" }]);
+  assert.match(listSource, /<AuctionProductCard\b[^>]*:auction=["']auction["']/);
   assert.match(listCard, /賣家：/);
   const expression = memberExpression(listCard, "auction", "sellerName");
   assert.equal(evaluate(expression, "auction", auction), "王小明");

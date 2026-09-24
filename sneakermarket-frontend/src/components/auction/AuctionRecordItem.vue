@@ -282,6 +282,11 @@ watch(
   text-align: right;
 }
 
+.record-actions :deep(.record-action-notice--single-line) {
+  max-width: none;
+  white-space: nowrap;
+}
+
 @media (max-width: 992px) {
   .record-body {
     grid-template-columns: 122px minmax(0, 1fr);

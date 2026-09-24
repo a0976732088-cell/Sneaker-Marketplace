@@ -37,6 +37,61 @@ export const TAIWAN_CITIES = Object.freeze([
 
 export const MAX_AUCTION_IMAGE_COUNT = 10;
 
+export const AUCTION_MODEL_OPTIONS_BY_BRAND = Object.freeze({
+  Nike: Object.freeze([
+    "Air Force 1",
+    "Dunk Low",
+    "Air Max 1",
+    "Air Max 90",
+    "Air Max 97",
+    "Blazer Mid '77",
+    "Cortez",
+    "Pegasus",
+  ]),
+  Jordan: Object.freeze([
+    "Air Jordan 1",
+    "Air Jordan 3",
+    "Air Jordan 4",
+    "Air Jordan 5",
+    "Air Jordan 11",
+    "Jordan 1 Low",
+    "Jordan 1 Mid",
+  ]),
+  adidas: Object.freeze([
+    "Samba OG",
+    "Gazelle",
+    "Superstar",
+    "Stan Smith",
+    "Campus 00s",
+    "Ultraboost",
+    "Yeezy Boost 350 V2",
+  ]),
+  "New Balance": Object.freeze([
+    "327",
+    "530",
+    "574",
+    "9060",
+    "990",
+    "2002R",
+    "1906R",
+  ]),
+  Vans: Object.freeze([
+    "Old Skool",
+    "Authentic",
+    "Sk8-Hi",
+    "Classic Slip-On",
+    "Knu Skool",
+    "Era",
+  ]),
+});
+
+export const AUCTION_DESCRIPTION_OPTIONS = Object.freeze([
+  "全新未落地，僅開盒檢查，鞋款與配件狀況良好。",
+  "近全新，僅短暫試穿，鞋底與鞋面無明顯使用痕跡。",
+  "正常二手使用狀況，已完成基本清潔，詳細鞋況請參考照片。",
+  "收藏釋出，平時妥善保存，盒裝與配件內容以照片為準。",
+]);
+
 export function normalizeTaiwanCity(value) {
   if (typeof value !== "string") return "";
 

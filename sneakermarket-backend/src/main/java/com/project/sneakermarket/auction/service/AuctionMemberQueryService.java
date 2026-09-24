@@ -112,7 +112,9 @@ public class AuctionMemberQueryService {
             AuctionProduct product = productMap.get(auction.getAuctionProductId());
             return new AuctionOrderSummaryResponse(
                     order.getOrderNumber(), order.getAuctionId(), product.getProductName(),
-                    order.getFinalPrice(), order.getPaymentMethod(), order.getPaymentStatus(),
+                    order.getFinalPrice(), product.getShippingFee(),
+                    order.getFinalPrice().add(product.getShippingFee()),
+                    order.getPaymentMethod(), order.getPaymentStatus(),
                     order.getShippingStatus(), order.getOrderStatus(), order.getCreatedAt(), order.getUpdatedAt(),
                     product.getModel(), product.getSize(), imageUrlMap.get(product.getAuctionProductId()),
                     order.getPaymentDueAt(), managementState(auction));

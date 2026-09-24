@@ -266,7 +266,7 @@ function getSearchPlaceholder(targetType) {
   border: 0;
   border-radius: 6px;
   color: #fff;
-  background: #2563eb;
+  background: #111827;
   cursor: pointer;
 }
 

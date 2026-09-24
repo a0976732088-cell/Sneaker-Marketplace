@@ -162,7 +162,9 @@ test("buyer order rows use commerce summary fields, deadline and pending-only pa
     ':image-url="order.imageUrl"',
     "order.productName",
     "formatProductMeta(order)",
+    "formatTwd(order.totalAmount)",
     "formatTwd(order.finalPrice)",
+    "formatTwd(order.shippingFee)",
     "formatBuyerAuctionOrderStatus(order)",
     "getBuyerAuctionOrderStatusTone(order)",
   ]) {
@@ -200,7 +202,7 @@ test("buyer public auction action is limited to visible records without affectin
   );
   assert.match(
     buyerTemplate,
-    /v-else class="record-action-notice"[\s\S]*?formatMemberPublicDetailNotice\(order\.managementState\)/,
+    /v-else[\s\S]*?class="record-action-notice record-action-notice--single-line"[\s\S]*?formatMemberPublicDetailNotice\(order\.managementState\)/,
   );
 });
 
@@ -215,13 +217,19 @@ test("seller order rows show summary, status and a read-only detail action", () 
     ':image-url="order.imageUrl"',
     "order.productName",
     "formatProductMeta(order)",
+    "formatTwd(order.totalAmount)",
     "formatTwd(order.finalPrice)",
+    "formatTwd(order.shippingFee)",
     "formatSellerAuctionOrderStatus(order)",
     "getSellerAuctionOrderStatusTone(order)",
   ]) {
     assert.ok(sellerTemplate.includes(binding), binding);
   }
 
+  assert.match(buyerTemplate, /訂單總額/);
+  assert.match(sellerTemplate, /訂單總額（買家應付）/);
+  assert.match(sellerTemplate, /成交價/);
+  assert.match(sellerTemplate, /運費/);
   assert.match(sellerTemplate, /#actions/);
   assert.match(sellerTemplate, /name: 'auction-order-detail'/);
   assert.match(sellerTemplate, />\s*查看訂單\s*</);

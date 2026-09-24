@@ -6,7 +6,9 @@ import { computed, nextTick, reactive, ref } from "vue";
 
 import {
   AUCTION_AUTHENTICITY_NOTE_OPTIONS,
+  AUCTION_DESCRIPTION_OPTIONS,
   AUCTION_DEFECT_NOTE_OPTIONS,
+  AUCTION_MODEL_OPTIONS_BY_BRAND,
   AUCTION_PAYMENT_METHOD_OPTIONS,
   AUCTION_SHIPPING_METHOD_OPTIONS,
   AUCTION_SHOE_SIZES,
@@ -14,7 +16,6 @@ import {
   CUSTOM_OPTION_VALUE,
   DELIVERY_OPTION_VALUES,
   TAIWAN_CITIES,
-  normalizeTaiwanCity,
 } from "../src/constants/auctionFormOptions.js";
 
 async function readSource(url) {
@@ -117,7 +118,36 @@ test("Auction Edit marks only its thirteen required controls and renders red err
   );
 });
 
-test("Auction Edit exposes the five shared preset selectors with inline Custom inputs", () => {
+test("Auction Edit mirrors Create model choices and editable description templates", () => {
+  assert.ok(AUCTION_MODEL_OPTIONS_BY_BRAND.Nike.includes("Dunk Low"));
+  assert.ok(AUCTION_MODEL_OPTIONS_BY_BRAND.Jordan.includes("Air Jordan 4"));
+  assert.equal(AUCTION_DESCRIPTION_OPTIONS.length, 4);
+
+  const modelSelect = templateSource.match(
+    /<select\b(?=[^>]*id=["']auction-edit-model-option["'])(?=[^>]*v-model=["']selectedModelOption["'])[^>]*>([\s\S]*?)<\/select>/,
+  );
+  assert.ok(modelSelect);
+  assert.match(modelSelect[0], /:disabled=["']!editable \|\| !form\.brandId["']/);
+  assert.match(modelSelect[1], /option in availableModelOptions/);
+  assert.match(modelSelect[1], /CUSTOM_OPTION_VALUE/);
+  assert.match(
+    templateSource,
+    /id=["']auction-edit-model-custom["'][\s\S]*?v-model\.trim=["']form\.model["']/,
+  );
+
+  assert.match(
+    templateSource,
+    /v-for=["']\(option, index\) in AUCTION_DESCRIPTION_OPTIONS["']/,
+  );
+  assert.match(templateSource, /@click=["']applyDescriptionTemplate\(option\)["']/);
+  assert.match(templateSource, /@click=["']startCustomDescription["']/);
+  assert.match(
+    templateSource,
+    /v-model\.trim=["']form\.description["'][\s\S]*?@input=["']handleDescriptionInput["']/,
+  );
+});
+
+test("Auction Edit keeps optional custom fields but fixes shipping and payment choices", () => {
   assert.deepEqual(AUCTION_DEFECT_NOTE_OPTIONS, [
     "無明顯瑕疵",
     "有輕微使用痕跡",
@@ -139,37 +169,32 @@ test("Auction Edit exposes the five shared preset selectors with inline Custom i
     "售後問題可與賣家聯繫協調",
   ]);
 
-  for (const fieldName of [
-    "defectNote",
-    "authenticityNote",
-    "shippingMethod",
-    "paymentMethod",
-    "warrantyNote",
-  ]) {
+  for (const fieldName of ["defectNote", "authenticityNote", "warrantyNote"]) {
     assert.match(
       templateSource,
       new RegExp(
         `v-model=["']selectedFormOptions\\.${fieldName}["'][\\s\\S]*?` +
-          `@change=["']handleFormOptionChange\\('${fieldName}'\\)["']`,
-      ),
-    );
-    assert.match(
-      templateSource,
-      new RegExp(
-        `selectedFormOptions\\.${fieldName}[\\s\\S]*?CUSTOM_OPTION_VALUE`,
+          `CUSTOM_OPTION_VALUE`,
       ),
     );
   }
 
-  assert.match(templateSource, /data-custom-input/);
-  assert.match(
-    templateSource,
-    /id=["']auction-edit-shipping-method-custom["'][\s\S]*?maxlength=["']50["']/,
-  );
-  assert.match(
-    templateSource,
-    /id=["']auction-edit-payment-method-custom["'][\s\S]*?maxlength=["']50["']/,
-  );
+  for (const [fieldName, legacyOption] of [
+    ["shippingMethod", "legacyShippingMethodOption"],
+    ["paymentMethod", "legacyPaymentMethodOption"],
+  ]) {
+    const select = templateSource.match(
+      new RegExp(
+        `<select\\b(?=[^>]*v-model=["']selectedFormOptions\\.${fieldName}["'])[^>]*>([\\s\\S]*?)<\\/select>`,
+      ),
+    )?.[0] ?? "";
+    assert.ok(select);
+    assert.doesNotMatch(select, /CUSTOM_OPTION_VALUE|其他（自行填寫）/);
+    assert.match(select, new RegExp(legacyOption));
+  }
+
+  assert.doesNotMatch(templateSource, /auction-edit-shipping-method-custom/);
+  assert.doesNotMatch(templateSource, /auction-edit-payment-method-custom/);
 });
 
 test("Auction Edit uses the existing read-only gallery without image upload controls", () => {
@@ -196,76 +221,32 @@ test("Auction Edit uses the existing read-only gallery without image upload cont
   assert.doesNotMatch(imageSection, /功能 4|尚未實作|API 尚未完成/);
 });
 
-test("Auction Edit location is a select-style searchable combobox with inline errors", () => {
+test("Auction Edit uses the shared 22-city select and renders a legacy option", () => {
   const locationArea = section(
     templateSource,
     '<!-- 商品所在地 -->',
     '<!-- 圖片 -->',
   );
-  const locationInput =
-    locationArea.match(
-      /<input\b(?=[^>]*\bid\s*=\s*["']auction-edit-location["'])(?=[^>]*v-model\.trim\s*=\s*["']form\.location["'])[^>]*>/,
-    )?.[0] ?? "";
+  const locationSelect = locationArea.match(
+    /<select\b(?=[^>]*id=["']auction-edit-location["'])(?=[^>]*v-model\.trim=["']form\.location["'])[^>]*>([\s\S]*?)<\/select>/,
+  );
 
-  assert.match(locationArea, /data-validation-field\s*=\s*["']location["']/);
-  assert.ok(locationInput, "location must remain bound to form.location");
-  assert.match(
-    locationInput,
-    /class\s*=\s*["']form-select location-combobox-input["']/,
-  );
-  assert.match(locationInput, /role\s*=\s*["']combobox["']/);
-  assert.match(locationInput, /aria-autocomplete\s*=\s*["']list["']/);
-  assert.match(
-    locationInput,
-    /aria-controls\s*=\s*["']auction-edit-location-options["']/,
-  );
-  assert.match(
-    locationInput,
-    /:aria-expanded\s*=\s*["']locationMenuOpen["']/,
-  );
-  assert.match(locationInput, /:aria-activedescendant/);
-  assert.match(locationInput, /autocomplete\s*=\s*["']off["']/);
-  assert.match(locationInput, /:disabled\s*=\s*["']!editable["']/);
-  assert.match(locationInput, /:aria-invalid\s*=\s*["']Boolean\(fieldErrors\.location\)["']/);
-  assert.match(locationInput, /auction-edit-location-error/);
-  assert.doesNotMatch(locationInput, /\slist\s*=/);
-  assert.doesNotMatch(locationInput, /\brequired\b/);
-
-  const locationLabel = locationArea.match(
-    /<label\b[^>]*for\s*=\s*["']auction-edit-location["'][^>]*>([\s\S]*?)<\/label>/,
-  );
-  assert.ok(locationLabel);
-  assert.doesNotMatch(locationLabel[1], /required-mark/);
-  assert.match(
+  assert.ok(locationSelect, "location must be a native select");
+  assert.match(locationSelect[0], /:disabled=["']!editable["']/);
+  assert.match(locationSelect[0], /Boolean\(fieldErrors\.location\)/);
+  assert.doesNotMatch(locationSelect[0], /\brequired\b/);
+  assert.match(locationSelect[1], /city in TAIWAN_CITIES/);
+  assert.match(locationSelect[1], /legacyLocationOption/);
+  assert.match(locationSelect[1], /（舊資料）/);
+  assert.equal(TAIWAN_CITIES.length, 22);
+  assert.doesNotMatch(locationArea, /role=["']combobox["']|location-combobox/);
+  assert.doesNotMatch(
     locationArea,
-    /<ul\b(?=[^>]*id\s*=\s*["']auction-edit-location-options["'])(?=[^>]*role\s*=\s*["']listbox["'])/,
+    /<input\b(?=[^>]*v-model\.trim=["']form\.location["'])/,
   );
   assert.match(
     locationArea,
-    /v-for\s*=\s*["']\(city, index\) in filteredTaiwanCities["']/,
-  );
-  assert.match(locationArea, /role\s*=\s*["']option["']/);
-  assert.match(
-    locationArea,
-    /@pointerdown\.prevent\s*=\s*["']selectLocation\(city\)["']/,
-  );
-  assert.doesNotMatch(locationArea, /<datalist\b/);
-  assert.doesNotMatch(locationArea, /location-combobox-arrow/);
-  assert.match(locationInput, /@keydown\.down\.prevent/);
-  assert.match(locationInput, /@keydown\.up\.prevent/);
-  assert.match(locationInput, /@keydown\.enter\s*=\s*["']handleLocationEnter["']/);
-  assert.match(locationInput, /@keydown\.esc\.prevent/);
-  assert.match(
-    locationArea,
-    /<p\b(?=[^>]*v-if\s*=\s*["']fieldErrors\.location["'])(?=[^>]*id\s*=\s*["']auction-edit-location-error["'])[^>]*\brole\s*=\s*["']alert["']/,
-  );
-  assert.match(
-    editSource,
-    /\.location-combobox\s*\{[\s\S]*?position:\s*relative/,
-  );
-  assert.match(
-    editSource,
-    /\.location-combobox-menu\s*\{[\s\S]*?max-height:\s*15rem;[\s\S]*?overflow-y:\s*auto/,
+    /<p\b(?=[^>]*v-if=["']fieldErrors\.location["'])(?=[^>]*role=["']alert["'])/,
   );
 });
 
@@ -347,6 +328,8 @@ function createEditHarness() {
     reactive,
     ref,
     console,
+    AUCTION_DESCRIPTION_OPTIONS,
+    AUCTION_MODEL_OPTIONS_BY_BRAND,
     AUCTION_AUTHENTICITY_NOTE_OPTIONS,
     AUCTION_DEFECT_NOTE_OPTIONS,
     AUCTION_PAYMENT_METHOD_OPTIONS,
@@ -356,8 +339,11 @@ function createEditHarness() {
     CUSTOM_OPTION_VALUE,
     DELIVERY_OPTION_VALUES,
     TAIWAN_CITIES,
-    normalizeTaiwanCity,
     document: {
+      getElementById(id) {
+        assert.equal(id, "auction-edit-description");
+        return focusableField;
+      },
       querySelector(selector) {
         selectedFields.push(selector);
         const fieldName = selector.match(
@@ -401,35 +387,44 @@ function createEditHarness() {
       `
       globalThis.subject = {
         form,
+        brands,
         fieldErrors,
         validationOrder,
         editable,
         selectedFormOptions,
+        selectedModelOption,
+        availableModelOptions,
+        selectedDescriptionOption,
+        legacyLocationOption,
+        legacyShippingMethodOption,
+        legacyPaymentMethodOption,
         deliveryOption,
         currentImageUrls,
         auctionStatus,
         bidCount,
         originalStartAt,
+        originalLocation,
         fillForm,
         handleFormOptionChange,
+        handleBrandChange,
+        handleModelOptionChange,
+        applyDescriptionTemplate,
+        startCustomDescription,
+        handleDescriptionInput,
         validateForm,
         revalidateField,
-        normalizeLocation,
-        locationMenuOpen,
-        activeLocationIndex,
-        activeLocationOptionId,
-        filteredTaiwanCities,
-        openLocationMenu,
-        closeLocationMenu,
-        handleLocationInput,
-        moveLocationOption,
-        selectLocation,
-        handleLocationEnter,
         submitUpdate
       };
     `,
     context,
   );
+  context.subject.brands.value = [
+    { id: 1, name: "Nike" },
+    { id: 2, name: "Jordan" },
+    { id: 3, name: "adidas" },
+    { id: 4, name: "New Balance" },
+    { id: 5, name: "Vans" },
+  ];
 
   return {
     ...context.subject,
@@ -443,178 +438,178 @@ function createEditHarness() {
   };
 }
 
-test("Edit preserves all legacy Custom values and current image URLs on initialization", () => {
+test("Edit model options follow brand changes and support a new custom value", () => {
   const harness = createEditHarness();
-  const legacyValues = {
+  harness.fillForm(editableAuction({ brandId: 1, model: "Dunk Low" }));
+
+  assert.ok(harness.availableModelOptions.value.includes("Dunk Low"));
+  assert.equal(harness.selectedModelOption.value, "Dunk Low");
+
+  harness.form.brandId = 2;
+  harness.handleBrandChange();
+  assert.equal(harness.form.model, "");
+  assert.equal(harness.selectedModelOption.value, "");
+  assert.ok(harness.availableModelOptions.value.includes("Air Jordan 4"));
+
+  harness.selectedModelOption.value = CUSTOM_OPTION_VALUE;
+  harness.handleModelOptionChange();
+  harness.form.model = "Custom Sneaker X";
+  assert.equal(harness.form.model, "Custom Sneaker X");
+});
+
+test("Edit preserves legacy model and custom description until the user applies a template", async () => {
+  const harness = createEditHarness();
+  const description = "會員自己寫的舊商品介紹";
+  harness.fillForm(
+    editableAuction({
+      brandId: 1,
+      model: "Old Legacy Model",
+      description,
+    }),
+  );
+
+  assert.equal(harness.selectedModelOption.value, CUSTOM_OPTION_VALUE);
+  assert.equal(harness.form.model, "Old Legacy Model");
+  assert.equal(harness.selectedDescriptionOption.value, CUSTOM_OPTION_VALUE);
+  assert.equal(harness.form.description, description);
+
+  await harness.submitUpdate();
+  assert.equal(harness.updateRequests[0][1].model, "Old Legacy Model");
+  assert.equal(harness.updateRequests[0][1].description, description);
+
+  const template = AUCTION_DESCRIPTION_OPTIONS[0];
+  harness.applyDescriptionTemplate(template);
+  assert.equal(harness.form.description, template);
+  assert.equal(harness.selectedDescriptionOption.value, template);
+
+  await harness.startCustomDescription();
+  assert.equal(harness.selectedDescriptionOption.value, CUSTOM_OPTION_VALUE);
+  assert.ok(harness.focusCalls.length > 0);
+});
+
+test("Edit preserves an untouched legacy location and accepts only official new choices", async () => {
+  for (const location of ["", "高雄市", "臺北市", "台北市", "高雄左營"]) {
+    const harness = createEditHarness();
+    harness.fillForm(editableAuction({ location }));
+
+    assert.equal(harness.form.location, location);
+    assert.equal(harness.validateForm(), true);
+    assert.equal(harness.fieldErrors.location, "");
+
+    await harness.submitUpdate();
+    assert.equal(harness.updateRequests[0][1].location, location);
+  }
+
+  const switchHarness = createEditHarness();
+  switchHarness.fillForm(editableAuction({ location: "高雄左營" }));
+  assert.equal(switchHarness.legacyLocationOption.value, "高雄左營");
+
+  switchHarness.form.location = "高雄市";
+  switchHarness.revalidateField("location");
+  await switchHarness.submitUpdate();
+  assert.equal(switchHarness.updateRequests[0][1].location, "高雄市");
+
+  const invalidHarness = createEditHarness();
+  invalidHarness.fillForm(editableAuction({ location: "臺北市" }));
+  invalidHarness.form.location = "新輸入的非縣市值";
+  assert.equal(invalidHarness.validateForm(), false);
+  assert.equal(
+    invalidHarness.fieldErrors.location,
+    "請從台灣縣市選項中選擇商品所在地",
+  );
+});
+
+test("Edit preserves optional custom notes, fixed legacy methods, and image URLs", () => {
+  const harness = createEditHarness();
+  const optionalLegacyValues = {
     defectNote: "左鞋鞋頭有一道約 1 公分刮痕",
     authenticityNote: "親友自海外實體店購入",
-    shippingMethod: "黑貓宅配",
-    paymentMethod: "匯款後通知",
     warrantyNote: "收到商品七日內可聯絡賣家",
   };
   const imageUrls = ["/uploads/auctions/one.jpg", "/uploads/auctions/two.jpg"];
 
-  harness.fillForm(editableAuction({ ...legacyValues, imageUrls }));
+  harness.fillForm(
+    editableAuction({
+      ...optionalLegacyValues,
+      shippingMethod: "黑貓宅配",
+      paymentMethod: "面交付款",
+      imageUrls,
+    }),
+  );
 
-  for (const [fieldName, value] of Object.entries(legacyValues)) {
+  for (const [fieldName, value] of Object.entries(optionalLegacyValues)) {
     assert.equal(harness.selectedFormOptions[fieldName], CUSTOM_OPTION_VALUE);
     assert.equal(harness.form[fieldName], value);
   }
+  assert.equal(harness.selectedFormOptions.shippingMethod, "黑貓宅配");
+  assert.equal(harness.selectedFormOptions.paymentMethod, "面交付款");
+  assert.equal(harness.legacyShippingMethodOption.value, "黑貓宅配");
+  assert.equal(harness.legacyPaymentMethodOption.value, "面交付款");
   assert.deepEqual(Array.from(harness.currentImageUrls.value), imageUrls);
 });
 
-test("Edit normalizes exact 台 aliases but preserves and rejects ambiguous legacy locations", async () => {
-  for (const validLocation of ["", "高雄市", "臺北市"]) {
-    const harness = createEditHarness();
-    harness.fillForm(editableAuction({ location: validLocation }));
-    assert.equal(harness.validateForm(), true);
-    assert.equal(harness.fieldErrors.location, "");
-  }
-
-  const aliasHarness = createEditHarness();
-  aliasHarness.fillForm(editableAuction({ location: "台北市" }));
-  assert.equal(aliasHarness.form.location, "臺北市");
-  assert.equal(aliasHarness.validateForm(), true);
-
-  for (const legacyLocation of ["新北", "北部", "左營", "台北信義區"]) {
-    const harness = createEditHarness();
-    harness.fillForm(editableAuction({ location: legacyLocation }));
-    assert.equal(harness.form.location, legacyLocation);
-    assert.equal(harness.validateForm(), false);
-    assert.equal(
-      harness.fieldErrors.location,
-      "請從台灣縣市選項中選擇商品所在地",
-    );
-  }
-
-  const focusHarness = createEditHarness();
-  focusHarness.fillForm(editableAuction({ location: "北部" }));
-
-  await focusHarness.submitUpdate();
-
-  assert.equal(focusHarness.updateRequests.length, 0);
-  assert.deepEqual(focusHarness.selectedFields, [
-    '[data-validation-field="location"]',
-  ]);
-  assert.equal(focusHarness.scrollCalls.length, 1);
-  assert.equal(focusHarness.focusCalls.length, 1);
-  assert.ok(
-    focusHarness.validationOrder.indexOf("location") <
-      focusHarness.validationOrder.indexOf("shippingMethod"),
+test("Edit preserves legacy shipping/payment until the user selects fixed presets", async () => {
+  const legacyHarness = createEditHarness();
+  legacyHarness.fillForm(
+    editableAuction({
+      shippingMethod: "黑貓宅配",
+      paymentMethod: "面交付款",
+    }),
   );
 
-  focusHarness.form.location = "台北市";
-  focusHarness.normalizeLocation();
-  assert.equal(focusHarness.form.location, "臺北市");
-  assert.equal(focusHarness.fieldErrors.location, "");
+  await legacyHarness.submitUpdate();
+  assert.equal(legacyHarness.updateRequests[0][1].shippingMethod, "黑貓宅配");
+  assert.equal(legacyHarness.updateRequests[0][1].paymentMethod, "面交付款");
+
+  const switchHarness = createEditHarness();
+  switchHarness.fillForm(
+    editableAuction({
+      shippingMethod: "黑貓宅配",
+      paymentMethod: "面交付款",
+    }),
+  );
+  switchHarness.selectedFormOptions.shippingMethod = "宅配";
+  switchHarness.handleFormOptionChange("shippingMethod");
+  switchHarness.selectedFormOptions.paymentMethod = "信用卡";
+  switchHarness.handleFormOptionChange("paymentMethod");
+
+  await switchHarness.submitUpdate();
+  assert.equal(switchHarness.updateRequests[0][1].shippingMethod, "宅配");
+  assert.equal(switchHarness.updateRequests[0][1].paymentMethod, "信用卡");
+  assert.equal(switchHarness.legacyShippingMethodOption.value, "");
+  assert.equal(switchHarness.legacyPaymentMethodOption.value, "");
 });
 
-test("Edit combobox filters aliases and keeps its UI state out of the update request", async () => {
-  const harness = createEditHarness();
-  harness.fillForm(editableAuction({ location: "" }));
-
-  harness.openLocationMenu();
-  assert.equal(harness.locationMenuOpen.value, true);
-  assert.equal(harness.filteredTaiwanCities.value.length, 22);
-
-  harness.form.location = "台北";
-  harness.fieldErrors.location =
-    "請從台灣縣市選項中選擇商品所在地";
-  harness.handleLocationInput();
-
-  assert.deepEqual(
-    Array.from(harness.filteredTaiwanCities.value),
-    ["臺北市"],
-  );
-
-  let preventCount = 0;
-  harness.handleLocationEnter({
-    preventDefault() {
-      preventCount += 1;
-    },
-  });
-
-  assert.equal(preventCount, 1);
-  assert.equal(harness.form.location, "臺北市");
-  assert.equal(harness.fieldErrors.location, "");
-  assert.equal(harness.locationMenuOpen.value, false);
-
-  await harness.submitUpdate();
-
-  assert.equal(harness.updateRequests.length, 1);
-  const [, request] = harness.updateRequests[0];
-  assert.equal(request.location, "臺北市");
-  assert.equal(Object.hasOwn(request, "locationMenuOpen"), false);
-  assert.equal(Object.hasOwn(request, "activeLocationIndex"), false);
-  assert.equal(Object.hasOwn(request, "filteredTaiwanCities"), false);
-});
-
-test("Edit Custom shipping/payment errors focus the expanded input and presets clear them", async () => {
-  const harness = createEditHarness();
-
-  harness.fillForm(editableAuction());
-  harness.selectedFormOptions.shippingMethod = CUSTOM_OPTION_VALUE;
-  harness.handleFormOptionChange("shippingMethod");
-  harness.selectedFormOptions.paymentMethod = CUSTOM_OPTION_VALUE;
-  harness.handleFormOptionChange("paymentMethod");
-  harness.renderedCustomFields.add("shippingMethod");
-  harness.renderedCustomFields.add("paymentMethod");
-
-  await harness.submitUpdate();
-
-  assert.equal(
-    harness.fieldErrors.shippingMethod,
-    "請輸入自訂運送方式",
-  );
-  assert.equal(
-    harness.fieldErrors.paymentMethod,
-    "請輸入自訂付款方式",
-  );
-  assert.deepEqual(harness.selectedFields, [
-    '[data-validation-field="shippingMethod"]',
-  ]);
-  assert.deepEqual(harness.fieldControlQueries, [
-    ["shippingMethod", "[data-custom-input]"],
-  ]);
-  assert.equal(harness.updateRequests.length, 0);
-
-  harness.selectedFormOptions.shippingMethod = "宅配";
-  harness.handleFormOptionChange("shippingMethod");
-  harness.selectedFormOptions.paymentMethod = "轉帳";
-  harness.handleFormOptionChange("paymentMethod");
-
-  assert.equal(harness.form.shippingMethod, "宅配");
-  assert.equal(harness.form.paymentMethod, "轉帳");
-  assert.equal(harness.fieldErrors.shippingMethod, "");
-  assert.equal(harness.fieldErrors.paymentMethod, "");
-});
-
-test("Edit sends real Custom strings without UI selectors or sentinel values", async () => {
+test("Edit sends optional custom notes and fixed legacy methods without UI state", async () => {
   const harness = createEditHarness();
   const customValues = {
     defectNote: "鞋帶有輕微染色",
     authenticityNote: "朋友自日本門市購入",
-    shippingMethod: "黑貓宅配",
-    paymentMethod: "匯款後通知",
     warrantyNote: "售後問題請先站內聯絡",
   };
 
-  harness.fillForm(editableAuction());
+  harness.fillForm(
+    editableAuction({
+      shippingMethod: "黑貓宅配",
+      paymentMethod: "匯款後通知",
+    }),
+  );
 
-  for (const fieldName of Object.keys(customValues)) {
+  for (const [fieldName, value] of Object.entries(customValues)) {
     harness.selectedFormOptions[fieldName] = CUSTOM_OPTION_VALUE;
     harness.handleFormOptionChange(fieldName);
-    harness.form[fieldName] = customValues[fieldName];
+    harness.form[fieldName] = value;
   }
 
   await harness.submitUpdate();
 
   assert.equal(harness.updateRequests.length, 1);
   const request = harness.updateRequests[0][1];
-
   for (const [fieldName, value] of Object.entries(customValues)) {
     assert.equal(request[fieldName], value);
   }
+  assert.equal(request.shippingMethod, "黑貓宅配");
+  assert.equal(request.paymentMethod, "匯款後通知");
   assert.equal(JSON.stringify(request).includes(CUSTOM_OPTION_VALUE), false);
   assert.equal("selectedFormOptions" in request, false);
   assert.equal("deliveryOption" in request, false);
@@ -660,11 +655,11 @@ test("Edit scrubs a manually entered UI sentinel before validation or request", 
   assert.equal(requiredHarness.form.paymentMethod, "");
   assert.equal(
     requiredHarness.fieldErrors.shippingMethod,
-    "請輸入自訂運送方式",
+    "請選擇運送方式",
   );
   assert.equal(
     requiredHarness.fieldErrors.paymentMethod,
-    "請輸入自訂付款方式",
+    "請選擇付款方式",
   );
 });
 
@@ -783,6 +778,10 @@ test("Edit preserves lifecycle locks and ACTIVE original startAt update contract
   assert.match(
     template,
     /v-model\.number\s*=\s*["']form\.brandId["'][\s\S]*?:disabled\s*=\s*["']!editable \|\| auctionStatus === 'ACTIVE'["']/,
+  );
+  assert.match(
+    template,
+    /v-model\.number\s*=\s*["']form\.categoryId["'][\s\S]*?:disabled\s*=\s*["']!editable \|\| auctionStatus === 'ACTIVE'["']/,
   );
   assert.match(
     template,

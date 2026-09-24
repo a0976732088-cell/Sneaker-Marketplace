@@ -13,7 +13,11 @@ import com.project.sneakermarket.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.servlet.http.HttpSession;
 
+import java.io.Serializable;
+import java.util.HashSet;
+import java.util.Set;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collection;
@@ -36,23 +40,90 @@ public class AdvertisementStatsService {
 
     private final AdvertisementRepository advertisementRepository;
     private final AdvertisementStatsRepository advertisementStatsRepository;
+    // Session 裡保存廣告追蹤狀態時使用的名稱
+    private static final String TRACKING_STATE_SESSION_KEY =
+            "advertisementTrackingState";
 
-    @Transactional
-    public void recordView(Long adId) {
-        AdvertisementStats stats = getOrCreateTodayStats(adId);
+    /**
+     * 同一個 Session 當天已經曝光、點擊過哪些廣告。
+     *
+     * 日期改變時會建立新的狀態，讓隔天可以重新計算。
+     */
+    private static final class AdvertisementTrackingState
+            implements Serializable {
 
-        stats.setViewCount(stats.getViewCount() + 1);
+        private final LocalDate statDate;
 
-        advertisementStatsRepository.save(stats);
+        private final Set<Long> viewedAdIds = new HashSet<>();
+
+        private final Set<Long> clickedAdIds = new HashSet<>();
+
+        private AdvertisementTrackingState(LocalDate statDate) {
+            this.statDate = statDate;
+        }
     }
 
     @Transactional
-    public void recordClick(Long adId) {
-        AdvertisementStats stats = getOrCreateTodayStats(adId);
+    public void recordView(Long adId, HttpSession session) {
+        /*
+         * 同一個 Session 可能同時送出多個請求，
+         * synchronized 可以避免兩個請求同時通過去重檢查。
+         */
+        synchronized (session) {
+            AdvertisementTrackingState trackingState =
+                    getOrCreateTrackingState(session);
 
-        stats.setClickCount(stats.getClickCount() + 1);
+            // 今天這個 Session 已看過此廣告，不重複計算
+            if (trackingState.viewedAdIds.contains(adId)) {
+                return;
+            }
 
-        advertisementStatsRepository.save(stats);
+            AdvertisementStats stats = getOrCreateTodayStats(adId);
+
+            stats.setViewCount(stats.getViewCount() + 1);
+
+            advertisementStatsRepository.save(stats);
+
+            // 資料庫操作成功後，再記錄到 Session
+            trackingState.viewedAdIds.add(adId);
+        }
+    }
+
+    @Transactional
+    public void recordClick(Long adId, HttpSession session) {
+        synchronized (session) {
+            AdvertisementTrackingState trackingState =
+                    getOrCreateTrackingState(session);
+
+            // 今天這個 Session 已點擊過此廣告，不重複計算
+            if (trackingState.clickedAdIds.contains(adId)) {
+                return;
+            }
+
+            AdvertisementStats stats = getOrCreateTodayStats(adId);
+
+            /*
+             * 使用者可能在廣告顯示未滿一秒時就點擊。
+             * 如果尚未計算曝光，點擊時補上一筆曝光，
+             * 確保 clickCount 不會大於 viewCount。
+             */
+            boolean needsView =
+                    !trackingState.viewedAdIds.contains(adId);
+
+            if (needsView) {
+                stats.setViewCount(stats.getViewCount() + 1);
+            }
+
+            stats.setClickCount(stats.getClickCount() + 1);
+
+            advertisementStatsRepository.save(stats);
+
+            if (needsView) {
+                trackingState.viewedAdIds.add(adId);
+            }
+
+            trackingState.clickedAdIds.add(adId);
+        }
     }
 
     // 批次查詢方法
@@ -136,6 +207,34 @@ public class AdvertisementStatsService {
                 clicks,
                 calculateCtr(views, clicks)
         );
+    }
+
+    /**
+     * 取得今天的廣告追蹤狀態。
+     * 如果 Session 沒有資料，或日期已改變，就建立新的狀態。
+     */
+    private AdvertisementTrackingState getOrCreateTrackingState(
+            HttpSession session
+    ) {
+        LocalDate today = LocalDate.now(TAIPEI_ZONE);
+
+        Object savedState =
+                session.getAttribute(TRACKING_STATE_SESSION_KEY);
+
+        if (savedState instanceof AdvertisementTrackingState trackingState
+                && today.equals(trackingState.statDate)) {
+            return trackingState;
+        }
+
+        AdvertisementTrackingState newState =
+                new AdvertisementTrackingState(today);
+
+        session.setAttribute(
+                TRACKING_STATE_SESSION_KEY,
+                newState
+        );
+
+        return newState;
     }
 
     // 共用邏輯，觀看點擊相同流程

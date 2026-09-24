@@ -1,4 +1,4 @@
-package com.project.sneakermarket.commerce.dto;
+package com.project.sneakermarket.commerce.logistics;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

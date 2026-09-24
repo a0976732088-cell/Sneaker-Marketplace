@@ -1,5 +1,6 @@
 package com.project.sneakermarket.auction.repository;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -11,7 +12,9 @@ import org.springframework.util.StringUtils;
 import com.project.sneakermarket.auction.dto.AuctionSearchCriteria;
 import com.project.sneakermarket.auction.entity.Auction;
 import com.project.sneakermarket.auction.entity.AuctionProduct;
+import com.project.sneakermarket.auction.entity.AuctionStatus;
 
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -35,6 +38,24 @@ public final class AuctionSpecification {
     public static Specification<Auction> withCriteria(
             AuctionSearchCriteria criteria) {
 
+        return build(criteria, null);
+    }
+
+    /**
+     * Builds the public storefront's ending-soon business order.
+     * The caller must use an unsorted Pageable so this order is not overwritten.
+     */
+    public static Specification<Auction> withEndingSoonOrder(
+            AuctionSearchCriteria criteria,
+            LocalDateTime now) {
+
+        return build(criteria, java.util.Objects.requireNonNull(now));
+    }
+
+    private static Specification<Auction> build(
+            AuctionSearchCriteria criteria,
+            LocalDateTime endingSoonReferenceTime) {
+
         return (root, query, criteriaBuilder) -> {
 
             List<Predicate> predicates = new ArrayList<>();
@@ -54,10 +75,13 @@ public final class AuctionSpecification {
             predicates.add(criteriaBuilder.isNull(root.get("deletedAt")));
             predicates.add(criteriaBuilder.notEqual(
                     root.get("status"),
-                    com.project.sneakermarket.auction.entity.AuctionStatus.REMOVED));
+                    AuctionStatus.REMOVED));
             predicates.add(criteriaBuilder.notEqual(
                     root.get("status"),
-                    com.project.sneakermarket.auction.entity.AuctionStatus.DRAFT));
+                    AuctionStatus.DRAFT));
+            predicates.add(criteriaBuilder.notEqual(
+                    root.get("status"),
+                    AuctionStatus.CANCELLED));
 
             // 競標狀態
             if (!statuses.isEmpty()) {
@@ -172,6 +196,43 @@ public final class AuctionSpecification {
                 predicates.add(
                         root.get("auctionProductId")
                                 .in(productSubquery)
+                );
+            }
+
+            if (endingSoonReferenceTime != null
+                    && !Long.class.equals(query.getResultType())
+                    && !long.class.equals(query.getResultType())) {
+
+                Predicate activeAndNotExpired = criteriaBuilder.and(
+                        criteriaBuilder.equal(
+                                root.<AuctionStatus>get("status"),
+                                AuctionStatus.ACTIVE),
+                        criteriaBuilder.greaterThan(
+                                root.<LocalDateTime>get("endAt"),
+                                endingSoonReferenceTime));
+                Predicate scheduled = criteriaBuilder.equal(
+                        root.<AuctionStatus>get("status"),
+                        AuctionStatus.SCHEDULED);
+
+                Expression<Integer> groupOrder = criteriaBuilder.<Integer>selectCase()
+                        .when(activeAndNotExpired, 0)
+                        .when(scheduled, 1)
+                        .otherwise(2);
+                Expression<LocalDateTime> activeEndOrder =
+                        criteriaBuilder.<LocalDateTime>selectCase()
+                                .when(activeAndNotExpired, root.<LocalDateTime>get("endAt"))
+                                .otherwise(criteriaBuilder.nullLiteral(LocalDateTime.class));
+                Expression<LocalDateTime> scheduledStartOrder =
+                        criteriaBuilder.<LocalDateTime>selectCase()
+                                .when(scheduled, root.<LocalDateTime>get("startAt"))
+                                .otherwise(criteriaBuilder.nullLiteral(LocalDateTime.class));
+
+                query.orderBy(
+                        criteriaBuilder.asc(groupOrder),
+                        criteriaBuilder.asc(activeEndOrder),
+                        criteriaBuilder.asc(scheduledStartOrder),
+                        criteriaBuilder.desc(root.<LocalDateTime>get("endAt")),
+                        criteriaBuilder.asc(root.get("auctionId"))
                 );
             }
 

@@ -1,3 +1,124 @@
+<template>
+  <div class="event-admin activity-management">
+    <header class="admin-header">
+      <div class="admin-header-top">
+        <div>
+          <span class="admin-eyebrow">酷客 Kicks ADMIN</span>
+
+          <h1 class="admin-title">活動管理</h1>
+
+          <p class="admin-description">建立、查詢、編輯與追蹤平台活動。</p>
+        </div>
+
+        <button type="button" class="create-button" @click="toggleCreateForm">
+          <span aria-hidden="true">
+            {{ showCreateForm ? "×" : "+" }}
+          </span>
+
+          {{ showCreateForm ? "關閉新增" : "新增活動" }}
+        </button>
+      </div>
+
+      <nav class="status-tabs" aria-label="活動狀態">
+        <button
+          v-for="tab in statusTabs"
+          :key="tab.value"
+          type="button"
+          class="status-tab"
+          :class="{ active: activeStatus === tab.value }"
+          @click="selectStatus(tab.value)"
+        >
+          <span>{{ tab.label }}</span>
+          <span class="tab-count">{{ tab.count }}</span>
+        </button>
+      </nav>
+    </header>
+
+    <section v-if="showCreateForm" class="create-section" aria-label="新增活動">
+      <EventCreateForm @success="handleCreateSuccess" />
+    </section>
+
+    <section class="management-card">
+      <div class="operation-notice">
+        <span class="notice-icon">▣</span>
+        <strong>
+          本頁共有 {{ currentPageActiveCount }} 場啟用中的活動。
+        </strong>
+      </div>
+
+      <EventSearchFilter @search="handleSearch" @reset="handleResetSearch" />
+
+      <div v-if="loading" class="loading-state" role="status">
+        活動資料載入中……
+      </div>
+
+      <EventTable
+        v-else
+        :events="eventList"
+        @open-detail="openDetailModal"
+        @open-edit="openEditModal"
+        @delete="handleDelete"
+      />
+    </section>
+
+    <nav
+      v-if="!loading && totalPages > 1"
+      class="activity-pagination"
+      aria-label="活動列表分頁"
+    >
+      <ul class="pagination">
+        <li :class="['page-item', currentPage === 1 ? 'disabled' : '']">
+          <button
+            type="button"
+            class="page-link"
+            @click="fetchEvents(currentPage - 1)"
+          >
+            上一頁
+          </button>
+        </li>
+
+        <li
+          v-for="page in totalPages"
+          :key="page"
+          :class="['page-item', currentPage === page ? 'active' : '']"
+        >
+          <button type="button" class="page-link" @click="fetchEvents(page)">
+            {{ page }}
+          </button>
+        </li>
+
+        <li
+          :class="[
+            'page-item',
+            currentPage === totalPages ? 'disabled' : '',
+          ]"
+        >
+          <button
+            type="button"
+            class="page-link"
+            @click="fetchEvents(currentPage + 1)"
+          >
+            下一頁
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <EventDetailModal
+      v-if="showDetailModal"
+      :event="selectedEvent"
+      @close="closeDetailModal"
+    />
+
+    <EventEditModal
+      v-if="showEditModal"
+      :event="selectedEvent"
+      @close="closeEditModal"
+      @success="handleEditSuccess"
+    />
+  </div>
+</template>
+
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { deleteEvent, getEventPage } from "@/service/eventService";
@@ -15,13 +136,21 @@ const totalPages = ref(1);
 const loading = ref(false);
 const activeStatus = ref("ALL");
 
-const statusTabs = [
-  { value: "ALL", label: "全部" },
-  { value: "ACTIVE", label: "啟用中" },
-  { value: "INACTIVE", label: "停用" },
-  { value: "DRAFT", label: "草稿" },
-  { value: "CANCELLED", label: "已取消" },
-];
+const statusCounts = reactive({
+  ALL: 0,
+  ACTIVE: 0,
+  INACTIVE: 0,
+  DRAFT: 0,
+  CANCELLED: 0,
+});
+
+const statusTabs = computed(() => [
+  { value: "ALL", label: "全部", count: statusCounts.ALL },
+  { value: "ACTIVE", label: "啟用中", count: statusCounts.ACTIVE },
+  { value: "INACTIVE", label: "停用", count: statusCounts.INACTIVE },
+  { value: "DRAFT", label: "草稿", count: statusCounts.DRAFT },
+  { value: "CANCELLED", label: "已取消", count: statusCounts.CANCELLED },
+]);
 
 const searchParams = reactive({});
 
@@ -29,9 +158,32 @@ const selectedEvent = ref(null);
 const showDetailModal = ref(false);
 const showEditModal = ref(false);
 
-const currentPageActiveCount = computed(() =>
-  eventList.value.filter((event) => event.status === "ACTIVE").length,
+const currentPageActiveCount = computed(
+  () => eventList.value.filter((event) => event.status === "ACTIVE").length,
 );
+
+async function fetchStatusCounts() {
+  const statuses = ["ALL", "ACTIVE", "INACTIVE", "DRAFT", "CANCELLED"];
+
+  try {
+    const responses = await Promise.all(
+      statuses.map((status) =>
+        getEventPage({
+          pageNumber: 1,
+          pageSize: 1,
+          ...(status === "ALL" ? {} : { status }),
+        }),
+      ),
+    );
+
+    responses.forEach((response, index) => {
+      const status = statuses[index];
+      statusCounts[status] = response.data?.totalElements ?? 0;
+    });
+  } catch (error) {
+    console.error("取得活動狀態數量失敗：", error);
+  }
+}
 
 function formatDateTimeParam(value) {
   if (!value) return undefined;
@@ -145,7 +297,8 @@ function closeEditModal() {
 
 async function handleEditSuccess() {
   closeEditModal();
-  await fetchEvents(currentPage.value);
+
+  await Promise.all([fetchEvents(currentPage.value), fetchStatusCounts()]);
 }
 
 async function handleDelete(eventId) {
@@ -162,11 +315,12 @@ async function handleDelete(eventId) {
     const shouldGoToPreviousPage =
       eventList.value.length === 1 && currentPage.value > 1;
 
-    await fetchEvents(
-      shouldGoToPreviousPage
-        ? currentPage.value - 1
-        : currentPage.value,
-    );
+    await Promise.all([
+      fetchEvents(
+        shouldGoToPreviousPage ? currentPage.value - 1 : currentPage.value,
+      ),
+      fetchStatusCounts(),
+    ]);
   } catch (error) {
     console.error("取消活動失敗：", error);
     alert(
@@ -177,103 +331,23 @@ async function handleDelete(eventId) {
   }
 }
 
+async function handleCreateSuccess() {
+  showCreateForm.value = false;
+
+  Object.keys(searchParams).forEach((key) => {
+    delete searchParams[key];
+  });
+
+  activeStatus.value = "ALL";
+
+  await Promise.all([fetchEvents(1), fetchStatusCounts()]);
+}
+
 onMounted(() => {
   fetchEvents(1);
+  fetchStatusCounts();
 });
 </script>
-
-<template>
-  <div class="event-admin activity-management">
-    <header class="admin-header">
-      <div class="admin-header-top">
-        <div>
-          <span class="admin-eyebrow">SNEAKERMARKET ADMIN</span>
-
-          <h1 class="admin-title">活動管理</h1>
-
-          <p class="admin-description">
-            建立、查詢、編輯與追蹤平台活動。
-          </p>
-        </div>
-
-        <button
-          type="button"
-          class="create-button"
-          @click="toggleCreateForm"
-        >
-          <span aria-hidden="true">
-            {{ showCreateForm ? "×" : "+" }}
-          </span>
-
-          {{ showCreateForm ? "關閉新增" : "新增活動" }}
-        </button>
-      </div>
-
-      <nav class="status-tabs" aria-label="活動狀態">
-        <button
-          v-for="tab in statusTabs"
-          :key="tab.value"
-          type="button"
-          class="status-tab"
-          :class="{ active: activeStatus === tab.value }"
-          @click="selectStatus(tab.value)"
-        >
-          {{ tab.label }}
-        </button>
-      </nav>
-    </header>
-
-    <section
-      v-if="showCreateForm"
-      class="create-section"
-      aria-label="新增活動"
-    >
-      <EventCreateForm />
-    </section>
-
-    <section class="management-card">
-      <div v-if="currentPageActiveCount > 0" class="operation-notice">
-        <span class="notice-icon">▣</span>
-        <strong>
-          本頁共有 {{ currentPageActiveCount }} 場啟用中的活動。
-        </strong>
-      </div>
-
-      <EventSearchFilter
-        @search="handleSearch"
-        @reset="handleResetSearch"
-      />
-
-      <div v-if="loading" class="loading-state" role="status">
-        活動資料載入中……
-      </div>
-
-      <EventTable
-        v-else
-        :events="eventList"
-        :current-page="currentPage"
-        :total-pages="totalPages"
-        @open-detail="openDetailModal"
-        @open-edit="openEditModal"
-        @delete="handleDelete"
-        @change-page="fetchEvents"
-      />
-    </section>
-
-    <EventDetailModal
-      v-if="showDetailModal"
-      :event="selectedEvent"
-      @close="closeDetailModal"
-    />
-
-    <EventEditModal
-      v-if="showEditModal"
-      :event="selectedEvent"
-      @close="closeEditModal"
-      @success="handleEditSuccess"
-    />
-  </div>
-</template>
 
 <style scoped>
 .activity-management {
@@ -316,8 +390,15 @@ onMounted(() => {
   display: flex;
   gap: 28px;
   overflow-x: auto;
+  overflow-y: hidden;
   margin: 0;
   padding: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.status-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .status-tab {
@@ -354,7 +435,33 @@ onMounted(() => {
   min-width: 0;
   padding: 0;
   border: 0;
+  background: transparent;
+}
+
+.activity-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.activity-pagination .pagination {
+  gap: 4px;
+  margin: 0;
+}
+
+.activity-pagination .page-link {
+  min-width: 32px;
+  border-color: #dedfdb;
+  color: #565a53;
   background: #ffffff;
+  font-size: 11px;
+  text-align: center;
+}
+
+.activity-pagination .page-item.active .page-link {
+  border-color: #292b28;
+  color: #ffffff;
+  background: #292b28;
 }
 
 .operation-notice {
@@ -404,6 +511,30 @@ onMounted(() => {
 
 .activity-management :deep(.admin-description) {
   font-size: 12px;
+}
+
+.status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-count {
+  display: inline-grid;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  place-items: center;
+  border-radius: 9px;
+  color: #777a74;
+  background: #eeefec;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.status-tab.active .tab-count {
+  color: #ffffff;
+  background: #292b28;
 }
 
 @media (max-width: 768px) {

@@ -116,12 +116,12 @@ function markImageFailed(index) {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  color: #8b9197;
+  color: #495057;
   font-size: 0.85rem;
 }
 
 .placeholder-mark {
-  color: #c4c8cc;
+  color: #5d6670;
   font-size: 2rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -166,7 +166,7 @@ function markImageFailed(index) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #adb5bd;
+  color: #495057;
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.08em;

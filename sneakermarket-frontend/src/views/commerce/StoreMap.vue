@@ -1,261 +1,248 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-
-let map = null
-
-// ============================================================
-// 往外通知父層（結帳頁）：使用者選好門市了
-// ============================================================
+import httpClient from '@/service/httpClient'
 
 const emit = defineEmits(['storeSelected'])
 
 const loading = ref(true)
+const errorMessage = ref('')
+const mapStores = ref([])
 
-// ============================================================
-// 展示用門市清單（高雄，20 間，涵蓋多個行政區）
-// ============================================================
+// 目前選擇的城市
+const selectedCity = ref('高雄市')
 
-const mapStores = [
-  {
-    storeId: '893312',
-    storeName: '強民門市',
-    address: '高雄市小港區小港路182號',
-    phone: '07-812-4098',
-    type: '7-ELEVEN',
-    latitude: 22.564791,
-    longitude: 120.337043
-  },
-  {
-    storeId: '政德',
-    storeName: '政德門市',
-    address: '高雄市左營區政德路130、132號',
-    phone: '07-345-1959',
-    type: '7-ELEVEN',
-    latitude: 22.67388,
-    longitude: 120.29749
-  },
-  {
-    storeId: '林德',
-    storeName: '林德門市',
-    address: '高雄市苓雅區林德街37號',
-    phone: '07-721-3735',
-    type: '7-ELEVEN',
-    latitude: 22.624,
-    longitude: 120.317466
-  },
-  {
-    storeId: '前鎮',
-    storeName: '高雄門市',
-    address: '高雄市前鎮區復興三路116號',
-    phone: '07-336-7915',
-    type: '7-ELEVEN',
-    latitude: 22.610935,
-    longitude: 120.310728
-  },
-  {
-    storeId: '鳳山',
-    storeName: '善志門市',
-    address: '高雄市鳳山區善志街27號',
-    phone: '07-726-0748',
-    type: '7-ELEVEN',
-    latitude: 22.601749,
-    longitude: 120.335487
-  },
-  {
-    storeId: '後驛',
-    storeName: '後驛門市',
-    address: '高雄市三民區察哈爾一街148號1樓',
-    phone: '07-322-8514',
-    type: '7-ELEVEN',
-    latitude: 22.647715,
-    longitude: 120.303685
-  },
-  {
-    storeId: '新本館',
-    storeName: '新本館門市',
-    address: '高雄市三民區大裕路119號',
-    phone: '07-392-4430',
-    type: '7-ELEVEN',
-    latitude: 22.656121,
-    longitude: 120.32851
-  },
-  {
-    storeId: '楠梓',
-    storeName: '楠梓門市',
-    address: '高雄市楠梓區藍昌路356、358號',
-    phone: '07-364-8856',
-    type: '7-ELEVEN',
-    latitude: 22.722855,
-    longitude: 120.29137
-  },
-  {
-    storeId: '鼓山',
-    storeName: '美珍門市',
-    address: '高雄市鼓山區明誠四路23號',
-    phone: '07-550-2901',
-    type: '7-ELEVEN',
-    latitude: 22.660897,
-    longitude: 120.291354
-  },
-  {
-    storeId: '新興',
-    storeName: '興村門市',
-    address: '高雄市新興區五福二路92號',
-    phone: '07-282-9812',
-    type: '7-ELEVEN',
-    latitude: 22.625634,
-    longitude: 120.308063
-  },
-  {
-    storeId: '仁武',
-    storeName: '雄鼎門市',
-    address: '高雄市仁武區仁雄路346號',
-    phone: '07-374-7409',
-    type: '7-ELEVEN',
-    latitude: 22.674416,
-    longitude: 120.335243
-  },
-  {
-    storeId: '橋頭',
-    storeName: '橋鄰門市',
-    address: '高雄市橋頭區成功南路151號',
-    phone: '07-611-2945',
-    type: '7-ELEVEN',
-    latitude: 22.752265,
-    longitude: 120.312758
-  },
-  {
-    storeId: '大寮',
-    storeName: '開封門市',
-    address: '高雄市大寮區大寮路688號',
-    phone: '07-788-0424',
-    type: '7-ELEVEN',
-    latitude: 22.591398,
-    longitude: 120.414872
-  },
-  {
-    storeId: '鳥松',
-    storeName: '翔盛門市',
-    address: '高雄市鳥松區神農路479號',
-    phone: '07-735-1489',
-    type: '7-ELEVEN',
-    latitude: 22.658928,
-    longitude: 120.381481
-  },
-  {
-    storeId: '旗津',
-    storeName: '旗津門市',
-    address: '高雄市旗津區海安路9號',
-    phone: '07-571-9252',
-    type: '7-ELEVEN',
-    latitude: 22.613937,
-    longitude: 120.269367
-  },
-  {
-    storeId: '鹽埕',
-    storeName: '駁藝門市',
-    address: '高雄市鹽埕區大勇路29號',
-    phone: '07-521-2477',
-    type: '7-ELEVEN',
-    latitude: 22.62124,
-    longitude: 120.282363
-  },
-  {
-    storeId: '前金',
-    storeName: '前金門市',
-    address: '高雄市前金區自強二路172號1樓',
-    phone: '07-241-9355',
-    type: '7-ELEVEN',
-    latitude: 22.627881,
-    longitude: 120.29449
-  },
-  {
-    storeId: '大社',
-    storeName: '大民門市',
-    address: '高雄市大社區三民路213號',
-    phone: '07-352-8550',
-    type: '7-ELEVEN',
-    latitude: 22.724882,
-    longitude: 120.348639
-  },
-  {
-    storeId: '岡山',
-    storeName: '岡好門市',
-    address: '高雄市岡山區岡山路612-2號',
-    phone: '07-621-6214',
-    type: '7-ELEVEN',
-    latitude: 22.802841,
-    longitude: 120.291109
-  },
-  {
-    storeId: '林園',
-    storeName: '艾文門市',
-    address: '高雄市林園區東林西路99號',
-    phone: '07-641-4848',
-    type: '7-ELEVEN',
-    latitude: 22.503744,
-    longitude: 120.393146
-  }
+// 依門市數量排序：高雄 20 → 大城市 10 → 其他縣市 1
+const cities = [
+  '高雄市',
+  '台北市', '新北市', '桃園市', '台中市', '台南市',
+  '基隆市', '新竹市', '新竹縣', '苗栗縣', '彰化縣', '南投縣',
+  '雲林縣', '嘉義市', '嘉義縣', '屏東縣', '宜蘭縣', '花蓮縣',
+  '台東縣', '澎湖縣', '金門縣', '連江縣'
 ]
 
+// 各城市市中心座標（市政府附近）
+// 沒列在這裡的縣市，地圖會以第一間門市為中心
+const CITY_CENTERS = {
+  '高雄市': [22.6273, 120.3014],
+  '台北市': [25.0375, 121.5637],
+  '新北市': [25.0120, 121.4650],
+  '桃園市': [24.9936, 121.3010],
+  '台中市': [24.1618, 120.6469],
+  '台南市': [22.9920, 120.1850]
+}
+
+let map = null
+
+// Leaflet 預設 marker 圖示修正
+delete L.Icon.Default.prototype._getIconUrl
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+})
+
+
 // ============================================================
-// 建立地圖
+// 選擇門市
 // ============================================================
 
-onMounted(() => {
+function selectStore(store) {
+  console.log('選擇的門市：', store)
 
-  // ----------------------------------------------------------
-  // 1. 建立 Leaflet 地圖
-  // ----------------------------------------------------------
+  emit('storeSelected', {
+    storeId: store.storeId,
+    storeName: store.storeName,
+    address: store.address,
+    phone: store.phone,
+    chain: store.chain,
+    city: store.city,
+    latitude: store.latitude,
+    longitude: store.longitude
+  })
 
-  map = L.map('store-map').setView(
-    [22.6273, 120.3014],
-    10
+  if (map) {
+    map.closePopup()
+  }
+}
+
+
+// ============================================================
+// 取得門市資料
+// ============================================================
+
+async function loadStores() {
+  try {
+    loading.value = true
+    errorMessage.value = ''
+
+    console.log(
+      `開始取得 ${selectedCity.value} 門市資料`
+    )
+
+    const response = await httpClient.get(
+      '/logistics/cvs/stores',
+      {
+        params: {
+          chain: 'UNIMART',
+          city: selectedCity.value
+        }
+      }
+    )
+
+    console.log(
+      `${selectedCity.value} 門市資料：`,
+      response.data
+    )
+
+    // 只保留有座標的門市
+    mapStores.value = response.data.filter(store => {
+      return (
+        store.latitude !== null &&
+        store.longitude !== null &&
+        !isNaN(Number(store.latitude)) &&
+        !isNaN(Number(store.longitude))
+      )
+    })
+
+    console.log(
+      `${selectedCity.value} 共有 ${mapStores.value.length} 間門市具有座標`
+    )
+
+    // 沒有座標
+    if (mapStores.value.length === 0) {
+      errorMessage.value =
+        `${selectedCity.value} 目前沒有可顯示的門市座標`
+
+      return
+    }
+
+    await nextTick()
+
+    // 第一次建立地圖，之後只更新 Marker
+    initMap()
+
+  } catch (error) {
+    console.error('取得門市資料失敗：', error)
+
+    errorMessage.value =
+      error.response?.data?.message ||
+      '門市資料載入失敗，請稍後再試'
+
+  } finally {
+    loading.value = false
+  }
+}
+
+
+// ============================================================
+// 切換城市
+// ============================================================
+
+function changeCity() {
+  console.log(
+    `切換城市：${selectedCity.value}`
   )
 
-  // ----------------------------------------------------------
-  // 2. OpenStreetMap
-  // ----------------------------------------------------------
+  loadStores()
+}
 
-  L.tileLayer(
-    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    {
-      attribution: '&copy; OpenStreetMap contributors'
+
+// ============================================================
+// 初始化 / 更新地圖
+// ============================================================
+
+function initMap() {
+
+  const mapElement = document.getElementById('store-map')
+
+  if (!mapElement) {
+    console.error('找不到 store-map')
+    errorMessage.value = '地圖元件初始化失敗'
+    return
+  }
+
+
+  // ==========================================================
+  // 第一次才建立 Leaflet 地圖
+  // ==========================================================
+
+  if (!map) {
+
+    map = L.map(mapElement)
+
+    // OpenStreetMap
+    L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      }
+    ).addTo(map)
+  }
+
+
+  // ==========================================================
+  // 清除舊 Marker
+  // ==========================================================
+
+  map.eachLayer(layer => {
+
+    if (layer instanceof L.Marker) {
+      map.removeLayer(layer)
     }
-  ).addTo(map)
 
-  // ----------------------------------------------------------
-  // 3. 在地圖上放置門市
-  // ----------------------------------------------------------
+  })
 
-  mapStores.forEach(store => {
+
+  // ==========================================================
+  // 建立新的 Marker
+  // ==========================================================
+
+  mapStores.value.forEach(store => {
+
+    const latitude = Number(store.latitude)
+    const longitude = Number(store.longitude)
 
     const marker = L.marker([
-      store.latitude,
-      store.longitude
-    ])
-      .addTo(map)
+      latitude,
+      longitude
+    ]).addTo(map)
 
-    // --------------------------------------------------------
-    // 點擊 Marker 後顯示門市資訊
-    // --------------------------------------------------------
 
-    marker.bindPopup(`
-      <div>
-        <strong>7-ELEVEN ${store.storeName}</strong>
-        <br>
-        地址：${store.address}
-        <br>
-        電話：${store.phone}
+    // Popup
+    const popupContent = document.createElement('div')
+
+    popupContent.innerHTML = `
+      <div style="min-width: 220px;">
+
+        <strong>
+          7-ELEVEN ${store.storeName}
+        </strong>
+
         <br><br>
+
+        <span>
+          地址：${store.address}
+        </span>
+
+        <br>
+
+        <span>
+          電話：${store.phone || '無資料'}
+        </span>
+
+        <br><br>
+
         <button
-          id="select-${store.storeId}"
+          class="store-select-button"
           style="
-            padding: 6px 12px;
+            width: 100%;
+            padding: 8px 12px;
             border: none;
-            border-radius: 4px;
+            border-radius: 5px;
             background: #198754;
             color: white;
             cursor: pointer;
@@ -263,60 +250,65 @@ onMounted(() => {
         >
           選擇此門市
         </button>
+
       </div>
-    `)
+    `
 
-    // --------------------------------------------------------
-    // Popup 開啟後，讓「選擇此門市」按鈕可以使用
-    // --------------------------------------------------------
 
-    marker.on('popupopen', () => {
-
-      const button = document.getElementById(
-        `select-${store.storeId}`
+    const button =
+      popupContent.querySelector(
+        '.store-select-button'
       )
 
-      if (button) {
 
-        button.addEventListener('click', () => {
-
-          console.log('選擇的門市：', store)
-
-          // 往外通知父層（結帳頁）使用者選了哪間門市
-          emit('storeSelected', store)
-
-          marker.closePopup()
-
-        })
-
+    button.addEventListener(
+      'click',
+      () => {
+        selectStore(store)
       }
+    )
 
-    })
+
+    marker.bindPopup(
+      popupContent
+    )
 
   })
 
-  // ----------------------------------------------------------
-  // 4. 地圖自動調整範圍，讓所有門市都看得到
-  // ----------------------------------------------------------
 
-  const bounds = L.latLngBounds(
-    mapStores.map(store => [
-      store.latitude,
-      store.longitude
-    ])
-  )
+  // ==========================================================
+  // 確保地圖尺寸正確後，置中在市中心
+  // （沒有市中心座標的縣市，改以第一間門市為中心）
+  // ==========================================================
 
-  map.fitBounds(bounds, {
-    padding: [40, 40]
-  })
+  setTimeout(() => {
 
-  loading.value = false
+    if (map) {
+      map.invalidateSize()
 
+      const firstStore = mapStores.value[0]
+      const center =
+        CITY_CENTERS[selectedCity.value] ||
+        [Number(firstStore.latitude), Number(firstStore.longitude)]
+
+      map.setView(center, 12)
+    }
+
+  }, 100)
+}
+
+
+// ============================================================
+// 元件載入
+// ============================================================
+
+onMounted(() => {
+  loadStores()
 })
 
 
 // ============================================================
-// 元件離開時清除 Leaflet
+// 元件離開
 // ============================================================
 
 onBeforeUnmount(() => {
@@ -324,49 +316,102 @@ onBeforeUnmount(() => {
   if (map) {
 
     map.remove()
-    map = null
 
+    map = null
   }
 
 })
 </script>
-
-
 <template>
 
   <div>
 
-    <!-- ========================================================
-         地圖
-         ======================================================== -->
+    <!-- ======================================================
+         城市選擇
+    ======================================================= -->
+
+    <div class="mb-3">
+
+      <label
+        for="citySelect"
+        class="form-label fw-semibold"
+      >
+        選擇取貨城市
+      </label>
+
+
+      <select
+        id="citySelect"
+        v-model="selectedCity"
+        class="form-select"
+        @change="changeCity"
+      >
+
+        <option
+          v-for="city in cities"
+          :key="city"
+          :value="city"
+        >
+          {{ city }}
+        </option>
+
+      </select>
+
+    </div>
+
+
+    <!-- ======================================================
+         載入中
+    ======================================================= -->
 
     <div
+      v-if="loading"
+      class="border rounded p-4 text-center text-secondary"
+    >
+
+      <div class="mb-2">
+        門市資料載入中...
+      </div>
+
+      <small>
+        正在取得
+        {{ selectedCity }}
+        7-ELEVEN 門市資料
+      </small>
+
+    </div>
+
+
+    <!-- ======================================================
+         錯誤
+    ======================================================= -->
+
+    <div
+      v-else-if="errorMessage"
+      class="alert alert-danger"
+    >
+
+      {{ errorMessage }}
+
+    </div>
+
+
+    <!-- ======================================================
+         Leaflet 地圖
+    ======================================================= -->
+
+    <div
+      v-show="!loading && !errorMessage"
       id="store-map"
       style="
         width: 100%;
-        height: 500px;
+        height: 400px;
         border-radius: 8px;
+        overflow: hidden;
       "
     ></div>
 
 
-    <!-- ========================================================
-         載入狀態 / 可選門市數量
-         ======================================================== -->
-
-    <p
-      v-if="loading"
-      class="text-secondary mt-2"
-    >
-      門市資料載入中...
-    </p>
-
-    <p
-      v-else
-      class="text-secondary mt-2"
-    >
-      目前開放 {{ mapStores.length }} 間門市可供選擇
-    </p>
 
   </div>
 

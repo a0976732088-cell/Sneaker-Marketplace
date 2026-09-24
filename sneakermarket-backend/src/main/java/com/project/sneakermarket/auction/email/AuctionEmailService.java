@@ -81,7 +81,7 @@ public class AuctionEmailService {
         log.setRecipientEmail(member.getEmail());
         log.setRecipientRole(role);
         log.setEmailType(type);
-        String subject = "SneakerMarket " + outcome(type) + "：" + productName;
+        String subject = "酷客 Kicks " + outcome(type) + "：" + productName;
         subject = subject.replaceAll("[\\r\\n]+", " ");
         log.setSubject(subject.substring(0, Math.min(200, subject.length())));
         log.setSendStatus(AuctionEmailSendStatus.PENDING);

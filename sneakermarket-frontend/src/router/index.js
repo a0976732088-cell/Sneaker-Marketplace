@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import HomeView from "@/views/HomeView.vue";
+import HomeView from "@/views/advertisement/StorefrontHomeView.vue";
 
 import { getCurrentMember } from "@/service/authService";
 
@@ -97,6 +97,17 @@ const routes = [
     component: () => import("@/views/commerce/CheckoutView.vue"),
   },
 
+  // =====================================================
+  // 商城模組自己的「我的訂單」列表頁，呼叫商城模組自己的 GET /orders/me
+  {
+  path: "/orders",
+
+  name: "order-list",
+
+  component: () => import("@/views/commerce/OrderListView.vue"),
+  },
+  // =====================================================
+  
   {
     path: "/orders/:id",
 
@@ -282,6 +293,14 @@ const routes = [
         component: () => import("@/views/admin/AdminHomeView.vue"),
       },
 
+      {
+        path: "members",
+
+        name: "admin-members",
+
+        component: () => import("@/views/admin/AdminMemberManagementView.vue"),
+      },
+
       // ================================================
       // Product
       // ================================================
@@ -325,7 +344,7 @@ const routes = [
       // Calendar / Notification
       // ================================================
       {
-        path: "events",
+        path: "events-and-notifications",
         name: "admin-activity-overview",
         component: () =>
           import("@/views/admin/calendarAndNotification/AdminActivityOverviewView.vue"),
@@ -412,7 +431,6 @@ router.beforeEach(async (to) => {
     const member = await getCurrentMember();
 
     if (member.role !== "ROLE_ADMIN") {
-
       return {
         name: "forbidden",
       };
@@ -420,7 +438,6 @@ router.beforeEach(async (to) => {
 
     return true;
   } catch (error) {
-
     return {
       name: "login",
 

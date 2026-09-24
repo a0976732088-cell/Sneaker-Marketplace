@@ -263,6 +263,8 @@ class AuctionMemberQueryIntegrationTests {
     void ordersAreBuyerScopedEvenWhenMemberSellsOtherOrders() {
         var oldAuction = auction(seller, AuctionStatus.SOLD, NOW);
         var recentAuction = auction(seller, AuctionStatus.SOLD, NOW);
+        products.findById(recentAuction.getAuctionProductId()).orElseThrow()
+                .setShippingFee(new BigDecimal("120"));
         var old = order(oldAuction, a, seller, NOW.minusDays(1));
         var recent = order(recentAuction, a, seller, NOW);
         recent.setPaymentDueAt(NOW.plusDays(1));
@@ -280,6 +282,8 @@ class AuctionMemberQueryIntegrationTests {
         assertEquals("US 9", row.size());
         assertEquals("/images/order-primary.jpg", row.imageUrl());
         assertMoney("6500", row.finalPrice());
+        assertMoney("120", row.shippingFee());
+        assertMoney("6620", row.totalAmount());
         assertEquals("Transfer", row.paymentMethod());
         assertEquals(AuctionPaymentStatus.PENDING, row.paymentStatus());
         assertEquals(AuctionShippingStatus.NOT_SHIPPED, row.shippingStatus());
@@ -300,6 +304,8 @@ class AuctionMemberQueryIntegrationTests {
     void salesAreSellerScopedPaginatedAndReuseOrderSummary() {
         var oldAuction = auction(seller, AuctionStatus.SOLD, NOW);
         var recentAuction = auction(seller, AuctionStatus.SOLD, NOW);
+        products.findById(recentAuction.getAuctionProductId()).orElseThrow()
+                .setShippingFee(new BigDecimal("120"));
         var old = order(oldAuction, a, seller, NOW.minusDays(1));
         var recent = order(recentAuction, b, seller, NOW);
         recent.setPaymentDueAt(NOW.plusHours(12));
@@ -321,6 +327,8 @@ class AuctionMemberQueryIntegrationTests {
         assertEquals("US 9", row.size());
         assertEquals("/images/sale-first.jpg", row.imageUrl());
         assertMoney("6500", row.finalPrice());
+        assertMoney("120", row.shippingFee());
+        assertMoney("6620", row.totalAmount());
         assertEquals("Transfer", row.paymentMethod());
         assertEquals(AuctionPaymentStatus.PENDING, row.paymentStatus());
         assertEquals(AuctionShippingStatus.NOT_SHIPPED, row.shippingStatus());

@@ -6,10 +6,7 @@
       <div class="list-controls">
         <CalendarViewTabs v-model="currentView" />
 
-        <div
-          v-if="currentView === 'list' || currentView === 'map'"
-          class="month-controls"
-        >
+        <div v-if="currentView === 'list'" class="month-controls">
           <span>{{ currentYear }} 年 {{ currentMonth + 1 }} 月</span>
           <button type="button" aria-label="上一個月" @click="changeMonth(-1)">
             ‹
@@ -31,9 +28,7 @@
 
     <div
       class="content-grid"
-      :class="{
-        'single-column': currentView === 'month' || currentView === 'map',
-      }"
+      :class="{ 'single-column': currentView === 'month' }"
     >
       <main class="main-content">
         <CalendarListView
@@ -48,12 +43,10 @@
           @toggle-follow="toggleFollow"
         />
 
-        <CalendarMapView
-          v-else-if="currentView === 'map'"
-          v-show="!loading"
-          :events="events"
-          @open-detail="openDetail"
-        />
+        <div v-else-if="currentView === 'map'" class="map-message">
+          <h2>地圖瀏覽</h2>
+          <p>目前活動資料尚未提供地點座標，地圖功能會在資料備齊後開放。</p>
+        </div>
         <MemberMonthView
           v-else-if="followStatus === 'ready'"
           v-show="!calendarLoading"
@@ -77,31 +70,29 @@
         </div>
       </main>
 
-      <aside v-if="currentView === 'list'" class="member-calendar-column">
-        <MemberCalendarPanel
-          v-if="followStatus === 'ready'"
-          v-show="!calendarLoading"
-          :events="followedCalendarEvents"
-          :selected-day-events="followedSelectedDayEvents"
-          :current-year="calendarYear"
-          :current-month="calendarMonth"
-          :selected-date="calendarSelectedDate"
-          :followed-ids="followedIds"
-          :follow-loading-ids="followLoadingIds"
-          @change-month="changeCalendarMonth"
-          @select-date="selectCalendarDate"
-          @open-detail="openDetail"
-          @toggle-follow="toggleFollow"
-        />
-
-        <div v-else-if="followStatus === 'guest'" class="member-login-prompt">
-          <h2>會員行事曆</h2>
-          <p>登入後，這裡會顯示你關注的活動。</p>
-          <RouterLink to="/login"> 登入會員 </RouterLink>
-        </div>
-
-        <GoogleCalendarConnectionCard />
-      </aside>
+      <MemberCalendarPanel
+        v-if="currentView !== 'month' && followStatus === 'ready'"
+        v-show="!calendarLoading"
+        :events="followedCalendarEvents"
+        :selected-day-events="followedSelectedDayEvents"
+        :current-year="calendarYear"
+        :current-month="calendarMonth"
+        :selected-date="calendarSelectedDate"
+        :followed-ids="followedIds"
+        :follow-loading-ids="followLoadingIds"
+        @change-month="changeCalendarMonth"
+        @select-date="selectCalendarDate"
+        @open-detail="openDetail"
+        @toggle-follow="toggleFollow"
+      />
+      <div
+        v-if="currentView !== 'month' && followStatus === 'guest'"
+        class="member-login-prompt"
+      >
+        <h2>會員行事曆</h2>
+        <p>登入後，這裡會顯示你關注的活動。</p>
+        <RouterLink to="/login">登入會員</RouterLink>
+      </div>
     </div>
 
     <CalendarEventDetailModal
@@ -122,14 +113,18 @@ import CalendarEventDetailModal from "@/components/calendar/CalendarEventDetailM
 import { useCalendarEvents } from "@/composables/calendar/useCalendarEvents";
 import { useEventFollows } from "@/composables/calendar/useEventFollows";
 import MemberMonthView from "@/components/calendar/MemberMonthView.vue";
-import CalendarMapView from "@/components/calendar/CalendarMapView.vue";
-import GoogleCalendarConnectionCard from "@/components/calendar/GoogleCalendarConnectionCard.vue";
 
 const currentView = ref("list");
 const selectedModalEvent = ref(null);
 
-const { currentYear, currentMonth, events, loading, error, changeMonth } =
-  useCalendarEvents();
+const {
+  currentYear,
+  currentMonth,
+  events,
+  loading,
+  error,
+  changeMonth,
+} = useCalendarEvents();
 
 const {
   currentYear: calendarYear,
@@ -267,13 +262,6 @@ function openDetail(event) {
 .map-message p {
   color: #697079;
   line-height: 1.7;
-}
-
-.member-calendar-column {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 18px;
 }
 
 @media (max-width: 1100px) {

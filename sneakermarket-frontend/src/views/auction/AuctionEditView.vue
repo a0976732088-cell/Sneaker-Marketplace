@@ -55,7 +55,7 @@
                   :aria-describedby="
                     fieldErrors.brandId ? 'auction-edit-brand-error' : undefined
                   "
-                  @change="revalidateField('brandId')"
+                  @change="handleBrandChange"
                 >
                   <option disabled value="">請選擇品牌</option>
 
@@ -162,15 +162,50 @@
 
               <!-- 型號 -->
               <div class="col-md-4">
-                <label class="form-label"> 型號／系列 </label>
+                <label class="form-label" for="auction-edit-model-option">
+                  型號／系列
+                </label>
 
-                <input
-                  v-model.trim="form.model"
-                  type="text"
-                  maxlength="100"
-                  class="form-control"
-                  :disabled="!editable"
-                />
+                <select
+                  id="auction-edit-model-option"
+                  v-model="selectedModelOption"
+                  class="form-select"
+                  :disabled="!editable || !form.brandId"
+                  @change="handleModelOptionChange"
+                >
+                  <option value="">
+                    {{ form.brandId ? "請選擇型號（可不填）" : "請先選擇品牌" }}
+                  </option>
+                  <option
+                    v-for="option in availableModelOptions"
+                    :key="option"
+                    :value="option"
+                  >
+                    {{ option }}
+                  </option>
+                  <option :value="CUSTOM_OPTION_VALUE">其他（自行填寫）</option>
+                </select>
+
+                <div
+                  v-if="selectedModelOption === CUSTOM_OPTION_VALUE"
+                  class="custom-option-field"
+                >
+                  <label
+                    class="custom-option-label"
+                    for="auction-edit-model-custom"
+                  >
+                    自訂型號／系列
+                  </label>
+                  <input
+                    id="auction-edit-model-custom"
+                    v-model.trim="form.model"
+                    type="text"
+                    maxlength="100"
+                    class="form-control"
+                    :disabled="!editable"
+                    placeholder="例如：聯名款名稱或特殊型號"
+                  />
+                </div>
               </div>
 
               <!-- 尺寸 -->
@@ -259,22 +294,73 @@
                   <span class="required-mark" aria-hidden="true">*</span>
                 </label>
 
-                <textarea
-                  id="auction-edit-description"
-                  v-model.trim="form.description"
-                  class="form-control"
-                  :class="{ 'is-invalid-field': fieldErrors.description }"
-                  rows="4"
-                  required
-                  :disabled="!editable"
-                  :aria-invalid="Boolean(fieldErrors.description)"
-                  :aria-describedby="
-                    fieldErrors.description
-                      ? 'auction-edit-description-error'
-                      : undefined
-                  "
-                  @input="revalidateField('description')"
-                ></textarea>
+                <div class="description-composer">
+                  <div class="description-template-header">
+                    <div>
+                      <p class="description-template-title">快速套用介紹範本</p>
+                      <p class="description-template-hint">
+                        選擇後可直接修改，補充實際鞋況與配件內容。
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="description-custom-button"
+                      :class="{
+                        'is-active':
+                          selectedDescriptionOption === CUSTOM_OPTION_VALUE,
+                      }"
+                      :aria-pressed="
+                        selectedDescriptionOption === CUSTOM_OPTION_VALUE
+                      "
+                      :disabled="!editable"
+                      @click="startCustomDescription"
+                    >
+                      自行撰寫
+                    </button>
+                  </div>
+
+                  <div
+                    class="description-template-grid"
+                    aria-label="商品介紹範本"
+                  >
+                    <button
+                      v-for="(option, index) in AUCTION_DESCRIPTION_OPTIONS"
+                      :key="option"
+                      type="button"
+                      class="description-template-card"
+                      :class="{
+                        'is-active': selectedDescriptionOption === option,
+                      }"
+                      :aria-pressed="selectedDescriptionOption === option"
+                      :disabled="!editable"
+                      @click="applyDescriptionTemplate(option)"
+                    >
+                      <span class="description-template-index">
+                        範本 {{ index + 1 }}
+                      </span>
+                      <span class="description-template-copy">{{ option }}</span>
+                    </button>
+                  </div>
+
+                  <textarea
+                    id="auction-edit-description"
+                    v-model.trim="form.description"
+                    class="form-control description-editor"
+                    :class="{ 'is-invalid-field': fieldErrors.description }"
+                    rows="5"
+                    required
+                    :disabled="!editable"
+                    :aria-invalid="Boolean(fieldErrors.description)"
+                    :aria-describedby="
+                      fieldErrors.description
+                        ? 'auction-edit-description-error'
+                        : undefined
+                    "
+                    placeholder="請描述商品狀況、使用情形、盒裝與配件內容"
+                    @input="handleDescriptionInput"
+                  ></textarea>
+                </div>
 
                 <p
                   v-if="fieldErrors.description"
@@ -387,69 +473,35 @@
                   商品所在地
                 </label>
 
-                <div
-                  class="location-combobox"
-                  :class="{ 'is-disabled': !editable }"
+                <select
+                  id="auction-edit-location"
+                  v-model.trim="form.location"
+                  class="form-select"
+                  :class="{ 'is-invalid-field': fieldErrors.location }"
+                  :disabled="!editable"
+                  :aria-invalid="Boolean(fieldErrors.location)"
+                  :aria-describedby="
+                    fieldErrors.location
+                      ? 'auction-edit-location-error'
+                      : undefined
+                  "
+                  @change="revalidateField('location')"
                 >
-                  <input
-                    id="auction-edit-location"
-                    v-model.trim="form.location"
-                    type="text"
-                    maxlength="100"
-                    autocomplete="off"
-                    class="form-select location-combobox-input"
-                    :class="{ 'is-invalid-field': fieldErrors.location }"
-                    placeholder="選擇縣市或輸入文字搜尋"
-                    role="combobox"
-                    aria-autocomplete="list"
-                    aria-controls="auction-edit-location-options"
-                    :aria-expanded="locationMenuOpen"
-                    :aria-activedescendant="activeLocationOptionId"
-                    :disabled="!editable"
-                    :aria-invalid="Boolean(fieldErrors.location)"
-                    :aria-describedby="
-                      fieldErrors.location
-                        ? 'auction-edit-location-error'
-                        : undefined
-                    "
-                    @click="openLocationMenu"
-                    @input="handleLocationInput"
-                    @change="normalizeLocation"
-                    @keydown.down.prevent="moveLocationOption(1)"
-                    @keydown.up.prevent="moveLocationOption(-1)"
-                    @keydown.enter="handleLocationEnter"
-                    @keydown.esc.prevent="closeLocationMenu"
-                    @blur="closeLocationMenu"
-                  />
-
-                  <ul
-                    v-if="locationMenuOpen"
-                    id="auction-edit-location-options"
-                    class="location-combobox-menu"
-                    role="listbox"
+                  <option value="">請選擇縣市（可不填）</option>
+                  <option
+                    v-for="city in TAIWAN_CITIES"
+                    :key="city"
+                    :value="city"
                   >
-                    <li
-                      v-for="(city, index) in filteredTaiwanCities"
-                      :id="`auction-edit-location-option-${index}`"
-                      :key="city"
-                      class="location-combobox-option"
-                      :class="{ 'is-active': index === activeLocationIndex }"
-                      role="option"
-                      :aria-selected="form.location === city"
-                      @pointerdown.prevent="selectLocation(city)"
-                    >
-                      {{ city }}
-                    </li>
-
-                    <li
-                      v-if="filteredTaiwanCities.length === 0"
-                      class="location-combobox-empty"
-                      role="presentation"
-                    >
-                      找不到符合的縣市
-                    </li>
-                  </ul>
-                </div>
+                    {{ city }}
+                  </option>
+                  <option
+                    v-if="legacyLocationOption"
+                    :value="legacyLocationOption"
+                  >
+                    {{ legacyLocationOption }}（舊資料）
+                  </option>
+                </select>
 
                 <p
                   v-if="fieldErrors.location"
@@ -502,26 +554,11 @@
                   id="auction-edit-shipping-method-option"
                   v-model="selectedFormOptions.shippingMethod"
                   class="form-select"
-                  :class="{
-                    'is-invalid-field':
-                      fieldErrors.shippingMethod &&
-                      selectedFormOptions.shippingMethod !== CUSTOM_OPTION_VALUE,
-                  }"
+                  :class="{ 'is-invalid-field': fieldErrors.shippingMethod }"
                   required
                   :disabled="!editable"
-                  :aria-invalid="
-                    Boolean(
-                      fieldErrors.shippingMethod &&
-                        selectedFormOptions.shippingMethod !==
-                          CUSTOM_OPTION_VALUE,
-                    )
-                  "
-                  :aria-describedby="
-                    fieldErrors.shippingMethod &&
-                    selectedFormOptions.shippingMethod !== CUSTOM_OPTION_VALUE
-                      ? 'auction-edit-shipping-method-error'
-                      : undefined
-                  "
+                  :aria-invalid="Boolean(fieldErrors.shippingMethod)"
+                  :aria-describedby="fieldErrors.shippingMethod ? 'auction-edit-shipping-method-error' : undefined"
                   @change="handleFormOptionChange('shippingMethod')"
                 >
                   <option disabled value="">請選擇運送方式</option>
@@ -532,41 +569,14 @@
                   >
                     {{ option }}
                   </option>
-                  <option :value="CUSTOM_OPTION_VALUE">其他（自行填寫）</option>
+                  <option
+                    v-if="legacyShippingMethodOption"
+                    :value="legacyShippingMethodOption"
+                  >
+                    {{ legacyShippingMethodOption }}（舊資料）
+                  </option>
                 </select>
 
-                <div
-                  v-if="
-                    selectedFormOptions.shippingMethod === CUSTOM_OPTION_VALUE
-                  "
-                  class="custom-option-field"
-                >
-                  <label
-                    for="auction-edit-shipping-method-custom"
-                    class="custom-option-label"
-                  >
-                    請輸入自訂運送方式
-                  </label>
-                  <input
-                    id="auction-edit-shipping-method-custom"
-                    v-model.trim="form.shippingMethod"
-                    type="text"
-                    maxlength="50"
-                    class="form-control"
-                    :class="{
-                      'is-invalid-field': fieldErrors.shippingMethod,
-                    }"
-                    data-custom-input
-                    :disabled="!editable"
-                    :aria-invalid="Boolean(fieldErrors.shippingMethod)"
-                    :aria-describedby="
-                      fieldErrors.shippingMethod
-                        ? 'auction-edit-shipping-method-error'
-                        : undefined
-                    "
-                    @input="revalidateField('shippingMethod')"
-                  />
-                </div>
 
                 <p
                   v-if="fieldErrors.shippingMethod"
@@ -628,26 +638,11 @@
                   id="auction-edit-payment-method-option"
                   v-model="selectedFormOptions.paymentMethod"
                   class="form-select"
-                  :class="{
-                    'is-invalid-field':
-                      fieldErrors.paymentMethod &&
-                      selectedFormOptions.paymentMethod !== CUSTOM_OPTION_VALUE,
-                  }"
+                  :class="{ 'is-invalid-field': fieldErrors.paymentMethod }"
                   required
                   :disabled="!editable"
-                  :aria-invalid="
-                    Boolean(
-                      fieldErrors.paymentMethod &&
-                        selectedFormOptions.paymentMethod !==
-                          CUSTOM_OPTION_VALUE,
-                    )
-                  "
-                  :aria-describedby="
-                    fieldErrors.paymentMethod &&
-                    selectedFormOptions.paymentMethod !== CUSTOM_OPTION_VALUE
-                      ? 'auction-edit-payment-method-error'
-                      : undefined
-                  "
+                  :aria-invalid="Boolean(fieldErrors.paymentMethod)"
+                  :aria-describedby="fieldErrors.paymentMethod ? 'auction-edit-payment-method-error' : undefined"
                   @change="handleFormOptionChange('paymentMethod')"
                 >
                   <option disabled value="">請選擇付款方式</option>
@@ -658,41 +653,14 @@
                   >
                     {{ option }}
                   </option>
-                  <option :value="CUSTOM_OPTION_VALUE">其他（自行填寫）</option>
+                  <option
+                    v-if="legacyPaymentMethodOption"
+                    :value="legacyPaymentMethodOption"
+                  >
+                    {{ legacyPaymentMethodOption }}（舊資料）
+                  </option>
                 </select>
 
-                <div
-                  v-if="
-                    selectedFormOptions.paymentMethod === CUSTOM_OPTION_VALUE
-                  "
-                  class="custom-option-field"
-                >
-                  <label
-                    for="auction-edit-payment-method-custom"
-                    class="custom-option-label"
-                  >
-                    請輸入自訂付款方式
-                  </label>
-                  <input
-                    id="auction-edit-payment-method-custom"
-                    v-model.trim="form.paymentMethod"
-                    type="text"
-                    maxlength="50"
-                    class="form-control"
-                    :class="{
-                      'is-invalid-field': fieldErrors.paymentMethod,
-                    }"
-                    data-custom-input
-                    :disabled="!editable"
-                    :aria-invalid="Boolean(fieldErrors.paymentMethod)"
-                    :aria-describedby="
-                      fieldErrors.paymentMethod
-                        ? 'auction-edit-payment-method-error'
-                        : undefined
-                    "
-                    @input="revalidateField('paymentMethod')"
-                  />
-                </div>
 
                 <p
                   v-if="fieldErrors.paymentMethod"
@@ -1012,7 +980,9 @@
 import AuctionImageGallery from "@/components/auction/AuctionImageGallery.vue";
 import {
   AUCTION_AUTHENTICITY_NOTE_OPTIONS,
+  AUCTION_DESCRIPTION_OPTIONS,
   AUCTION_DEFECT_NOTE_OPTIONS,
+  AUCTION_MODEL_OPTIONS_BY_BRAND,
   AUCTION_PAYMENT_METHOD_OPTIONS,
   AUCTION_SHIPPING_METHOD_OPTIONS,
   AUCTION_SHOE_SIZES,
@@ -1020,7 +990,6 @@ import {
   CUSTOM_OPTION_VALUE,
   DELIVERY_OPTION_VALUES,
   TAIWAN_CITIES,
-  normalizeTaiwanCity,
 } from "@/constants/auctionFormOptions";
 import { parseAuctionTime } from "@/utils/auctionTime";
 import {
@@ -1064,6 +1033,7 @@ const isOwner = ref(false);
  * 不依賴 datetime-local 轉換後的字串。
  */
 const originalStartAt = ref("");
+const originalLocation = ref("");
 
 const brands = ref([]);
 const categories = ref([]);
@@ -1095,29 +1065,35 @@ const form = reactive({
   endAt: "",
 });
 
-const locationMenuOpen = ref(false);
-const activeLocationIndex = ref(-1);
+const selectedModelOption = ref("");
+const selectedDescriptionOption = ref("");
 
-const filteredTaiwanCities = computed(() => {
-  const currentLocation =
-    typeof form.location === "string" ? form.location.trim() : "";
-
-  if (
-    currentLocation === "" ||
-    TAIWAN_CITIES.includes(currentLocation)
-  ) {
-    return TAIWAN_CITIES;
-  }
-
-  const searchValue = currentLocation.replace(/^台/, "臺");
-  return TAIWAN_CITIES.filter((city) => city.includes(searchValue));
+const selectedBrandName = computed(() => {
+  const selectedBrand = brands.value.find(
+    (brand) => String(brand.id) === String(form.brandId),
+  );
+  return selectedBrand?.name ?? "";
 });
 
-const activeLocationOptionId = computed(() =>
-  activeLocationIndex.value >= 0
-    ? `auction-edit-location-option-${activeLocationIndex.value}`
-    : undefined,
-);
+const availableModelOptions = computed(() => {
+  const brandName = selectedBrandName.value.trim().toLowerCase();
+  if (brandName.includes("jordan")) return AUCTION_MODEL_OPTIONS_BY_BRAND.Jordan;
+  if (brandName.includes("nike")) return AUCTION_MODEL_OPTIONS_BY_BRAND.Nike;
+  if (brandName.includes("adidas")) return AUCTION_MODEL_OPTIONS_BY_BRAND.adidas;
+  if (brandName.replace(/[\s-]+/g, "").includes("newbalance")) {
+    return AUCTION_MODEL_OPTIONS_BY_BRAND["New Balance"];
+  }
+  if (brandName.includes("vans")) return AUCTION_MODEL_OPTIONS_BY_BRAND.Vans;
+  return [];
+});
+
+const legacyLocationOption = computed(() => {
+  const value = originalLocation.value;
+
+  return !isBlank(value) && !TAIWAN_CITIES.includes(value)
+    ? value
+    : "";
+});
 
 // 純 UI selector state；不屬於 AuctionUpdateRequest。
 const selectedFormOptions = reactive({
@@ -1135,6 +1111,25 @@ const formOptionPresets = Object.freeze({
   paymentMethod: AUCTION_PAYMENT_METHOD_OPTIONS,
   warrantyNote: AUCTION_WARRANTY_NOTE_OPTIONS,
 });
+
+const FIXED_FORM_OPTION_FIELDS = new Set([
+  "shippingMethod",
+  "paymentMethod",
+]);
+
+function getLegacyFormOption(fieldName) {
+  const value = form[fieldName];
+  return !isBlank(value) && !formOptionPresets[fieldName].includes(value)
+    ? value
+    : "";
+}
+
+const legacyShippingMethodOption = computed(() =>
+  getLegacyFormOption("shippingMethod"),
+);
+const legacyPaymentMethodOption = computed(() =>
+  getLegacyFormOption("paymentMethod"),
+);
 
 // 交付選項只控制既有 allowMeetup Boolean，不會新增 request 欄位。
 const deliveryOption = computed({
@@ -1246,10 +1241,72 @@ function toDateTimeLocal(value) {
   return value.slice(0, 16);
 }
 
+function initializeModelOption(value) {
+  form.model = value ?? "";
+
+  if (isBlank(form.model)) {
+    selectedModelOption.value = "";
+    return;
+  }
+
+  selectedModelOption.value = availableModelOptions.value.includes(form.model)
+    ? form.model
+    : CUSTOM_OPTION_VALUE;
+}
+
+function handleBrandChange() {
+  selectedModelOption.value = "";
+  form.model = "";
+  revalidateField("brandId");
+}
+
+function handleModelOptionChange() {
+  form.model =
+    selectedModelOption.value === CUSTOM_OPTION_VALUE
+      ? ""
+      : selectedModelOption.value;
+}
+
+function initializeDescriptionOption(value) {
+  form.description = value ?? "";
+  selectedDescriptionOption.value = AUCTION_DESCRIPTION_OPTIONS.includes(
+    form.description,
+  )
+    ? form.description
+    : isBlank(form.description)
+      ? ""
+      : CUSTOM_OPTION_VALUE;
+}
+
+function applyDescriptionTemplate(option) {
+  if (!AUCTION_DESCRIPTION_OPTIONS.includes(option)) return;
+
+  selectedDescriptionOption.value = option;
+  form.description = option;
+  revalidateField("description");
+}
+
+async function startCustomDescription() {
+  selectedDescriptionOption.value = CUSTOM_OPTION_VALUE;
+  await nextTick();
+
+  if (typeof document !== "undefined") {
+    document.getElementById?.("auction-edit-description")?.focus();
+  }
+}
+
+function handleDescriptionInput() {
+  if (selectedDescriptionOption.value !== form.description) {
+    selectedDescriptionOption.value = CUSTOM_OPTION_VALUE;
+  }
+
+  revalidateField("description");
+}
+
 /**
  * 依既有後端字串初始化 UI selector。
  *
- * 非 preset 的舊資料會展開 Custom input，且原字串完整留在 form；
+ * 可自訂欄位展開 Custom input；固定欄位則用動態 legacy option 保留舊值；
  * UI sentinel 永遠不會寫進 form。
  */
 function initializeFormOption(fieldName, value) {
@@ -1264,6 +1321,11 @@ function initializeFormOption(fieldName, value) {
 
   if (isBlank(formValue)) {
     selectedFormOptions[fieldName] = "";
+    return;
+  }
+
+  if (FIXED_FORM_OPTION_FIELDS.has(fieldName)) {
+    selectedFormOptions[fieldName] = formValue;
     return;
   }
 
@@ -1303,13 +1365,14 @@ function fillForm(auction) {
   form.brandId = auction.brandId;
   form.categoryId = auction.categoryId;
   form.productName = auction.productName;
-  form.model = auction.model ?? "";
+  initializeModelOption(auction.model);
   form.size = auction.size;
   form.condition = auction.condition;
-  form.description = auction.description;
+  initializeDescriptionOption(auction.description);
   initializeFormOption("defectNote", auction.defectNote);
   initializeFormOption("authenticityNote", auction.authenticityNote);
-  form.location = normalizeTaiwanCity(auction.location ?? "");
+  originalLocation.value = auction.location ?? "";
+  form.location = originalLocation.value;
 
   initializeFormOption("shippingMethod", auction.shippingMethod);
   form.shippingFee = auction.shippingFee;
@@ -1440,14 +1503,12 @@ function getFieldError(fieldName) {
     case "description":
       return isBlank(form.description) ? "請輸入商品介紹" : "";
     case "location":
-      return isBlank(form.location) || TAIWAN_CITIES.includes(form.location)
+      return isBlank(form.location) ||
+        TAIWAN_CITIES.includes(form.location) ||
+        form.location === legacyLocationOption.value
         ? ""
         : "請從台灣縣市選項中選擇商品所在地";
     case "shippingMethod":
-      if (selectedFormOptions.shippingMethod === CUSTOM_OPTION_VALUE) {
-        return isBlank(form.shippingMethod) ? "請輸入自訂運送方式" : "";
-      }
-
       return isBlank(form.shippingMethod) ? "請選擇運送方式" : "";
     case "shippingFee":
       if (isBlank(form.shippingFee)) {
@@ -1458,10 +1519,6 @@ function getFieldError(fieldName) {
         ? ""
         : "運費必須是 0 以上的整數";
     case "paymentMethod":
-      if (selectedFormOptions.paymentMethod === CUSTOM_OPTION_VALUE) {
-        return isBlank(form.paymentMethod) ? "請輸入自訂付款方式" : "";
-      }
-
       return isBlank(form.paymentMethod) ? "請選擇付款方式" : "";
     case "startPrice":
       if (isBlank(form.startPrice)) {
@@ -1535,83 +1592,12 @@ function revalidateField(fieldName) {
   }
 }
 
-function resetActiveLocationOption() {
-  const selectedIndex = filteredTaiwanCities.value.indexOf(form.location);
-  activeLocationIndex.value =
-    selectedIndex >= 0
-      ? selectedIndex
-      : filteredTaiwanCities.value.length > 0
-        ? 0
-        : -1;
-}
-
-function openLocationMenu() {
-  if (!editable.value) return;
-
-  locationMenuOpen.value = true;
-  resetActiveLocationOption();
-}
-
-function closeLocationMenu() {
-  locationMenuOpen.value = false;
-  activeLocationIndex.value = -1;
-}
-
-function handleLocationInput() {
-  if (!editable.value) return;
-
-  locationMenuOpen.value = true;
-  resetActiveLocationOption();
-  revalidateField("location");
-}
-
-function moveLocationOption(direction) {
-  if (!editable.value) return;
-
-  if (!locationMenuOpen.value) {
-    openLocationMenu();
-    return;
-  }
-
-  const optionCount = filteredTaiwanCities.value.length;
-  if (optionCount === 0) {
-    activeLocationIndex.value = -1;
-    return;
-  }
-
-  activeLocationIndex.value =
-    (activeLocationIndex.value + direction + optionCount) % optionCount;
-}
-
-function selectLocation(city) {
-  if (!editable.value || !TAIWAN_CITIES.includes(city)) return;
-
-  form.location = city;
-  fieldErrors.location = "";
-  closeLocationMenu();
-}
-
-function handleLocationEnter(event) {
-  if (!locationMenuOpen.value) return;
-
-  const city = filteredTaiwanCities.value[activeLocationIndex.value];
-  if (!city) return;
-
-  event.preventDefault();
-  selectLocation(city);
-}
-
-function normalizeLocation() {
-  form.location = normalizeTaiwanCity(form.location);
-  revalidateField("location");
-}
 
 /**
  * 一次顯示全部欄位錯誤，回傳表單是否有效。
  */
 function validateForm() {
   clearReservedFormOptionValues();
-  normalizeLocation();
 
   validationOrder.forEach((fieldName) => {
     fieldErrors[fieldName] = getFieldError(fieldName);
@@ -1794,55 +1780,131 @@ onMounted(() => {
   box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.16);
 }
 
-.location-combobox {
-  position: relative;
-  min-width: 0;
+.description-composer {
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #e1e5e9;
+  border-radius: 0.5rem;
 }
 
-.location-combobox-menu {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 0.35rem);
-  right: 0;
-  left: 0;
-  max-height: 15rem;
+.description-template-header {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+
+.description-template-title,
+.description-template-hint {
   margin: 0;
-  padding: 0.35rem;
-  overflow-y: auto;
-  list-style: none;
-  background: #fff;
-  border: 1px solid #dee2e6;
-  border-radius: 0.375rem;
-  box-shadow: 0 0.75rem 1.5rem rgba(17, 17, 17, 0.1);
 }
 
-.location-combobox-option,
-.location-combobox-empty {
-  padding: 0.65rem 0.75rem;
-  border-radius: 0.25rem;
-  font-size: 1rem;
+.description-template-title {
+  color: #212529;
+  font-size: 0.9rem;
+  font-weight: 800;
   line-height: 1.4;
 }
 
-.location-combobox-option {
-  color: #212529;
-  cursor: pointer;
-}
-
-.location-combobox-option:hover,
-.location-combobox-option.is-active {
-  color: #111;
-  background: #e9ecef;
-}
-
-.location-combobox-option[aria-selected="true"]:not(.is-active) {
-  font-weight: 700;
-  background: #f1f3f5;
-}
-
-.location-combobox-empty {
+.description-template-hint {
+  margin-top: 0.18rem;
   color: #6c757d;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
+
+.description-custom-button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0.35rem 0.75rem;
+  color: #212529;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #ced4da;
+  border-radius: 999px;
+}
+
+.description-custom-button:hover:not(:disabled),
+.description-custom-button:focus-visible,
+.description-custom-button.is-active {
+  color: #fff;
+  outline: 0;
+  background: #212529;
+  border-color: #212529;
+}
+
+.description-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.65rem;
+}
+
+.description-template-card {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 0.75rem;
+  color: #343a40;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.4rem;
+}
+
+.description-template-card:hover:not(:disabled),
+.description-template-card:focus-visible {
+  outline: 0;
+  border-color: #6c757d;
+  box-shadow: 0 0.35rem 0.8rem rgb(17 17 17 / 8%);
+}
+
+.description-template-card.is-active {
+  border-color: #212529;
+  box-shadow: inset 3px 0 0 #212529;
+}
+
+.description-template-index {
+  flex: 0 0 auto;
+  padding: 0.18rem 0.4rem;
+  color: #495057;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: nowrap;
+  background: #e9ecef;
+  border-radius: 0.25rem;
+}
+
+.description-template-card.is-active .description-template-index {
+  color: #fff;
+  background: #212529;
+}
+
+.description-template-copy {
+  min-width: 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.description-editor.form-control {
+  min-height: 140px;
+  margin-top: 0.9rem;
+  background: #fff;
+}
+
+.description-custom-button:disabled,
+.description-template-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 
 .custom-option-field {
   margin-top: 0.75rem;

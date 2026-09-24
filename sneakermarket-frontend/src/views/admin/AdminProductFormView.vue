@@ -181,7 +181,13 @@ onMounted(async () => {
 
 <template>
   <div class="container py-5">
-    <h1 class="h2 mb-4">{{ isEditMode ? "編輯商品" : "新增商品" }}</h1>
+    <header class="admin-page-heading">
+      <div>
+        <p class="admin-page-eyebrow">SNEAKERMARKET ADMIN</p>
+        <h1 class="h2 mb-4">{{ isEditMode ? "編輯商品" : "新增商品" }}</h1>
+        <p class="admin-page-description">管理商城商品資料。</p>
+      </div>
+    </header>
 
     <div class="card shadow-sm">
       <div class="card-body">

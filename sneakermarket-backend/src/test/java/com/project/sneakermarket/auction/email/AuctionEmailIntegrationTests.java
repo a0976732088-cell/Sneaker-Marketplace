@@ -15,7 +15,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -26,6 +25,10 @@ import com.project.sneakermarket.auction.scheduler.AuctionEmailRecoveryScheduler
 import com.project.sneakermarket.auction.service.*;
 import com.project.sneakermarket.member.entity.Member;
 import com.project.sneakermarket.member.repository.MemberRepository;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
 
 /** 真實 MSSQL + Spring proxy/AFTER_COMMIT；只 mock SMTP、設定及時間，不掃歷史 Demo。 */
 @SpringBootTest(properties = {
@@ -66,6 +69,7 @@ class AuctionEmailIntegrationTests {
         when(settings.maxRetries()).thenReturn(3);
         when(settings.from()).thenReturn("sender@example.invalid");
         when(settings.frontendBaseUrl()).thenReturn("https://frontend.example.invalid");
+        when(sender.createMimeMessage()).thenAnswer(call -> new MimeMessage(Session.getInstance(new Properties())));
         seller = member("Seller");
         winner = member("Winner");
         loserA = member("Loser A");
@@ -210,7 +214,7 @@ class AuctionEmailIntegrationTests {
 
         markAbandonedAndQueue(id, false, true);
 
-        verify(sender, times(2)).send(any(SimpleMailMessage.class));
+        verify(sender, times(2)).send(any(MimeMessage.class));
         var abandonedRows = logs.findByAuctionId(id).stream()
                 .filter(e -> e.getEmailType() == AuctionEmailType.ORDER_ABANDONED_BUYER
                         || e.getEmailType() == AuctionEmailType.ORDER_ABANDONED_SELLER)
@@ -241,7 +245,7 @@ class AuctionEmailIntegrationTests {
                 .filter(e -> e.getEmailType() == AuctionEmailType.ORDER_ABANDONED_BUYER)
                 .findFirst().orElseThrow().getEmailLogId();
         var orderBefore = jdbc.queryForMap("SELECT * FROM dbo.auction_orders WHERE auction_id=?", id);
-        doThrow(new MailSendException("fixture")).when(sender).send(any(SimpleMailMessage.class));
+        doThrow(new MailSendException("fixture")).when(sender).send(any(MimeMessage.class));
 
         dispatch.sendEmailLog(logId);
 
@@ -251,7 +255,7 @@ class AuctionEmailIntegrationTests {
         assertEquals(AuctionOrderStatus.ABANDONED, orders.findByAuctionId(id).orElseThrow().getOrderStatus());
         assertEquals(orderBefore, jdbc.queryForMap("SELECT * FROM dbo.auction_orders WHERE auction_id=?", id));
 
-        doNothing().when(sender).send(any(SimpleMailMessage.class));
+        doNothing().when(sender).send(any(MimeMessage.class));
         dispatch.sendEmailLog(logId);
         row = logs.findById(logId).orElseThrow();
         assertEquals(AuctionEmailSendStatus.SENT, row.getSendStatus());
@@ -260,26 +264,33 @@ class AuctionEmailIntegrationTests {
     }
 
     @Test
-    void smtpSuccessUsesSnapshotAndExpectedRoleLinks() {
+    void smtpSuccessUsesSnapshotAndExpectedRoleLinks() throws Exception {
         Long id = closed(true, true);
         for (Long logId : emails.ensureEmailLogsForAuction(id)) dispatch.sendEmailLog(logId);
-        var captured = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
+        var captured = org.mockito.ArgumentCaptor.forClass(MimeMessage.class);
         verify(sender, times(4)).send(captured.capture());
         for (var row : logs.findByAuctionId(id)) {
             assertEquals(AuctionEmailSendStatus.SENT, row.getSendStatus());
             assertEquals(NOW, row.getSentAt());
             assertEquals(0, row.getRetryCount());
             assertNull(row.getLastError());
-            var message = captured.getAllValues().stream()
-                    .filter(m -> m.getTo()[0].equals(row.getRecipientEmail())).findFirst().orElseThrow();
-            assertEquals(1, message.getTo().length);
-            assertNull(message.getCc());
-            assertEquals("sender@example.invalid", message.getFrom());
-            assertTrue(message.getText().contains("Email integration fixture"));
-            assertTrue(message.getText().contains("6000"));
+            var message = captured.getAllValues().stream().filter(m -> {
+                try {
+                    return m.getAllRecipients()[0].toString().equals(row.getRecipientEmail());
+                } catch (Exception exception) {
+                    return false;
+                }
+            }).findFirst().orElseThrow();
+            message.saveChanges();
+            assertEquals(1, message.getAllRecipients().length);
+            assertNull(message.getRecipients(MimeMessage.RecipientType.CC));
+            assertEquals("sender@example.invalid", message.getFrom()[0].toString());
+            String plainText = body(message, "text/plain");
+            assertTrue(plainText.contains("Email integration fixture"));
+            assertTrue(plainText.contains("6000"));
             String route = row.getEmailType() == AuctionEmailType.WON ? "/auction-orders"
                     : row.getEmailType() == AuctionEmailType.SOLD_SELLER ? "/auctions/me/listings" : "/auctions/" + id;
-            assertTrue(message.getText().contains("https://frontend.example.invalid" + route));
+            assertTrue(plainText.contains("https://frontend.example.invalid" + route));
         }
     }
 
@@ -292,7 +303,7 @@ class AuctionEmailIntegrationTests {
         var bidsBefore = jdbc.queryForList("SELECT * FROM dbo.auction_bids WHERE auction_id=? ORDER BY bid_id", id);
         Long logId = emails.ensureEmailLogsForAuction(id).get(0);
         doThrow(new MailSendException("password=secret\r\nCookie=credential " + "x".repeat(2000)))
-                .when(sender).send(any(SimpleMailMessage.class));
+                .when(sender).send(any(MimeMessage.class));
         dispatch.sendEmailLog(logId);
         var row = logs.findById(logId).orElseThrow();
         assertEquals(AuctionEmailSendStatus.FAILED, row.getSendStatus());
@@ -303,7 +314,7 @@ class AuctionEmailIntegrationTests {
         assertEquals(resultBefore, jdbc.queryForMap("SELECT * FROM dbo.auction_results WHERE auction_id=?", id));
         assertEquals(orderBefore, jdbc.queryForMap("SELECT * FROM dbo.auction_orders WHERE auction_id=?", id));
         assertEquals(bidsBefore, jdbc.queryForList("SELECT * FROM dbo.auction_bids WHERE auction_id=? ORDER BY bid_id", id));
-        doNothing().when(sender).send(any(SimpleMailMessage.class));
+        doNothing().when(sender).send(any(MimeMessage.class));
         dispatch.sendEmailLog(logId);
         row = logs.findById(logId).orElseThrow();
         assertEquals(AuctionEmailSendStatus.SENT, row.getSendStatus());
@@ -316,7 +327,7 @@ class AuctionEmailIntegrationTests {
     void threeFailuresStopBothCandidateQueryAndDirectDispatch() {
         Long id = closed(false, false);
         Long logId = emails.ensureEmailLogsForAuction(id).get(0);
-        doThrow(new MailSendException("fixture")).when(sender).send(any(SimpleMailMessage.class));
+        doThrow(new MailSendException("fixture")).when(sender).send(any(MimeMessage.class));
         for (int failure = 1; failure <= 3; failure++) {
             dispatch.sendEmailLog(logId);
             assertEquals(failure, logs.findById(logId).orElseThrow().getRetryCount());
@@ -324,7 +335,7 @@ class AuctionEmailIntegrationTests {
         assertFalse(logs.findDispatchCandidateIds(id, 3).contains(logId));
         dispatch.sendEmailLog(logId);
         scheduler(List.of(), List.of(logId)).recoverEmails(); // stale candidate 也必須重新檢查
-        verify(sender, times(3)).send(any(SimpleMailMessage.class));
+        verify(sender, times(3)).send(any(MimeMessage.class));
     }
 
     @Test
@@ -338,7 +349,7 @@ class AuctionEmailIntegrationTests {
             dispatch.sendEmailLog(logId);
         }
         assertTrue(logs.findDispatchCandidateIds(id, 3).isEmpty());
-        verify(sender).send(any(SimpleMailMessage.class));
+        verify(sender).send(any(MimeMessage.class));
     }
 
     @Test
@@ -363,14 +374,14 @@ class AuctionEmailIntegrationTests {
             assertTrue(results.findByAuctionId(id).isPresent());
             assertEquals(AuctionStatus.UNSOLD, auctions.findById(id).orElseThrow().getStatus());
             return null;
-        }).when(sender).send(any(SimpleMailMessage.class));
+        }).when(sender).send(any(MimeMessage.class));
         new TransactionTemplate(transactions).executeWithoutResult(s -> {
             lifecycle.processAuction(id);
             assertTrue(logs.findByAuctionId(id).isEmpty());
             verifyNoInteractions(sender);
         });
         assertEquals(AuctionEmailSendStatus.SENT, logs.findByAuctionId(id).get(0).getSendStatus());
-        verify(sender).send(any(SimpleMailMessage.class));
+        verify(sender).send(any(MimeMessage.class));
     }
 
     @Test
@@ -382,14 +393,14 @@ class AuctionEmailIntegrationTests {
         doAnswer(call -> {
             assertTrue(orders.existsByAuctionId(id));
             return null;
-        }).when(sender).send(any(SimpleMailMessage.class));
+        }).when(sender).send(any(MimeMessage.class));
         new TransactionTemplate(transactions).executeWithoutResult(s -> {
             orderService.createOrderForAuction(id); // REQUIRES_NEW 已提交
             s.setRollbackOnly();
         });
         assertTrue(orders.existsByAuctionId(id));
         assertEquals(4, logs.findByAuctionId(id).size());
-        verify(sender, times(4)).send(any(SimpleMailMessage.class));
+        verify(sender, times(4)).send(any(MimeMessage.class));
     }
 
     @Test
@@ -441,7 +452,7 @@ class AuctionEmailIntegrationTests {
         var ownLogs = mock(AuctionEmailLogRepository.class);
         when(candidates.findEmailReadinessCandidateIds()).thenReturn(List.of(id));
         when(ownLogs.findDispatchCandidateIds(null, 3)).thenAnswer(c -> logs.findDispatchCandidateIds(id, 3));
-        doThrow(new MailSendException("fixture")).doNothing().when(sender).send(any(SimpleMailMessage.class));
+        doThrow(new MailSendException("fixture")).doNothing().when(sender).send(any(MimeMessage.class));
         new AuctionEmailRecoveryScheduler(candidates, ownLogs, emails, dispatch, settings).recoverEmails();
         var rows = logs.findByAuctionId(id).stream().sorted(Comparator.comparing(AuctionEmailLog::getEmailLogId)).toList();
         assertEquals(AuctionEmailSendStatus.FAILED, rows.get(0).getSendStatus());
@@ -498,7 +509,7 @@ class AuctionEmailIntegrationTests {
             entered.countDown();
             assertTrue(release.await(10, TimeUnit.SECONDS));
             return null;
-        }).when(sender).send(any(SimpleMailMessage.class));
+        }).when(sender).send(any(MimeMessage.class));
         executor = Executors.newFixedThreadPool(3);
         Future<?> a = executor.submit(() -> dispatch.sendEmailLog(logId));
         assertTrue(entered.await(10, TimeUnit.SECONDS));
@@ -511,7 +522,7 @@ class AuctionEmailIntegrationTests {
         release.countDown();
         a.get(20, TimeUnit.SECONDS);
         b.get(20, TimeUnit.SECONDS);
-        verify(sender).send(any(SimpleMailMessage.class));
+        verify(sender).send(any(MimeMessage.class));
         assertEquals(AuctionEmailSendStatus.SENT, logs.findById(logId).orElseThrow().getSendStatus());
     }
 
@@ -557,6 +568,18 @@ class AuctionEmailIntegrationTests {
             if (publishEvent) events.publishEvent(new AuctionEmailReadyEvent(auctionId));
             verifyNoInteractions(sender);
         });
+    }
+
+    private static String body(Part part, String mimeType) throws Exception {
+        if (part.isMimeType(mimeType)) return (String) part.getContent();
+        Object content = part.getContent();
+        if (content instanceof Multipart multipart) {
+            for (int i = 0; i < multipart.getCount(); i++) {
+                String found = body(multipart.getBodyPart(i), mimeType);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     private void assertRecipient(List<AuctionEmailLog> rows, Long id, AuctionEmailType type, AuctionEmailRecipientRole role) {

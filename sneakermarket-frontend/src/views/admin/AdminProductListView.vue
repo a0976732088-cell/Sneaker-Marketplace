@@ -95,16 +95,17 @@ onMounted(() => {
 
 <template>
   <div class="container py-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <header class="d-flex justify-content-between align-items-center mb-4 admin-page-heading">
       <div>
+        <p class="admin-page-eyebrow">SNEAKERMARKET ADMIN</p>
         <h1 class="h2 mb-1">商品管理</h1>
-        <p class="text-secondary mb-0">一般商城商品列表</p>
+        <p class="text-secondary mb-0 admin-page-description">一般商城商品列表</p>
       </div>
 
       <RouterLink :to="{ name: 'admin-product-create' }" class="btn btn-dark">
         + 新增商品
       </RouterLink>
-    </div>
+    </header>
 
     <div class="card shadow-sm mb-4">
       <div class="card-body">

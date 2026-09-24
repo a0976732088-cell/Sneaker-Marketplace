@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted,onUnmounted, computed } from 'vue'
 import httpClient from '@/service/httpClient'
 import { useRouter } from 'vue-router'
 import CheckoutSteps from '@/components/commerce/CheckoutSteps.vue'
 import { getCurrentMember } from '@/service/authService'
+import { refreshCartCount } from '@/service/cartState'
 
 const loading = ref(true)
 const errorMessage = ref('')
@@ -11,6 +12,7 @@ const cartItems = ref([])
 const isLoggedIn = ref(false)
 const memberId = ref(null)
 const router = useRouter()
+let redirectTimer = null
 
 const totalPrice = computed(() => {
   let total = 0
@@ -29,11 +31,21 @@ const grandTotal = computed(() => {
   return totalPrice.value + shippingFee.value
 })
 
+function checkEmptyCartAndRedirect() {
+  if (cartItems.value.length === 0) {
+    clearTimeout(redirectTimer)
+    redirectTimer = setTimeout(() => {
+      router.push('/products')
+    }, 3000)
+  }
+}
+
 async function fetchCart() {
   try {
     loading.value = true
     const response = await httpClient.get('/cart', { params: { memberId: memberId.value } })
     cartItems.value = response.data
+    checkEmptyCartAndRedirect()   // 改成呼叫共用函式
   } catch (error) {
     errorMessage.value = '無法載入購物車'
   } finally {
@@ -58,6 +70,7 @@ async function updateQuantity(item) {
     await httpClient.put(`/cart/items/${item.cartItemId}`, null, {
       params: { quantity: item.quantity }
     })
+    await refreshCartCount() 
   } catch (error) {
     alert('更新失敗')
   }
@@ -67,6 +80,8 @@ async function deleteItem(item) {
   try {
     await httpClient.delete(`/cart/items/${item.cartItemId}`)
     cartItems.value = cartItems.value.filter(i => i.cartItemId !== item.cartItemId)
+    await refreshCartCount()
+    checkEmptyCartAndRedirect()
   } catch (error) {
     alert('刪除失敗')
   }
@@ -98,6 +113,10 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+onUnmounted(() => {
+  clearTimeout(redirectTimer)
+})
 </script>
 
 <template>
@@ -116,7 +135,7 @@ onMounted(async () => {
   </div>
 
   <div v-else-if="cartItems.length === 0" class="text-secondary mt-3">
-    購物車是空的
+  購物車是空的，即將為您導回商城首頁...
   </div>
 
   <div v-else class="row mt-3">

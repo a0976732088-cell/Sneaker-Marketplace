@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 // Vite 的自訂環境變數必須以 VITE_ 開頭。
-// 若沒有另外建立 .env.local，預設直接連到目前 SneakerMarket Backend。
+// 若沒有另外建立 .env.local，預設直接連到目前酷客 Kicks Backend。
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
 
 

@@ -76,3 +76,15 @@ BEGIN
     );
 END;
 GO
+
+ALTER TABLE dbo.calendar_events
+ALTER COLUMN title NVARCHAR(150) NOT NULL;
+
+ALTER TABLE dbo.calendar_events
+ALTER COLUMN description NVARCHAR(MAX) NULL;
+
+ALTER TABLE dbo.calendar_events
+ALTER COLUMN venue_name NVARCHAR(150) NULL;
+
+ALTER TABLE dbo.calendar_events
+ALTER COLUMN address NVARCHAR(300) NULL;

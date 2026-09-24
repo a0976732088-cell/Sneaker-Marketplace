@@ -8,7 +8,8 @@ import com.project.sneakermarket.auction.entity.AuctionOrderStatus;
 
 public record AuctionOrderSummaryResponse(
         String orderNumber, Long auctionId, String productName,
-        BigDecimal finalPrice, String paymentMethod,
+        BigDecimal finalPrice, BigDecimal shippingFee, BigDecimal totalAmount,
+        String paymentMethod,
         AuctionPaymentStatus paymentStatus, AuctionShippingStatus shippingStatus,
         AuctionOrderStatus orderStatus, LocalDateTime createdAt, LocalDateTime updatedAt,
         String model, String size, String imageUrl, LocalDateTime paymentDueAt,

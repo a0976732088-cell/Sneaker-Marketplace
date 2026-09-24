@@ -3,18 +3,35 @@ import { computed } from "vue";
 
 import { useRoute } from "vue-router";
 
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import {
+  faHouse,
+  faUser,
+  faUserPlus,
+  faCube,
+  faBullhorn,
+  faCalendarDays,
+  faChartLine,
+  faBell,
+  faEnvelope,
+  faGavel,
+  faPlus,
+} from "@fortawesome/free-solid-svg-icons";
+
 const route = useRoute();
 
 // =====================================================
 // MEMBER
 // =====================================================
 
+const isDashboardActive = computed(() => route.name === "admin");
+
 const isMemberListActive = computed(() => {
-  return route.name === "admin" && route.query.action !== "create-member";
+  return route.name === "admin-members" && route.query.action !== "create-member";
 });
 
 const isCreateMemberActive = computed(() => {
-  return route.name === "admin" && route.query.action === "create-member";
+  return route.name === "admin-members" && route.query.action === "create-member";
 });
 
 // =====================================================
@@ -76,9 +93,36 @@ const isAuctionSection = computed(() => {
 
 <template>
   <aside class="admin-sidebar">
+    <div class="sidebar-heading">
+      <small>酷客 kicks</small>
+      <strong>管理後台</strong>
+    </div>
     <!-- =========================================
          MENU
     ========================================== -->
+
+    <div class="menu-section home-section">
+
+      <!-- 會員列表 -->
+
+      <RouterLink
+        :to="{
+          name: 'admin',
+        }"
+        class="menu-item"
+        :class="{
+          active: isDashboardActive,
+        }"
+        active-class=""
+        exact-active-class=""
+      >
+        <span class="menu-icon">
+          <FontAwesomeIcon :icon="faHouse" />
+        </span>
+
+          <span> 後台首頁 </span>
+      </RouterLink>
+    </div>
 
     <nav class="sidebar-menu">
       <!-- =====================================
@@ -92,7 +136,7 @@ const isAuctionSection = computed(() => {
 
         <RouterLink
           :to="{
-            name: 'admin',
+            name: 'admin-members',
           }"
           class="menu-item"
           :class="{
@@ -101,7 +145,9 @@ const isAuctionSection = computed(() => {
           active-class=""
           exact-active-class=""
         >
-          <span class="menu-icon"> ○ </span>
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faUser" />
+          </span>
 
           <span> 會員列表 </span>
         </RouterLink>
@@ -110,7 +156,7 @@ const isAuctionSection = computed(() => {
 
         <RouterLink
           :to="{
-            name: 'admin',
+            name: 'admin-members',
 
             query: {
               action: 'create-member',
@@ -123,7 +169,9 @@ const isAuctionSection = computed(() => {
           active-class=""
           exact-active-class=""
         >
-          <span class="menu-icon"> ＋ </span>
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faUserPlus" />
+          </span>
 
           <span> 新增會員 </span>
         </RouterLink>
@@ -149,7 +197,9 @@ const isAuctionSection = computed(() => {
           active-class=""
           exact-active-class=""
         >
-          <span class="menu-icon"> □ </span>
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faCube" />
+          </span>
 
           <span> 商品管理 </span>
         </RouterLink>
@@ -167,85 +217,11 @@ const isAuctionSection = computed(() => {
           active-class=""
           exact-active-class=""
         >
-          <span class="menu-icon"> ＋ </span>
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faPlus" />
+          </span>
 
           <span> 新增商品 </span>
-        </RouterLink>
-      </div>
-
-      <!-- =====================================
-           ADVERTISEMENT
-      ====================================== -->
-
-      <div class="menu-section">
-        <p class="menu-section-title">ADVERTISEMENT</p>
-
-        <RouterLink
-          :to="{
-            name: 'admin-advertisements',
-          }"
-          class="menu-item"
-          :class="{
-            active: isAdvertisementActive,
-          }"
-          active-class=""
-          exact-active-class=""
-        >
-          <span class="menu-icon"> ◇ </span>
-
-          <span> 廣告管理 </span>
-        </RouterLink>
-      </div>
-
-      <!-- =====================================
-           CALENDAR / NOTIFICATION
-      ====================================== -->
-
-      <div class="menu-section">
-        <p class="menu-section-title">CALENDAR</p>
-
-        <RouterLink
-          :to="{ name: 'admin-activity-overview' }"
-          class="menu-item"
-          :class="{ active: isActivityOverviewActive }"
-          active-class=""
-          exact-active-class=""
-        >
-          <span class="menu-icon"> ◫ </span>
-          <span>活動總覽</span>
-        </RouterLink>
-
-        <RouterLink
-          :to="{ name: 'admin-events' }"
-          class="menu-item"
-          :class="{ active: isActivityManagementActive }"
-          active-class=""
-          exact-active-class=""
-        >
-          <span class="menu-icon"> ▣ </span>
-          <span>活動管理</span>
-        </RouterLink>
-
-        <RouterLink
-          :to="{ name: 'admin-notifications' }"
-          class="menu-item"
-          :class="{ active: isNotificationActive }"
-          active-class=""
-          exact-active-class=""
-        >
-          <span class="menu-icon"> ◇ </span>
-          <span>通知中心</span>
-        </RouterLink>
-
-        <RouterLink
-          :to="{ name: 'admin-notification-logs' }"
-          class="menu-item"
-          :class="{ active: isNotificationLogActive }"
-          active-class=""
-          exact-active-class=""
-        >
-          <span class="menu-icon"> ✉ </span>
-          <span>發送紀錄</span>
         </RouterLink>
       </div>
 
@@ -267,9 +243,97 @@ const isAuctionSection = computed(() => {
           active-class=""
           exact-active-class=""
         >
-          <span class="menu-icon"> △ </span>
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faGavel" />
+          </span>
 
           <span> 競標管理 </span>
+        </RouterLink>
+      </div>
+
+      <!-- =====================================
+           ADVERTISEMENT
+      ====================================== -->
+
+      <div class="menu-section">
+        <p class="menu-section-title">ADVERTISEMENT</p>
+
+        <RouterLink
+          :to="{
+            name: 'admin-advertisements',
+          }"
+          class="menu-item"
+          :class="{
+            active: isAdvertisementActive,
+          }"
+          active-class=""
+          exact-active-class=""
+        >
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faBullhorn" />
+          </span>
+
+          <span> 廣告管理 </span>
+        </RouterLink>
+      </div>
+
+      <!-- =====================================
+           CALENDAR / NOTIFICATION
+      ====================================== -->
+
+      <div class="menu-section">
+        <p class="menu-section-title">CALENDAR</p>
+
+        <RouterLink
+          :to="{ name: 'admin-activity-overview' }"
+          class="menu-item"
+          :class="{ active: isActivityOverviewActive }"
+          active-class=""
+          exact-active-class=""
+        >
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faChartLine" />
+          </span>
+          <span>活動總覽</span>
+        </RouterLink>
+
+        <RouterLink
+          :to="{ name: 'admin-events' }"
+          class="menu-item"
+          :class="{ active: isActivityManagementActive }"
+          active-class=""
+          exact-active-class=""
+        >
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faCalendarDays" />
+          </span>
+          <span>活動管理</span>
+        </RouterLink>
+
+        <RouterLink
+          :to="{ name: 'admin-notifications' }"
+          class="menu-item"
+          :class="{ active: isNotificationActive }"
+          active-class=""
+          exact-active-class=""
+        >
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faBell" />
+          </span>
+          <span>通知中心</span>
+        </RouterLink>
+
+        <RouterLink
+          :to="{ name: 'admin-notification-logs' }"
+          class="menu-item"
+          :class="{ active: isNotificationLogActive }"
+          active-class=""
+          exact-active-class=""
+        >
+          <span class="menu-icon">
+            <FontAwesomeIcon :icon="faEnvelope" />
+          </span>
+          <span>發送紀錄</span>
         </RouterLink>
       </div>
     </nav>
@@ -277,137 +341,175 @@ const isAuctionSection = computed(() => {
 </template>
 
 <style scoped>
-/* =========================================
-   SIDEBAR
-========================================= */
-
 .admin-sidebar {
-  width: 250px;
-
-  min-width: 250px;
-
+  width: 228px;
+  min-width: 228px;
   min-height: calc(100vh - 56px);
-
-  display: flex;
-
-  flex-direction: column;
-
-  background: #111111;
-
-  color: #ffffff;
-
-  border-right: 1px solid #2b2b2b;
+  background: #f0eee8;
+  color: #202320;
+  border-right: 1px solid #e3e3df;
 }
 
-/* =========================================
-   MENU
-========================================= */
+.sidebar-heading {
+  padding: 26px 22px 20px;
+  border-bottom: 1px solid #303030;
+}
+
+.sidebar-heading small,
+.sidebar-heading strong {
+  display: block;
+}
+
+.sidebar-heading small {
+  margin-bottom: 5px;
+  color: #a4a4a4;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.sidebar-heading strong {
+  font-size: 1.18rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
 
 .sidebar-menu {
-  flex: 1;
-
-  padding: 30px 14px;
-
+  padding: 18px 14px 30px;
   overflow-y: auto;
+  padding: 22px 12px 32px;
 }
 
-/* =========================================
-   SECTION
-========================================= */
-
 .menu-section {
-  margin-bottom: 28px;
+  margin: 0;
+  padding: 18px 0;
+  border-top: 1px solid #deded9;
+}
+
+.home-section {
+  padding-right: 14px;
+  padding-left: 14px;
 }
 
 .menu-section-title {
   margin: 0 10px 10px;
-
-  color: #777777;
-
-  font-size: 10px;
-
-  font-weight: 700;
-
-  letter-spacing: 0.16em;
+  color: #72766f;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
 }
-
-/* =========================================
-   MENU ITEM
-========================================= */
 
 .menu-item {
   position: relative;
-
-  min-height: 42px;
-
   display: flex;
-
+  min-height: 48px;
   align-items: center;
-
-  gap: 12px;
-
-  padding: 10px 12px;
-
+  gap: 14px;
   margin: 2px 0;
-
-  color: #bdbdbd;
-
-  text-decoration: none;
-
+  padding: 0 14px;
+  border-radius: 6px;
+  color: #252925;
   font-size: 14px;
-
-  border-radius: 4px;
-
+  font-weight: 650;
+  text-decoration: none;
   transition:
-    background 0.15s ease,
-    color 0.15s ease;
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
 }
 
 .menu-item:hover {
-  background: #1f1f1f;
-
-  color: #ffffff;
+  color: #111411;
+  background: #ebebe7;
 }
 
-/* =========================================
-   ACTIVE
-========================================= */
-
 .menu-item.active {
-  background: #ffffff;
+  color: #ffffff;
+  background: linear-gradient(135deg, #313331, #191a19);
+  box-shadow: 0 6px 16px rgb(22 24 22 / 14%);
+}
 
-  color: #111111;
+.menu-item.active::before {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #81a889;
+  content: "";
 }
 
 .menu-item.active .menu-icon {
-  color: #111111;
+  color: #ffffff;
 }
-
-/* =========================================
-   ICON
-========================================= */
 
 .menu-icon {
-  width: 20px;
-
-  flex-shrink: 0;
-
-  text-align: center;
-
-  color: #aaaaaa;
-
-  font-size: 14px;
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  color: currentColor;
+  font-size: 19px;
 }
-
-/* =========================================
-   SCROLLBAR
-========================================= */
 
 .sidebar-menu::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 
 .sidebar-menu::-webkit-scrollbar-thumb {
-  background: #333333;
+  border-radius: 4px;
+  background: #555;
+}
+
+@media (max-width: 992px) {
+  .admin-sidebar {
+    position: static;
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+  }
+
+  .sidebar-heading {
+    padding: 16px 24px 12px;
+  }
+
+  .sidebar-heading small {
+    display: none;
+  }
+
+  .sidebar-heading strong {
+    font-size: 1rem;
+  }
+
+  .sidebar-menu {
+    display: flex;
+    gap: 18px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 20px 12px;
+  }
+
+  .menu-section {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 4px;
+    margin: 0;
+  }
+
+  .menu-section-title {
+    display: none;
+  }
+
+  .menu-item {
+    flex: 0 0 auto;
+    min-height: 38px;
+    margin: 0;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
 }
 </style>

@@ -52,29 +52,13 @@ export const mapEventData = (rawData = []) => {
       time: endTime ? `${startTime} - ${endDayPrefix}${endTime}` : startTime,
       title: item.title,
       description: item.description,
-
-      venueName: item.venueName || "",
-
-      address: item.address || "",
-
-      latitude:
-        item.latitude === null || item.latitude === undefined
-          ? null
-          : Number(item.latitude),
-
-      longitude:
-        item.longitude === null || item.longitude === undefined
-          ? null
-          : Number(item.longitude),
-
       startAt: item.startAt,
       endAt: item.endAt,
       eventType: item.eventType || "OTHER",
       color: getEventType(item.eventType).color,
       status: item.status,
       targetUrl: item.targetUrl,
-      photoUrl:
-        item.photoUrl || (item.hasPhoto ? getEventPhotoUrl(item.eventId) : ""),
+      photoUrl: item.hasPhoto ? getEventPhotoUrl(item.eventId) : "",
     };
   });
 };

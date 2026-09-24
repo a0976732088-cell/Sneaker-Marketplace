@@ -7,6 +7,17 @@ import AppNavbar from "@/components/layout/AppNavbar.vue";
 
 import AppFooter from "@/components/layout/AppFooter.vue";
 
+import ChatbotWidget from "@/components/commerce/ChatbotWidget.vue";
+const isCommercePage = computed(() => {
+  return (
+    route.path.startsWith("/products") ||
+    route.path === "/cart" ||
+    route.path === "/checkout" ||
+    route.path.startsWith("/orders")
+  );
+});
+
+
 const route = useRoute();
 
 // =====================================================
@@ -54,6 +65,10 @@ const isAdminPage = computed(() => {
     ====================================== -->
 
     <AppFooter v-if="!isAdminPage" />
+
+    <!-- 一般商城機器人 -->
+    <ChatbotWidget v-if="isCommercePage" />
+   
   </div>
 </template>
 

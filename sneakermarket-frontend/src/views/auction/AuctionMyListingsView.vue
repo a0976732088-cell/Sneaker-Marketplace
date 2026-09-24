@@ -60,7 +60,10 @@
             >
               查看競標 →
             </RouterLink>
-            <p v-else class="record-action-notice">
+            <p
+              v-else
+              class="record-action-notice record-action-notice--single-line"
+            >
               {{ formatMemberPublicDetailNotice(listing.managementState) }}
             </p>
           </template>
