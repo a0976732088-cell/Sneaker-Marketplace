@@ -23,9 +23,11 @@ const actionDialogPath = new URL("../src/components/auction/admin/AdminAuctionAc
 const routerPath = new URL("../src/router/index.js", import.meta.url);
 const sidebarPath = new URL("../src/components/admin/AdminSidebar.vue", import.meta.url);
 const detailPath = new URL("../src/views/admin/AdminAuctionDetailView.vue", import.meta.url);
+const overviewPath = new URL("../src/components/auction/admin/AdminAuctionOverviewPanel.vue", import.meta.url);
+const resultOrderPath = new URL("../src/components/auction/admin/AdminAuctionResultAndOrderPanel.vue", import.meta.url);
 const imageUrlPath = new URL("../src/utils/auctionImageUrl.js", import.meta.url);
 
-const [service, view, filterPanel, batchToolbar, card, paginationUi, actionDialog, router, sidebar, detail, imageUrl] = await Promise.all([
+const [service, view, filterPanel, batchToolbar, card, paginationUi, actionDialog, router, sidebar, detail, overview, resultOrder, imageUrl] = await Promise.all([
   readFile(servicePath, "utf8"),
   readFile(viewPath, "utf8"),
   readFile(filterPanelPath, "utf8"),
@@ -36,6 +38,8 @@ const [service, view, filterPanel, batchToolbar, card, paginationUi, actionDialo
   readFile(routerPath, "utf8"),
   readFile(sidebarPath, "utf8"),
   readFile(detailPath, "utf8"),
+  readFile(overviewPath, "utf8"),
+  readFile(resultOrderPath, "utf8"),
   readFile(imageUrlPath, "utf8"),
 ]);
 
@@ -283,36 +287,78 @@ test("admin detail remains available after moderation and resolves images agains
   );
   assert.ok(detail.includes("getAdminAuctionDetail"));
   assert.ok(detail.includes("公開中、已下架及已刪除"));
-  assert.ok(detail.includes("resolveAuctionImageUrl(imageUrl)"));
+  assert.ok(overview.includes("resolveAuctionImageUrl(imageUrl)"));
   assert.match(
-    detail,
+    overview,
     /賣家[\s\S]*?auction\.sellerName\s*\|\|\s*"會員資料未提供"[\s\S]*?賣家 ID[\s\S]*?auction\.sellerId/,
   );
   assert.ok(imageUrl.includes('import httpClient from "@/service/httpClient"'));
   assert.ok(imageUrl.includes('replace(/\\/api\\/?$/, "")'));
+  assert.ok(overview.includes("@error=\"emit('image-error', imageUrl)\""));
+  assert.ok(detail.includes('@image-error="markImageBroken"'));
+  assert.match(detail, /const brokenImages = ref\(new Set\(\)\)/);
+  assert.match(detail, /function markImageBroken\(imageUrl\)/);
   assert.ok(card.includes('@error="emit(\'image-error\')"'));
   assert.ok(view.includes('@image-error="markThumbnailBroken(auction.auctionId)"'));
 });
 
-test("admin detail renders bid result order and lifecycle aggregate sections", () => {
+test("admin detail overview preserves status, image, product, seller, price and time display", () => {
   for (const text of [
-    "出價紀錄",
-    "競標結果",
-    "競標訂單",
-    "完整生命週期",
-    "尚未產生競標結果",
-    "尚未建立競標訂單",
-    "付款期限",
-    "棄標時間",
-  ]) {
+    "商品圖片", "競標基本資料", "價格與時間", "品牌", "型號",
+    "尺寸", "商品狀況", "賣家 ID", "起標價格", "目前價格",
+    "最小加價", "出價次數", "建立時間", "開始時間", "結束時間",
+    "目前沒有可顯示的商品圖片",
+  ]) assert.ok(overview.includes(text), text);
+  assert.match(overview, /formatStatus\(auction\.status\)/);
+  assert.match(overview, /orderBadge\(order\.orderStatus\)/);
+  assert.match(overview, /managementBadge\(auction\.managementState\)/);
+  assert.match(overview, /formatCondition\(detail\.condition\)/);
+  assert.match(overview, /formatMoney\(auction\.currentPrice\)/);
+  assert.match(overview, /formatTime\(auction\.endAt\)/);
+  assert.match(overview, /\.detail-image\s*\{[\s\S]*?aspect-ratio:\s*4 \/ 3/);
+  assert.match(overview, /\.image-placeholder\s*\{[\s\S]*?min-height:\s*16rem/);
+});
+
+test("admin detail renders bid result order and lifecycle aggregate sections", () => {
+  for (const text of ["出價紀錄", "完整生命週期"]) {
     assert.ok(detail.includes(text), text);
   }
+  for (const text of [
+    "競標結果", "競標訂單", "尚未產生競標結果",
+    "尚未建立競標訂單", "結果狀態", "成交價格",
+    "得標會員", "結果原因", "付款狀態", "物流狀態",
+    "付款期限", "棄標時間",
+  ]) assert.ok(resultOrder.includes(text), text);
   assert.match(detail, /v-for="\(bid, index\) in bids"/);
-  assert.match(detail, /result\.winnerName/);
-  assert.match(detail, /order\.buyerName/);
-  assert.match(detail, /formatAuctionOrderStatus\(order\.orderStatus\)/);
-  assert.match(detail, /order\.orderStatus === 'ABANDONED'/);
-  assert.doesNotMatch(detail, /receiverPhone|shippingAddress|buyerEmail|sellerEmail/);
+  assert.match(resultOrder, /result\.winnerName/);
+  assert.match(resultOrder, /order\.buyerName/);
+  assert.match(resultOrder, /formatAuctionOrderStatus\(order\.orderStatus\)/);
+  assert.match(resultOrder, /order\.orderStatus === 'ABANDONED'/);
+  assert.doesNotMatch([detail, overview, resultOrder].join("\n"), /receiverPhone|shippingAddress|buyerEmail|sellerEmail/);
+});
+
+test("admin detail parent wires overview and result/order UI to its existing data", () => {
+  assert.match(detail, /import AdminAuctionOverviewPanel from/);
+  assert.match(detail, /import AdminAuctionResultAndOrderPanel from/);
+  const openingTag = (name) => {
+    const tag = detail.match(new RegExp("<" + name + "\\b[\\s\\S]*?/>"))?.[0];
+    assert.ok(tag, name + " is mounted");
+    return tag;
+  };
+  const overviewTag = openingTag("AdminAuctionOverviewPanel");
+  for (const binding of [
+    ':auction="auction"', ':detail="detail"', ':order="order"',
+    ':visible-images="visibleImages"', ':format-status="formatStatus"',
+    ':format-money="formatMoney"', ':format-time="formatTime"',
+    '@image-error="markImageBroken"',
+  ]) assert.ok(overviewTag.includes(binding), binding);
+  const resultOrderTag = openingTag("AdminAuctionResultAndOrderPanel");
+  for (const binding of [
+    ':result="result"', ':order="order"',
+    ':format-money="formatMoney"', ':format-time="formatTime"',
+  ]) assert.ok(resultOrderTag.includes(binding), binding);
+  assert.match(detail, /const result = computed\(\(\) => detail\.value\?\.result \|\| null\)/);
+  assert.match(detail, /const order = computed\(\(\) => detail\.value\?\.order \|\| null\)/);
 });
 
 test("ACTIVE lifecycle shows persisted schedule only and keeps result and order absent", () => {
@@ -335,8 +381,8 @@ test("ACTIVE lifecycle shows persisted schedule only and keeps result and order 
   );
   assert.equal(timeline[1].label, "排定開始");
   assert.equal(timeline[2].label, "競標排定截止");
-  assert.ok(detail.includes("尚未產生競標結果"));
-  assert.ok(detail.includes("尚未建立競標訂單"));
+  assert.ok(resultOrder.includes("尚未產生競標結果"));
+  assert.ok(resultOrder.includes("尚未建立競標訂單"));
 });
 
 test("SOLD pending lifecycle includes complete bids result order and deadline", () => {

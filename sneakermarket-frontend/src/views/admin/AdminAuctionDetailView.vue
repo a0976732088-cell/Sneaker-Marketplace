@@ -24,108 +24,16 @@
     </div>
 
     <template v-else-if="detail">
-      <section class="card shadow-sm mb-4">
-        <div class="card-body">
-          <div class="d-flex flex-wrap justify-content-between gap-3">
-            <div>
-              <div class="text-secondary small mb-1">
-                競標 #{{ auction.auctionId }}
-              </div>
-              <h2 class="h4 mb-1">{{ auction.productName }}</h2>
-              <p class="text-secondary mb-0">{{ auction.model || "無型號" }}</p>
-            </div>
-            <div class="d-flex flex-wrap align-items-start gap-2">
-              <span class="badge text-bg-secondary fs-6">
-                {{ formatStatus(auction.status) }}
-              </span>
-              <span
-                v-if="order"
-                class="badge fs-6"
-                :class="orderBadge(order.orderStatus)"
-              >
-                {{ formatAuctionOrderStatus(order.orderStatus) }}
-              </span>
-              <span
-                class="badge fs-6"
-                :class="managementBadge(auction.managementState)"
-              >
-                {{ formatManagementState(auction.managementState) }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div class="row g-4">
-        <div class="col-12 col-xl-7">
-          <section class="card shadow-sm h-100">
-            <div class="card-header fw-semibold">商品圖片</div>
-            <div class="card-body">
-              <div v-if="visibleImages.length" class="row g-3">
-                <div
-                  v-for="(imageUrl, index) in visibleImages"
-                  :key="imageUrl"
-                  class="col-12 col-md-6"
-                >
-                  <img
-                    class="detail-image"
-                    :src="resolveAuctionImageUrl(imageUrl)"
-                    :alt="auction.productName + ' 圖片 ' + (index + 1)"
-                    @error="markImageBroken(imageUrl)"
-                  />
-                </div>
-              </div>
-              <div v-else class="image-placeholder">
-                目前沒有可顯示的商品圖片
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div class="col-12 col-xl-5">
-          <section class="card shadow-sm mb-4">
-            <div class="card-header fw-semibold">競標基本資料</div>
-            <dl class="row card-body detail-list mb-0">
-              <dt class="col-5">品牌</dt>
-              <dd class="col-7">{{ detail.brandName || "—" }}</dd>
-              <dt class="col-5">型號</dt>
-              <dd class="col-7">{{ auction.model || "—" }}</dd>
-              <dt class="col-5">尺寸</dt>
-              <dd class="col-7">{{ detail.size || "—" }}</dd>
-              <dt class="col-5">商品狀況</dt>
-              <dd class="col-7">{{ formatCondition(detail.condition) }}</dd>
-              <dt class="col-5">賣家</dt>
-              <dd class="col-7">
-                {{ auction.sellerName || "會員資料未提供" }}
-              </dd>
-              <dt class="col-5">賣家 ID</dt>
-              <dd class="col-7">#{{ auction.sellerId }}</dd>
-            </dl>
-          </section>
-
-          <section class="card shadow-sm">
-            <div class="card-header fw-semibold">價格與時間</div>
-            <dl class="row card-body detail-list mb-0">
-              <dt class="col-5">起標價格</dt>
-              <dd class="col-7">{{ formatMoney(detail.startPrice) }}</dd>
-              <dt class="col-5">目前價格</dt>
-              <dd class="col-7">{{ formatMoney(auction.currentPrice) }}</dd>
-              <dt class="col-5">最小加價</dt>
-              <dd class="col-7">{{ formatMoney(detail.minIncrement) }}</dd>
-              <dt class="col-5">出價次數</dt>
-              <dd class="col-7">{{ auction.bidCount }}</dd>
-              <dt class="col-5">建立時間</dt>
-              <dd class="col-7">{{ formatTime(auction.createdAt) }}</dd>
-              <dt class="col-5">開始時間</dt>
-              <dd class="col-7">{{ formatTime(auction.startAt) }}</dd>
-              <dt class="col-5">結束時間</dt>
-              <dd class="col-7">{{ formatTime(auction.endAt) }}</dd>
-              <dt class="col-5">更新時間</dt>
-              <dd class="col-7">{{ formatTime(detail.updatedAt) }}</dd>
-            </dl>
-          </section>
-        </div>
-      </div>
+      <AdminAuctionOverviewPanel
+        :auction="auction"
+        :detail="detail"
+        :order="order"
+        :visible-images="visibleImages"
+        :format-status="formatStatus"
+        :format-money="formatMoney"
+        :format-time="formatTime"
+        @image-error="markImageBroken"
+      />
 
       <section class="card shadow-sm mt-4">
         <div class="card-header fw-semibold">出價紀錄</div>
@@ -153,87 +61,12 @@
         <div v-else class="card-body text-secondary">尚無出價紀錄</div>
       </section>
 
-      <div class="row g-4 mt-0">
-        <div class="col-12 col-xl-5">
-          <section class="card shadow-sm h-100">
-            <div class="card-header fw-semibold">競標結果</div>
-            <div v-if="!result" class="card-body text-secondary">
-              尚未產生競標結果
-            </div>
-            <dl v-else class="row card-body detail-list mb-0">
-              <dt class="col-5">結果狀態</dt>
-              <dd class="col-7">
-                <span class="badge" :class="resultBadge(result.resultStatus)">
-                  {{ formatAuctionResultStatus(result.resultStatus) }}
-                </span>
-              </dd>
-              <dt class="col-5">成交價格</dt>
-              <dd class="col-7">{{ formatMoney(result.finalPrice) }}</dd>
-              <dt class="col-5">得標會員</dt>
-              <dd class="col-7">{{ result.winnerName || "—" }}</dd>
-              <dt class="col-5">結標時間</dt>
-              <dd class="col-7">{{ formatTime(result.endedAt) }}</dd>
-              <dt class="col-5">結果建立</dt>
-              <dd class="col-7">{{ formatTime(result.createdAt) }}</dd>
-              <dt class="col-5">結果原因</dt>
-              <dd class="col-7 reason-value">{{ result.reason || "—" }}</dd>
-            </dl>
-          </section>
-        </div>
-
-        <div class="col-12 col-xl-7">
-          <section class="card shadow-sm h-100">
-            <div class="card-header fw-semibold">競標訂單</div>
-            <div v-if="!order" class="card-body text-secondary">
-              尚未建立競標訂單
-            </div>
-            <div v-else class="card-body">
-              <div
-                v-if="order.orderStatus === 'ABANDONED'"
-                class="alert alert-warning py-2"
-              >
-                此訂單已棄標（買家逾期未付款），不能再進行付款。
-              </div>
-              <dl class="row detail-list mb-0">
-                <dt class="col-5">訂單編號</dt>
-                <dd class="col-7">{{ order.orderNumber }}</dd>
-                <dt class="col-5">訂單狀態</dt>
-                <dd class="col-7 fw-semibold">
-                  {{ formatAuctionOrderStatus(order.orderStatus) }}
-                </dd>
-                <dt class="col-5">付款狀態</dt>
-                <dd class="col-7">
-                  {{ formatAuctionOrderStatus(order.paymentStatus) }}
-                </dd>
-                <dt class="col-5">物流狀態</dt>
-                <dd class="col-7">
-                  {{ formatAuctionOrderStatus(order.shippingStatus) }}
-                </dd>
-                <dt class="col-5">成交價格</dt>
-                <dd class="col-7">{{ formatMoney(order.finalPrice) }}</dd>
-                <dt class="col-5">買家</dt>
-                <dd class="col-7">{{ order.buyerName || "會員資料未提供" }}</dd>
-                <dt class="col-5">賣家</dt>
-                <dd class="col-7">{{ order.sellerName || "會員資料未提供" }}</dd>
-                <dt class="col-5">訂單建立</dt>
-                <dd class="col-7">{{ formatTime(order.createdAt) }}</dd>
-                <dt class="col-5">付款期限</dt>
-                <dd class="col-7">{{ formatTime(order.paymentDueAt) }}</dd>
-                <dt class="col-5">付款時間</dt>
-                <dd class="col-7">{{ formatTime(order.paidAt) }}</dd>
-                <dt class="col-5">棄標時間</dt>
-                <dd class="col-7">{{ formatTime(order.abandonedAt) }}</dd>
-                <dt class="col-5">出貨時間</dt>
-                <dd class="col-7">{{ formatTime(order.shippedAt) }}</dd>
-                <dt class="col-5">完成時間</dt>
-                <dd class="col-7">{{ formatTime(order.completedAt) }}</dd>
-                <dt class="col-5">最後更新</dt>
-                <dd class="col-7">{{ formatTime(order.updatedAt) }}</dd>
-              </dl>
-            </div>
-          </section>
-        </div>
-      </div>
+      <AdminAuctionResultAndOrderPanel
+        :result="result"
+        :order="order"
+        :format-money="formatMoney"
+        :format-time="formatTime"
+      />
 
       <section class="card shadow-sm mt-4">
         <div class="card-header fw-semibold">完整生命週期</div>
@@ -314,14 +147,11 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
+import AdminAuctionOverviewPanel from "@/components/auction/admin/AdminAuctionOverviewPanel.vue";
+import AdminAuctionResultAndOrderPanel from "@/components/auction/admin/AdminAuctionResultAndOrderPanel.vue";
 import { getAdminAuctionDetail } from "@/service/auctionAdminService";
 import { buildAdminAuctionTimeline } from "@/utils/auctionAdminLifecycle";
-import { resolveAuctionImageUrl } from "@/utils/auctionImageUrl";
-import {
-  formatAuctionOrderStatus,
-  formatAuctionResultStatus,
-  formatMemberAuctionStatus,
-} from "@/utils/auctionMemberStatus";
+import { formatMemberAuctionStatus } from "@/utils/auctionMemberStatus";
 import { formatAuctionTime } from "@/utils/auctionTime";
 
 const route = useRoute();
@@ -391,78 +221,12 @@ function formatStatus(status) {
   return status ? formatMemberAuctionStatus(status) : "—";
 }
 
-function formatManagementState(state) {
-  return (
-    { VISIBLE: "公開中", REMOVED: "已下架", DELETED: "已刪除" }[state] ||
-    state
-  );
-}
-
-function managementBadge(state) {
-  return (
-    {
-      VISIBLE: "text-bg-success",
-      REMOVED: "text-bg-warning",
-      DELETED: "text-bg-danger",
-    }[state] || "text-bg-secondary"
-  );
-}
-
-function resultBadge(status) {
-  return (
-    {
-      SOLD: "text-bg-success",
-      UNSOLD: "text-bg-secondary",
-      CANCELLED: "text-bg-warning",
-      REMOVED: "text-bg-danger",
-    }[status] || "text-bg-secondary"
-  );
-}
-
-function orderBadge(status) {
-  return (
-    {
-      PENDING_PAYMENT: "text-bg-warning",
-      PAID: "text-bg-primary",
-      SHIPPED: "text-bg-info",
-      COMPLETED: "text-bg-success",
-      CANCELLED: "text-bg-secondary",
-      ABANDONED: "text-bg-danger",
-    }[status] || "text-bg-secondary"
-  );
-}
-
-function formatCondition(condition) {
-  return (
-    { NEW: "全新", LIKE_NEW: "近全新", USED: "二手" }[condition] ||
-    condition ||
-    "—"
-  );
-}
-
 onMounted(loadDetail);
 </script>
 
 <style scoped>
 .admin-auction-detail {
   max-width: 1320px;
-}
-.detail-image {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.6rem;
-  object-fit: contain;
-  background: #f8f9fa;
-}
-.image-placeholder {
-  display: grid;
-  min-height: 16rem;
-  place-items: center;
-  border: 1px dashed var(--bs-border-color);
-  border-radius: 0.6rem;
-  color: #6c757d;
-  background: #f8f9fa;
 }
 .detail-list dt,
 .detail-list dd {
