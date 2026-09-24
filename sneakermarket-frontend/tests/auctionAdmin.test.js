@@ -15,14 +15,24 @@ import {
 
 const servicePath = new URL("../src/service/auctionAdminService.js", import.meta.url);
 const viewPath = new URL("../src/views/admin/AdminAuctionListView.vue", import.meta.url);
+const filterPanelPath = new URL("../src/components/auction/admin/AdminAuctionFilterPanel.vue", import.meta.url);
+const batchToolbarPath = new URL("../src/components/auction/admin/AdminAuctionBatchToolbar.vue", import.meta.url);
+const cardPath = new URL("../src/components/auction/admin/AdminAuctionCard.vue", import.meta.url);
+const paginationPath = new URL("../src/components/auction/admin/AdminAuctionPagination.vue", import.meta.url);
+const actionDialogPath = new URL("../src/components/auction/admin/AdminAuctionActionDialog.vue", import.meta.url);
 const routerPath = new URL("../src/router/index.js", import.meta.url);
 const sidebarPath = new URL("../src/components/admin/AdminSidebar.vue", import.meta.url);
 const detailPath = new URL("../src/views/admin/AdminAuctionDetailView.vue", import.meta.url);
 const imageUrlPath = new URL("../src/utils/auctionImageUrl.js", import.meta.url);
 
-const [service, view, router, sidebar, detail, imageUrl] = await Promise.all([
+const [service, view, filterPanel, batchToolbar, card, paginationUi, actionDialog, router, sidebar, detail, imageUrl] = await Promise.all([
   readFile(servicePath, "utf8"),
   readFile(viewPath, "utf8"),
+  readFile(filterPanelPath, "utf8"),
+  readFile(batchToolbarPath, "utf8"),
+  readFile(cardPath, "utf8"),
+  readFile(paginationPath, "utf8"),
+  readFile(actionDialogPath, "utf8"),
   readFile(routerPath, "utf8"),
   readFile(sidebarPath, "utf8"),
   readFile(detailPath, "utf8"),
@@ -60,23 +70,19 @@ test("admin auction route is guarded and the current sidebar links to it", () =>
 
 test("admin views use shared status and time formatters and keep required SFC order", () => {
   assert.ok(view.indexOf("<template>") < view.indexOf("<script setup>"));
-  for (const text of [
-    "競標狀態",
-    "訂單狀態",
-    "管理狀態",
-    "全選本頁",
-    "上一頁",
-    "下一頁",
-  ]) {
-    assert.ok(view.includes(text), text);
+  for (const text of ["競標狀態", "訂單狀態", "管理狀態"]) {
+    assert.ok(filterPanel.includes(text), text);
   }
-  assert.match(view, /formatAuctionOrderStatus/);
-  assert.match(view, /formatAuctionTime/);
+  assert.match(batchToolbar, /全選本頁/);
+  assert.match(paginationUi, /上一頁[\s\S]*?下一頁/);
+  assert.match(filterPanel, /formatAuctionOrderStatus/);
+  assert.match(card, /formatAuctionOrderStatus/);
+  assert.match(card, /formatAuctionTime/);
   assert.match(detail, /完整生命週期/);
   assert.match(detail, /formatAuctionTime/);
-  assert.doesNotMatch(view, /new Date\(/);
+  assert.doesNotMatch([view, filterPanel, batchToolbar, card, paginationUi, actionDialog].join("\n"), /new Date\(/);
   assert.doesNotMatch(detail, /new Date\(/);
-  assert.doesNotMatch(view, /假刪除/);
+  assert.doesNotMatch([view, filterPanel, batchToolbar, card, paginationUi, actionDialog].join("\n"), /假刪除/);
 });
 
 test("admin status filter excludes reserved DRAFT while defensive handling remains", () => {
@@ -88,32 +94,35 @@ test("admin status filter excludes reserved DRAFT while defensive handling remai
 });
 
 test("single action buttons follow visible removed and deleted states", () => {
-  assert.match(view, /v-if="isLegacyRemoved\(auction\)"[\s\S]*?>\s*補登下架資訊\s*<\/button\s*>/);
-  assert.match(view, /v-else-if="!auction\.removedAt && !auction\.deletedAt"[\s\S]*?>\s*下架\s*<\/button\s*>/);
-  assert.match(view, /v-if="canRestoreAuction\(auction\)"[\s\S]*?btn-success[\s\S]*?>\s*恢復顯示\s*<\/button\s*>/);
-  assert.match(view, /v-if="auction\.removedAt && !auction\.deletedAt"[\s\S]*?btn-danger[\s\S]*?>\s*刪除\s*<\/button\s*>/);
-  assert.match(view, /v-if="auction\.deletedAt"[\s\S]*?>\s*已刪除\s*<\/span\s*>/);
-  assert.match(view, /\.action-button[\s\S]*?box-shadow/);
+  assert.match(card, /v-if="legacyRemoved"[\s\S]*?>\s*補登下架資訊\s*<\/button\s*>/);
+  assert.match(card, /v-else-if="!auction\.removedAt && !auction\.deletedAt"[\s\S]*?>\s*下架\s*<\/button\s*>/);
+  assert.match(card, /v-if="canRestore"[\s\S]*?btn-success[\s\S]*?>\s*恢復顯示\s*<\/button\s*>/);
+  assert.match(card, /v-if="auction\.removedAt && !auction\.deletedAt"[\s\S]*?btn-danger[\s\S]*?>\s*刪除\s*<\/button\s*>/);
+  assert.match(card, /v-if="auction\.deletedAt"[\s\S]*?>\s*已刪除\s*<\/span\s*>/);
+  assert.match(card, /\.action-button[\s\S]*?box-shadow/);
 });
 
 test("action dialog requires confirmation and reasons only for remove or delete", () => {
-  assert.match(view, /<Teleport to="body">/);
-  assert.match(view, /role="dialog"/);
-  assert.match(view, /v-if="dialog\.action !== 'restore'"/);
-  assert.match(view, /id="auction-action-reason"[\s\S]*?maxlength="500"/);
-  assert.match(view, /v-model="dialog\.confirmed"/);
-  assert.match(view, /:disabled="!dialogValid \|\| submitting"/);
-  assert.match(view, /@submit\.prevent="confirmAction"/);
+  assert.match(actionDialog, /<Teleport to="body">/);
+  assert.match(actionDialog, /role="dialog"/);
+  assert.match(actionDialog, /v-if="action !== 'restore'"/);
+  assert.match(actionDialog, /id="auction-action-reason"[\s\S]*?maxlength="500"/);
+  assert.match(actionDialog, /v-model="reasonModel"/);
+  assert.match(actionDialog, /v-model="confirmedModel"/);
+  assert.match(actionDialog, /emit\("update:reason", value\)/);
+  assert.match(actionDialog, /emit\("update:confirmed", value\)/);
+  assert.match(actionDialog, /:disabled="!valid \|\| submitting"/);
+  assert.match(actionDialog, /@submit\.prevent="emit\('confirm'\)"/);
   assert.match(view, /dialog\.confirmed[\s\S]*?dialog\.action === "restore"[\s\S]*?dialog\.reason\.trim\(\)\.length > 0/);
-  assert.doesNotMatch(view, /id="admin-action-reason"/);
+  assert.doesNotMatch(actionDialog, /id="admin-action-reason"/);
 });
 
 test("batch controls appear only after entering batch mode", () => {
-  assert.match(view, /v-if="!batchMode"[\s\S]*?@click="enterBatchMode"[\s\S]*?>\s*批量操作\s*<\/button\s*>/);
-  assert.match(view, /<div(?=[^>]*\bv-else\b)[^>]*>[\s\S]*?openBatchAction\('remove'\)[\s\S]*?>\s*批量下架\s*<\/button\s*>/);
-  assert.match(view, /openBatchAction\('restore'\)[\s\S]*?>\s*批量恢復顯示\s*<\/button\s*>/);
-  assert.match(view, /openBatchAction\('delete'\)[\s\S]*?>\s*批量刪除\s*<\/button\s*>/);
-  assert.match(view, /@click="exitBatchMode"[\s\S]*?>\s*結束批量操作\s*<\/button\s*>/);
+  assert.match(batchToolbar, /v-if="!batchMode"[\s\S]*?@click="emit\('enter'\)"[\s\S]*?>\s*批量操作\s*<\/button\s*>/);
+  assert.match(batchToolbar, /<div(?=[^>]*\bv-else\b)[^>]*>[\s\S]*?emit\('remove'\)[\s\S]*?>\s*批量下架\s*<\/button\s*>/);
+  assert.match(batchToolbar, /emit\('restore'\)[\s\S]*?>\s*批量恢復顯示\s*<\/button\s*>/);
+  assert.match(batchToolbar, /emit\('delete'\)[\s\S]*?>\s*批量刪除\s*<\/button\s*>/);
+  assert.match(batchToolbar, /@click="emit\('exit'\)"[\s\S]*?>\s*結束批量操作\s*<\/button\s*>/);
   assert.match(view, /const restorableStatuses = new Set\(\["DRAFT", "SCHEDULED", "ACTIVE"\]\)/);
   assert.match(view, /const canBatchRestore = computed\([\s\S]*?every\(canRestoreAuction\)/);
   assert.match(view, /const canBatchDelete = computed\([\s\S]*?auction\.removedAt && !auction\.deletedAt/);
@@ -129,28 +138,29 @@ test("admin view prevents duplicate submissions and shows per-item batch results
 });
 
 test("admin list shows clear selectors, thumbnails, detail links and 15-row numbering", () => {
-  assert.ok(view.includes('class="form-check-input batch-checkbox"'));
-  assert.ok(view.includes("border: 1.5px solid #98a2b3"));
-  assert.match(view, /v-if="\s*auction\.imageUrl && !brokenImageIds\.has\(auction\.auctionId\)\s*"/);
-  assert.ok(view.includes(':src="resolveAuctionImageUrl(auction.imageUrl)"'));
-  assert.ok(view.includes("name: 'admin-auction-detail'"));
+  assert.ok(card.includes('class="form-check-input batch-checkbox"'));
+  assert.ok(card.includes("border: 1.5px solid #98a2b3"));
+  assert.match(card, /v-if="auction\.imageUrl && !thumbnailBroken"/);
+  assert.ok(card.includes(':src="resolveAuctionImageUrl(auction.imageUrl)"'));
+  assert.ok(card.includes("name: 'admin-auction-detail'"));
   assert.ok(view.includes('v-for="(auction, index) in items"'));
-  assert.ok(view.includes("pagination.page * pagination.size + index + 1"));
   assert.ok(view.includes("size: 15"));
+  assert.match(view, /function rowNumber\(index\)[\s\S]*?pagination\.page \* pagination\.size \+ index \+ 1/);
+  assert.match(card, /第 \{\{ rowNumber \}\} 筆 · 競標 #\{\{ auction\.auctionId \}\}/);
   assert.match(
-    view,
+    card,
     /auction\.sellerName\s*\|\|\s*"會員資料未提供"[\s\S]*?auction\.sellerId/,
   );
   assert.match(
-    view,
+    card,
     /<span class="auction-status-item">\s*<span>訂單狀態<\/span>[\s\S]*?auction\.orderStatus \? formatAuctionOrderStatus\(auction\.orderStatus\) : "-"/,
   );
-  assert.match(view, /role="listitem"/);
+  assert.match(card, /role="listitem"/);
 });
 
 test("admin list order-status filter exposes supported auction order states", () => {
   assert.match(
-    view,
+    filterPanel,
     /id="admin-order-status"[\s\S]*?v-model="filters\.orderStatus"[\s\S]*?v-for="status in orderStatuses"[\s\S]*?formatAuctionOrderStatus\(status\)/,
   );
   const configured =
@@ -173,19 +183,97 @@ test("admin list order-status filter exposes supported auction order states", ()
 });
 
 test("admin list uses compact responsive cards without a wide table", () => {
-  assert.match(view, /class="col-12 col-xl-4"/);
-  assert.equal((view.match(/class="col-12 col-md-4 col-xl-2"/g) || []).length, 3);
-  assert.match(view, /class="col-12 col-xl-2 d-grid"/);
+  assert.match(filterPanel, /class="col-12 col-xl-4"/);
+  assert.equal((filterPanel.match(/class="col-12 col-md-4 col-xl-2"/g) || []).length, 3);
+  assert.match(filterPanel, /class="col-12 col-xl-2 d-grid"/);
   assert.match(view, /class="auction-list" role="list"/);
-  assert.match(view, /class="auction-card"/);
-  assert.match(view, /\.auction-card-head\s*\{[^}]*display:\s*flex/);
-  assert.match(view, /\.auction-card-meta\s*\{[^}]*display:\s*grid/);
-  assert.match(view, /auction-row-actions auction-action-buttons/);
+  assert.match(card, /class="auction-card"/);
+  assert.match(card, /\.auction-card-head\s*\{[^}]*display:\s*flex/);
+  assert.match(card, /\.auction-card-meta\s*\{[^}]*display:\s*grid/);
+  assert.match(card, /auction-row-actions auction-action-buttons/);
   for (const label of ["賣家", "目前價格／出價", "時間"]) {
-    assert.ok(view.includes('class="auction-field-label">' + label), label);
+    assert.ok(card.includes('class="auction-field-label">' + label), label);
   }
-  assert.match(view, /\.auction-name-link\s*\{[^}]*overflow-wrap:\s*anywhere/);
-  assert.doesNotMatch(view, /min-width:\s*1380px/);
+  assert.match(card, /\.auction-name-link\s*\{[^}]*overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch([view, filterPanel, batchToolbar, card, paginationUi, actionDialog].join("\n"), /min-width:\s*1380px/);
+});
+
+test("admin auction parent wires five UI components to existing state and actions", () => {
+  function tag(name) {
+    const openingTag = view.match(new RegExp("<" + name + "\\b[\\s\\S]*?/>"))?.[0];
+    assert.ok(openingTag, name + " is mounted");
+    return openingTag;
+  }
+
+  const filter = tag("AdminAuctionFilterPanel");
+  for (const binding of [
+    ':filters="filters"',
+    ':statuses="statuses"',
+    ':order-statuses="orderStatuses"',
+    '@submit="applyFilters"',
+  ]) assert.ok(filter.includes(binding), binding);
+
+  const toolbar = tag("AdminAuctionBatchToolbar");
+  for (const binding of [
+    ':batch-mode="batchMode"',
+    ':selected-count="selectedIds.length"',
+    ':all-current-page-selected="allCurrentPageSelected"',
+    ':current-selectable-count="currentSelectableIds.length"',
+    ':can-batch-remove="canBatchRemove"',
+    ':can-batch-restore="canBatchRestore"',
+    ':can-batch-delete="canBatchDelete"',
+    '@enter="enterBatchMode"',
+    '@exit="exitBatchMode"',
+    '@toggle-current-page="toggleCurrentPageFromButton"',
+    '@remove="openBatchAction(\'remove\')"',
+    '@restore="openBatchAction(\'restore\')"',
+    '@delete="openBatchAction(\'delete\')"',
+  ]) assert.ok(toolbar.includes(binding), binding);
+
+  const auctionCard = tag("AdminAuctionCard");
+  for (const binding of [
+    'v-for="(auction, index) in items"',
+    ':auction="auction"',
+    ':row-number="rowNumber(index)"',
+    ':batch-mode="batchMode"',
+    ':selected="selectedIds.includes(auction.auctionId)"',
+    ':thumbnail-broken="brokenImageIds.has(auction.auctionId)"',
+    ':can-restore="canRestoreAuction(auction)"',
+    ':legacy-removed="isLegacyRemoved(auction)"',
+    '@image-error="markThumbnailBroken(auction.auctionId)"',
+    '@toggle-selection="toggleSelection(auction)"',
+    '@remove="openSingleAction(\'remove\', auction)"',
+    '@restore="openSingleAction(\'restore\', auction)"',
+    '@delete="openSingleAction(\'delete\', auction)"',
+  ]) assert.ok(auctionCard.includes(binding), binding);
+
+  const pagination = tag("AdminAuctionPagination");
+  for (const binding of [
+    ':page="pagination.page"',
+    ':total-pages="pagination.totalPages"',
+    ':total-elements="pagination.totalElements"',
+    '@change="changePage"',
+  ]) assert.ok(pagination.includes(binding), binding);
+  assert.match(paginationUi, /@click="emit\('change', page - 1\)"/);
+  assert.match(paginationUi, /@click="emit\('change', page \+ 1\)"/);
+
+  const dialogComponent = tag("AdminAuctionActionDialog");
+  for (const binding of [
+    ':open="dialog.open"',
+    ':action="dialog.action"',
+    'v-model:reason="dialog.reason"',
+    'v-model:confirmed="dialog.confirmed"',
+    ':error="dialog.error"',
+    ':title="dialogTitle"',
+    ':target-text="dialogTargetText"',
+    ':warning="dialogWarning"',
+    ':action-label="dialogActionLabel"',
+    ':alert-class="dialogAlertClass"',
+    ':submit-class="dialogSubmitClass"',
+    ':valid="dialogValid"',
+    '@close="closeActionDialog"',
+    '@confirm="confirmAction"',
+  ]) assert.ok(dialogComponent.includes(binding), binding);
 });
 
 test("admin detail remains available after moderation and resolves images against backend", () => {
@@ -202,7 +290,8 @@ test("admin detail remains available after moderation and resolves images agains
   );
   assert.ok(imageUrl.includes('import httpClient from "@/service/httpClient"'));
   assert.ok(imageUrl.includes('replace(/\\/api\\/?$/, "")'));
-  assert.ok(view.includes('@error="markThumbnailBroken(auction.auctionId)"'));
+  assert.ok(card.includes('@error="emit(\'image-error\')"'));
+  assert.ok(view.includes('@image-error="markThumbnailBroken(auction.auctionId)"'));
 });
 
 test("admin detail renders bid result order and lifecycle aggregate sections", () => {

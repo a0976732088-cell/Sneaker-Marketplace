@@ -10,89 +10,15 @@
       </div>
     </header>
 
-    <section class="card shadow-sm mb-4">
-      <div class="card-body">
-        <form class="row g-3 align-items-end" @submit.prevent="applyFilters">
-          <div class="col-12 col-xl-4">
-            <label
-              class="form-label filter-field-label"
-              for="admin-auction-keyword"
-              >商品名稱或型號</label
-            >
-            <input
-              id="admin-auction-keyword"
-              v-model.trim="filters.keyword"
-              class="form-control"
-              type="search"
-            />
-          </div>
-          <div class="col-12 col-md-4 col-xl-2">
-            <label
-              class="form-label filter-field-label"
-              for="admin-auction-status"
-              >競標狀態</label
-            >
-            <select
-              id="admin-auction-status"
-              v-model="filters.status"
-              class="form-select"
-            >
-              <option value="">全部</option>
-              <option v-for="status in statuses" :key="status" :value="status">
-                {{ formatStatus(status) }}
-              </option>
-            </select>
-          </div>
-          <div class="col-12 col-md-4 col-xl-2">
-            <label
-              class="form-label filter-field-label"
-              for="admin-order-status"
-              >訂單狀態</label
-            >
-            <select
-              id="admin-order-status"
-              v-model="filters.orderStatus"
-              class="form-select"
-            >
-              <option value="">全部</option>
-              <option
-                v-for="status in orderStatuses"
-                :key="status"
-                :value="status"
-              >
-                {{ formatAuctionOrderStatus(status) }}
-              </option>
-            </select>
-          </div>
-          <div class="col-12 col-md-4 col-xl-2">
-            <label
-              class="form-label filter-field-label"
-              for="admin-management-state"
-              >管理狀態</label
-            >
-            <select
-              id="admin-management-state"
-              v-model="filters.managementState"
-              class="form-select"
-            >
-              <option value="">全部</option>
-              <option value="VISIBLE">公開中</option>
-              <option value="REMOVED">已下架</option>
-              <option value="DELETED">已刪除</option>
-            </select>
-          </div>
-          <div class="col-12 col-xl-2 d-grid">
-            <button
-              class="btn btn-dark"
-              type="submit"
-              :disabled="loading || submitting"
-            >
-              {{ loading ? "查詢中…" : "查詢" }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </section>
+    <AdminAuctionFilterPanel
+      :filters="filters"
+      :statuses="statuses"
+      :order-statuses="orderStatuses"
+      :format-status="formatStatus"
+      :loading="loading"
+      :submitting="submitting"
+      @submit="applyFilters"
+    />
 
     <div v-if="errorMessage" class="alert alert-danger" role="alert">
       {{ errorMessage }}
@@ -102,81 +28,25 @@
     </div>
 
     <section class="card shadow-sm">
-      <div
-        class="card-body border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3"
-      >
-        <div>
-          <h2 class="h5 mb-1">競標清單</h2>
-          <p v-if="!batchMode" class="text-secondary small mb-0">
-            所有操作都會先確認；下架與刪除另外要求填寫原因。
-          </p>
-          <div v-else>
-            <p class="small mb-1" :class="batchSelectionClass">
-              {{ batchSelectionText }}
-            </p>
-            <p class="text-secondary small mb-0">
-              請選擇相同管理狀態的競標，避免混合下架、恢復與刪除。
-            </p>
-          </div>
-        </div>
-
-        <button
-          v-if="!batchMode"
-          class="btn btn-primary px-4"
-          type="button"
-          :disabled="loading || submitting"
-          @click="enterBatchMode"
-        >
-          批量操作
-        </button>
-
-        <div v-else class="d-flex flex-wrap align-items-center gap-2 auction-batch-actions auction-action-buttons">
-          <span class="badge text-bg-primary fs-6 auction-batch-count"
-            >已選 {{ selectedIds.length }} 筆（可跨頁）</span
-          >
-          <button
-            class="btn btn-outline-secondary auction-select-page"
-            type="button"
-            :aria-pressed="allCurrentPageSelected"
-            :disabled="loading || submitting || currentSelectableIds.length === 0"
-            @click="toggleCurrentPageFromButton"
-          >
-            {{ allCurrentPageSelected ? "取消本頁全選" : "全選本頁" }}
-          </button>
-          <button
-            class="btn btn-warning fw-semibold"
-            type="button"
-            :disabled="loading || submitting || !canBatchRemove"
-            @click="openBatchAction('remove')"
-          >
-            批量下架
-          </button>
-          <button
-            class="btn btn-success"
-            type="button"
-            :disabled="loading || submitting || !canBatchRestore"
-            @click="openBatchAction('restore')"
-          >
-            批量恢復顯示
-          </button>
-          <button
-            class="btn btn-danger"
-            type="button"
-            :disabled="loading || submitting || !canBatchDelete"
-            @click="openBatchAction('delete')"
-          >
-            批量刪除
-          </button>
-          <button
-            class="btn btn-outline-secondary"
-            type="button"
-            :disabled="submitting"
-            @click="exitBatchMode"
-          >
-            結束批量操作
-          </button>
-        </div>
-      </div>
+      <AdminAuctionBatchToolbar
+        :batch-mode="batchMode"
+        :selected-count="selectedIds.length"
+        :all-current-page-selected="allCurrentPageSelected"
+        :current-selectable-count="currentSelectableIds.length"
+        :can-batch-remove="canBatchRemove"
+        :can-batch-restore="canBatchRestore"
+        :can-batch-delete="canBatchDelete"
+        :loading="loading"
+        :submitting="submitting"
+        :batch-selection-text="batchSelectionText"
+        :batch-selection-class="batchSelectionClass"
+        @enter="enterBatchMode"
+        @exit="exitBatchMode"
+        @toggle-current-page="toggleCurrentPageFromButton"
+        @remove="openBatchAction('remove')"
+        @restore="openBatchAction('restore')"
+        @delete="openBatchAction('delete')"
+      />
 
       <div v-if="batchItems.length" class="border-bottom p-3 bg-light">
         <strong>本次處理結果</strong>
@@ -199,324 +69,76 @@
           沒有符合條件的競標。
         </div>
 
-        <article
+        <AdminAuctionCard
           v-for="(auction, index) in items"
           :key="auction.auctionId"
-          class="auction-card"
-          :class="{ 'is-batch': batchMode, 'is-selected': batchMode && selectedIds.includes(auction.auctionId) }"
-          role="listitem"
-        >
-          <div class="auction-card-head">
-            <div class="auction-product">
-              <img
-                v-if="
-                  auction.imageUrl && !brokenImageIds.has(auction.auctionId)
-                "
-                class="auction-thumbnail"
-                :src="resolveAuctionImageUrl(auction.imageUrl)"
-                :alt="(auction.productName || '競標商品') + '縮圖'"
-                loading="lazy"
-                @error="markThumbnailBroken(auction.auctionId)"
-              />
-              <div
-                v-else
-                class="auction-thumbnail thumbnail-placeholder"
-                aria-label="沒有商品圖片"
-              >
-                無圖片
-              </div>
-              <div class="product-info">
-                <div class="auction-product-id">
-                  第 {{ rowNumber(index) }} 筆 · 競標 #{{ auction.auctionId }}
-                </div>
-                <RouterLink
-                  class="auction-name-link"
-                  :to="{
-                    name: 'admin-auction-detail',
-                    params: { id: auction.auctionId },
-                  }"
-                >
-                  {{ auction.productName || "商品資料缺失" }}
-                </RouterLink>
-                <div class="small text-secondary">{{ auction.model || "無型號" }}</div>
-              </div>
-            </div>
+          :auction="auction"
+          :row-number="rowNumber(index)"
+          :batch-mode="batchMode"
+          :selected="selectedIds.includes(auction.auctionId)"
+          :thumbnail-broken="brokenImageIds.has(auction.auctionId)"
+          :loading="loading"
+          :submitting="submitting"
+          :can-restore="canRestoreAuction(auction)"
+          :legacy-removed="isLegacyRemoved(auction)"
+          :format-money="formatMoney"
+          :format-status="formatStatus"
+          :format-management-state="formatManagementState"
+          :management-badge="managementBadge"
+          @image-error="markThumbnailBroken(auction.auctionId)"
+          @toggle-selection="toggleSelection(auction)"
+          @remove="openSingleAction('remove', auction)"
+          @restore="openSingleAction('restore', auction)"
+          @delete="openSingleAction('delete', auction)"
+        />
 
-            <div class="auction-card-controls">
-              <div class="auction-statuses">
-                <span class="auction-status-item">
-                  <span>競標狀態</span>
-                  <span class="badge text-bg-secondary">{{
-                    formatStatus(auction.status)
-                  }}</span>
-                </span>
-                <span class="auction-status-item">
-                  <span>管理狀態</span>
-                  <span
-                    class="badge"
-                    :class="managementBadge(auction.managementState)"
-                  >
-                    {{ formatManagementState(auction.managementState) }}
-                  </span>
-                </span>
-                <span class="auction-status-item">
-                  <span>訂單狀態</span>
-                  <span class="badge text-bg-light border text-dark">
-                    {{ auction.orderStatus ? formatAuctionOrderStatus(auction.orderStatus) : "-" }}
-                  </span>
-                </span>
-              </div>
-              <input
-                v-if="batchMode"
-                class="form-check-input batch-checkbox"
-                type="checkbox"
-                :aria-label="'選取競標 ' + auction.auctionId"
-                :checked="selectedIds.includes(auction.auctionId)"
-                :disabled="loading || submitting || Boolean(auction.deletedAt)"
-                @change="toggleSelection(auction)"
-              />
-            </div>
-          </div>
 
-          <div class="auction-card-meta">
-            <div class="auction-meta-item">
-              <span class="auction-field-label">目前價格／出價</span>
-              <strong>{{ formatMoney(auction.currentPrice) }}</strong>
-              <span class="small text-secondary">{{ auction.bidCount }} 次出價</span>
-            </div>
-            <div class="auction-meta-item">
-              <span class="auction-field-label">賣家</span>
-              <span>{{ auction.sellerName || "會員資料未提供" }}</span>
-              <span class="small text-secondary">ID #{{ auction.sellerId }}</span>
-            </div>
-            <div class="auction-meta-item auction-meta-time">
-              <span class="auction-field-label">時間</span>
-              <span>建立 {{ formatAuctionTime(auction.createdAt) }}</span>
-              <span v-if="auction.removedAt">
-                下架 {{ formatAuctionTime(auction.removedAt) }}
-              </span>
-              <span v-if="auction.deletedAt">
-                刪除 {{ formatAuctionTime(auction.deletedAt) }}
-              </span>
-            </div>
-            <div
-              v-if="!batchMode"
-              class="d-flex flex-wrap justify-content-end gap-2 auction-row-actions auction-action-buttons auction-meta-actions"
-            >
-              <button
-                v-if="isLegacyRemoved(auction)"
-                class="btn btn-sm btn-warning fw-semibold action-button"
-                type="button"
-                :disabled="loading || submitting"
-                @click="openSingleAction('remove', auction)"
-              >
-                補登下架資訊
-              </button>
-              <button
-                v-else-if="!auction.removedAt && !auction.deletedAt"
-                class="btn btn-sm btn-warning fw-semibold action-button"
-                type="button"
-                :disabled="loading || submitting"
-                @click="openSingleAction('remove', auction)"
-              >
-                下架
-              </button>
-              <button
-                v-if="canRestoreAuction(auction)"
-                class="btn btn-sm btn-success action-button"
-                type="button"
-                :disabled="loading || submitting"
-                @click="openSingleAction('restore', auction)"
-              >
-                恢復顯示
-              </button>
-              <button
-                v-if="auction.removedAt && !auction.deletedAt"
-                class="btn btn-sm btn-danger action-button"
-                type="button"
-                :disabled="loading || submitting"
-                @click="openSingleAction('delete', auction)"
-              >
-                刪除
-              </button>
-              <span v-if="auction.deletedAt" class="small text-secondary">
-                已刪除
-              </span>
-            </div>
-          </div>
-
-          <div
-            v-if="auction.removeReason || auction.deleteReason"
-            class="auction-card-reasons"
-          >
-            <div
-              v-if="auction.removeReason"
-              class="reason-text"
-              :title="auction.removeReason"
-            >
-              下架：{{ auction.removeReason }}
-            </div>
-            <div
-              v-if="auction.deleteReason"
-              class="reason-text"
-              :title="auction.deleteReason"
-            >
-              刪除：{{ auction.deleteReason }}
-            </div>
-          </div>
-        </article>
       </div>
 
-      <div
-        class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3 border-top"
-      >
-        <span class="text-secondary"
-          >共 {{ pagination.totalElements }} 筆，第 {{ pagination.page + 1 }} /
-          {{ Math.max(pagination.totalPages, 1) }} 頁</span
-        >
-        <div class="btn-group" role="group" aria-label="競標管理分頁">
-          <button
-            class="btn btn-outline-secondary"
-            type="button"
-            :disabled="loading || submitting || pagination.page === 0"
-            @click="changePage(pagination.page - 1)"
-          >
-            上一頁
-          </button>
-          <button
-            class="btn btn-outline-secondary"
-            type="button"
-            :disabled="
-              loading ||
-              submitting ||
-              pagination.page + 1 >= pagination.totalPages
-            "
-            @click="changePage(pagination.page + 1)"
-          >
-            下一頁
-          </button>
-        </div>
-      </div>
+      <AdminAuctionPagination
+        :page="pagination.page"
+        :total-pages="pagination.totalPages"
+        :total-elements="pagination.totalElements"
+        :loading="loading"
+        :submitting="submitting"
+        @change="changePage"
+      />
+
     </section>
   </main>
 
-  <Teleport to="body">
-    <div
-      v-if="dialog.open"
-      class="action-dialog-overlay"
-      role="presentation"
-      @click.self="closeActionDialog"
-      @keydown.esc="closeActionDialog"
-    >
-      <section
-        class="card shadow-lg action-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="auction-action-dialog-title"
-      >
-        <form @submit.prevent="confirmAction">
-          <div
-            class="card-header d-flex justify-content-between align-items-start gap-3"
-          >
-            <div>
-              <p class="text-uppercase text-secondary small mb-1">操作確認</p>
-              <h2 id="auction-action-dialog-title" class="h5 mb-0">
-                {{ dialogTitle }}
-              </h2>
-            </div>
-            <button
-              class="btn-close"
-              type="button"
-              aria-label="關閉"
-              :disabled="submitting"
-              @click="closeActionDialog"
-            />
-          </div>
+  <AdminAuctionActionDialog
+    :open="dialog.open"
+    :action="dialog.action"
+    v-model:reason="dialog.reason"
+    v-model:confirmed="dialog.confirmed"
+    :error="dialog.error"
+    :title="dialogTitle"
+    :target-text="dialogTargetText"
+    :warning="dialogWarning"
+    :action-label="dialogActionLabel"
+    :alert-class="dialogAlertClass"
+    :submit-class="dialogSubmitClass"
+    :valid="dialogValid"
+    :submitting="submitting"
+    @close="closeActionDialog"
+    @confirm="confirmAction"
+  />
 
-          <div class="card-body">
-            <div class="alert mb-3" :class="dialogAlertClass">
-              {{ dialogWarning }}
-            </div>
-            <p class="fw-semibold mb-3">{{ dialogTargetText }}</p>
 
-            <div v-if="dialog.action !== 'restore'">
-              <label class="form-label" for="auction-action-reason"
-                >{{ dialogActionLabel }}原因</label
-              >
-              <textarea
-                id="auction-action-reason"
-                v-model="dialog.reason"
-                class="form-control"
-                rows="4"
-                maxlength="500"
-                autofocus
-                :placeholder="`請輸入${dialogActionLabel}原因（必填，最多 500 字）`"
-              />
-              <div class="d-flex justify-content-between form-text mb-3">
-                <span
-                  v-if="dialog.reason.trim().length === 0"
-                  class="text-danger"
-                  >原因不可空白</span
-                >
-                <span v-else>請填寫可供後續查核的具體原因</span>
-                <span>{{ dialog.reason.length }}/500</span>
-              </div>
-            </div>
-
-            <div class="form-check confirmation-check">
-              <input
-                id="auction-action-confirmed"
-                v-model="dialog.confirmed"
-                class="form-check-input"
-                type="checkbox"
-              />
-              <label class="form-check-label" for="auction-action-confirmed">
-                我已核對競標資料，確認執行{{ dialogActionLabel }}
-              </label>
-            </div>
-
-            <div
-              v-if="dialog.error"
-              class="alert alert-danger mt-3 mb-0"
-              role="alert"
-            >
-              {{ dialog.error }}
-            </div>
-          </div>
-
-          <div class="card-footer d-flex justify-content-end gap-2">
-            <button
-              class="btn btn-outline-secondary"
-              type="button"
-              :disabled="submitting"
-              @click="closeActionDialog"
-            >
-              取消
-            </button>
-            <button
-              class="btn"
-              :class="dialogSubmitClass"
-              type="submit"
-              :disabled="!dialogValid || submitting"
-            >
-              {{ submitting ? "處理中…" : `確認${dialogActionLabel}` }}
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
-  </Teleport>
 </template>
 
 <script setup>
+import AdminAuctionFilterPanel from "@/components/auction/admin/AdminAuctionFilterPanel.vue";
+import AdminAuctionBatchToolbar from "@/components/auction/admin/AdminAuctionBatchToolbar.vue";
+import AdminAuctionCard from "@/components/auction/admin/AdminAuctionCard.vue";
+import AdminAuctionPagination from "@/components/auction/admin/AdminAuctionPagination.vue";
+import AdminAuctionActionDialog from "@/components/auction/admin/AdminAuctionActionDialog.vue";
+
 import { computed, onMounted, reactive, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
-import { resolveAuctionImageUrl } from "@/utils/auctionImageUrl";
-import {
-  formatAuctionOrderStatus,
-  formatMemberAuctionStatus,
-} from "@/utils/auctionMemberStatus";
-import { formatAuctionTime, parseAuctionTime } from "@/utils/auctionTime";
+import { useRouter } from "vue-router";
+import { formatMemberAuctionStatus } from "@/utils/auctionMemberStatus";
+import { parseAuctionTime } from "@/utils/auctionTime";
 import {
   deleteAdminAuction,
   deleteAdminAuctionsBatch,
@@ -981,10 +603,6 @@ onMounted(() => loadAuctions(0));
 .admin-auctions {
   max-width: 1500px;
 }
-.filter-field-label {
-  white-space: nowrap;
-  word-break: keep-all;
-}
 /* Compact auction cards keep statuses and controls with their product. */
 .auction-list {
   display: grid;
@@ -1000,336 +618,9 @@ onMounted(() => loadAuctions(0));
   background: #fff;
   text-align: center;
 }
-.auction-card {
-  position: relative;
-  min-width: 0;
-  padding: 20px 22px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #fff;
-}
-.auction-card:hover {
-  border-color: #cfd4dc;
-}
-.auction-card.is-selected {
-  border-color: #98a2b3;
-  background: #fcfcfd;
-}
-.auction-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-}
-.auction-product {
-  display: flex;
-  flex: 1;
-  align-items: flex-start;
-  gap: 16px;
-  min-width: 0;
-}
-.auction-card.is-batch .auction-product {
-  padding-right: 36px;
-}
-.auction-card-controls {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: flex-start;
-  justify-content: flex-end;
-  max-width: 75%;
-  min-width: 0;
-}
-.auction-card.is-batch .auction-card-controls {
-  padding-right: 36px;
-}
-.auction-card.is-batch .batch-checkbox {
-  position: absolute;
-  top: 22px;
-  right: 22px;
-}
-.auction-statuses {
-  display: grid;
-  gap: 8px;
-  justify-items: start;
-}
-.auction-status-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #475467;
-  font-size: 0.875rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.auction-status-item .badge {
-  padding: 0.4em 0.65em;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-.auction-card-meta {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr) auto;
-  gap: 18px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-}
-.auction-card.is-batch .auction-card-meta {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr);
-}
-.auction-meta-actions {
-  align-self: center;
-  justify-self: end;
-}
-.auction-meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.auction-meta-item strong {
-  color: #111;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-.auction-field-label {
-  display: block;
-  margin-bottom: 3px;
-  color: #667085;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.35;
-  letter-spacing: 0.03em;
-}
-.auction-card-reasons {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  color: #667085;
-  background: #f8f9fa;
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
-@container (max-width: 680px) {
-  .auction-card-meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .auction-meta-time {
-    grid-column: 1;
-  }
-  .auction-card.is-batch .auction-meta-time {
-    grid-column: 1 / -1;
-  }
-  .auction-meta-actions {
-    grid-column: 2;
-  }
-}
-@container (max-width: 520px) {
-  .auction-card-head {
-    flex-wrap: wrap;
-    gap: 14px;
-  }
-  .auction-card-controls {
-    width: 100%;
-    max-width: none;
-  }
-}
 @media (max-width: 576px) {
   .auction-list {
     padding: 12px;
   }
-  .auction-card {
-    padding: 16px;
-  }
-  .auction-product {
-    gap: 12px;
-  }
-  .auction-card.is-batch .batch-checkbox {
-    top: 18px;
-    right: 16px;
-  }
-}
-.batch-checkbox {
-  width: 1.25rem;
-  height: 1.25rem;
-  margin: 0;
-  vertical-align: middle;
-  cursor: pointer;
-  background-color: #fff;
-  border: 1.5px solid #98a2b3;
-  border-radius: 5px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
-  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
-}
-.batch-checkbox:hover:not(:disabled) {
-  border-color: #344054;
-  box-shadow: 0 0 0 3px #f2f4f7;
-}
-.batch-checkbox:checked {
-  background-color: #111;
-  border-color: #111;
-  box-shadow: none;
-}
-.batch-checkbox:checked:hover:not(:disabled) {
-  background-color: #303030;
-  border-color: #303030;
-}
-.batch-checkbox:focus-visible {
-  outline: 2px solid #111;
-  outline-offset: 2px;
-  box-shadow: none;
-}
-.batch-checkbox:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-/* Batch controls follow the site's neutral admin action style. */
-.auction-batch-actions .auction-batch-count {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  padding: 0 12px;
-  color: #344054 !important;
-  background: #f2f4f7 !important;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.8rem !important;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.auction-action-buttons .btn {
-  min-height: 40px;
-  padding: 9px 14px;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  box-shadow: none;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
-}
-.auction-action-buttons .btn-warning,
-.auction-action-buttons .btn-outline-secondary {
-  color: #344054;
-  background: #fff;
-  border-color: #cfd4dc;
-}
-.auction-action-buttons .btn-warning:hover:not(:disabled),
-.auction-action-buttons .btn-outline-secondary:hover:not(:disabled) {
-  color: #111;
-  background: #f2f4f7;
-  border-color: #98a2b3;
-}
-.auction-action-buttons .btn-success {
-  color: #fff;
-  background: #111;
-  border-color: #111;
-}
-.auction-action-buttons .btn-success:hover:not(:disabled) {
-  color: #fff;
-  background: #303030;
-  border-color: #303030;
-}
-.auction-action-buttons .btn-danger {
-  color: #b42318;
-  background: #fff;
-  border-color: #f2c1c5;
-}
-.auction-action-buttons .btn-danger:hover:not(:disabled) {
-  color: #912018;
-  background: #fef3f2;
-  border-color: #e59a9f;
-}
-.auction-batch-actions .auction-select-page {
-  color: #111;
-  background: #f2f4f7;
-  border-color: #d0d5dd;
-}
-.auction-batch-actions .auction-select-page:hover:not(:disabled) {
-  color: #111;
-  background: #e9ecef;
-  border-color: #98a2b3;
-}
-.auction-action-buttons .btn:focus-visible {
-  outline: 2px solid #111;
-  outline-offset: 2px;
-  box-shadow: none;
-}
-.auction-action-buttons .btn:disabled {
-  color: #98a2b3;
-  background: #f8f9fa;
-  border-color: #e5e7eb;
-  opacity: 0.6;
-  box-shadow: none;
-}
-.product-info {
-  min-width: 0;
-}
-.auction-product-id {
-  margin-bottom: 2px;
-  color: #667085;
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-.auction-thumbnail {
-  width: 4rem;
-  height: 4rem;
-  flex: 0 0 4rem;
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.5rem;
-  object-fit: cover;
-  background: #fff;
-}
-.thumbnail-placeholder {
-  display: grid;
-  place-items: center;
-  color: #6c757d;
-  font-size: 0.75rem;
-  background: #f8f9fa;
-}
-.auction-name-link {
-  display: block;
-  overflow-wrap: anywhere;
-  word-break: normal;
-  color: #111;
-  font-size: 1.05rem;
-  font-weight: 700;
-  line-height: 1.35;
-  text-decoration: none;
-}
-.auction-name-link:hover,
-.auction-name-link:focus {
-  text-decoration: underline;
-}
-.reason-text {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
-.action-button {
-  min-width: 4.5rem;
-  white-space: nowrap;
-  box-shadow: none;
-}
-.action-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1080;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow-y: auto;
-  padding: 1.25rem;
-  background: rgba(17, 24, 39, 0.62);
-}
-.action-dialog {
-  width: min(100%, 36rem);
-}
-.confirmation-check {
-  padding: 0.9rem 0.9rem 0.9rem 2.4rem;
-  border: 1px solid var(--bs-border-color);
-  border-radius: 0.5rem;
-  background: var(--bs-light);
-}
-textarea {
-  resize: vertical;
 }
 </style>
