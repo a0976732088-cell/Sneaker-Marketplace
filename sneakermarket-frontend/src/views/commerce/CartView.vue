@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import CheckoutSteps from '@/components/commerce/CheckoutSteps.vue'
 import { getCurrentMember } from '@/service/authService'
 import { refreshCartCount } from '@/service/cartState'
+import { resolveProductImageUrl } from '@/utils/productImageUrl'
 
 const loading = ref(true)
 const errorMessage = ref('')
@@ -144,7 +145,7 @@ onUnmounted(() => {
         <input type="checkbox" :checked="item.selected" @change="toggleSelected(item)" style="accent-color: gray; margin-top: -25px;">
 
         <div>
-          <img :src="item.imageUrl" alt="" style="width: 120px; height: 120px; object-fit: cover;">
+          <img :src="resolveProductImageUrl(item.imageUrl)" alt="" style="width: 120px; height: 120px; object-fit: cover;">
           <p v-if="item.stock === 1" class="text-warning small mt-1 mb-0">所剩庫存不多，欲購從速。</p>
         </div>
 

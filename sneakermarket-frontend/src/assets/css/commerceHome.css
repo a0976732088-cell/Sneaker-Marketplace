@@ -1,0 +1,434 @@
+/* =========================================================
+   一般商城首頁（CommerceHomeView.vue）專用樣式
+   以 <style scoped src> 引入，只作用在這一頁
+   ========================================================= */
+
+.kicks-shop {
+  --kicks-ink: #111111;
+  --kicks-muted: #6c757d;
+  --kicks-line: #e7e3dc;
+  --kicks-cream: #efe6d6;
+  --kicks-gold: #b8955a;
+  --kicks-active-bg: #f1e8da;
+  --kicks-card-bg: #ffffff;
+}
+
+/* 所有 SVG 圖示共用：線條風格、跟著文字顏色 */
+.icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+/* ========== Banner ========== */
+.hero {
+  position: relative;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background-color: #1a1a1a;
+}
+
+.hero-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2014 / 781;
+  object-fit: cover;
+}
+
+/* 搜尋框與品牌標籤：大螢幕疊在圖片左下角、「嚴選球鞋」標語下方 */
+.hero-actions {
+  position: absolute;
+  left: 3.2%;
+  top: 83%;
+  width: 33%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* 整個搜尋列是一個膠囊，搜尋按鈕放在膠囊內右側 */
+.hero-search {
+  display: flex;
+  align-items: center;
+  height: 2.25rem;
+  padding: 0 0.2rem 0 0.9rem;
+  border: 1px solid rgba(239, 230, 214, 0.6);
+  border-radius: 999px;
+  background-color: rgba(20, 20, 20, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.hero-search-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  color: var(--kicks-cream);
+}
+
+.hero-search-field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.85rem;
+  color: #ffffff;
+}
+
+.hero-search-field input::placeholder {
+  color: rgba(239, 230, 214, 0.7);
+}
+
+.hero-search-btn {
+  height: 1.8rem;
+  padding: 0 1.2rem;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--kicks-ink);
+  color: var(--kicks-cream);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.hero-search-btn:hover {
+  background-color: var(--kicks-cream);
+  color: var(--kicks-ink);
+}
+
+.hero-brands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.hero-brand-chip {
+  padding: 0.2rem 0.8rem;
+  border: 1px solid rgba(239, 230, 214, 0.55);
+  border-radius: 999px;
+  background-color: rgba(17, 17, 17, 0.45);
+  color: var(--kicks-cream);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  transition: all 0.2s ease;
+}
+
+.hero-brand-chip:hover,
+.hero-brand-chip.active {
+  background-color: var(--kicks-cream);
+  border-color: var(--kicks-cream);
+  color: var(--kicks-ink);
+}
+
+/* 小於 1200px：圖片下方空間不夠，搜尋區改放到圖片下方的深色區塊 */
+@media (max-width: 1199.98px) {
+  .hero-actions {
+    position: static;
+    width: 100%;
+    gap: 0.6rem;
+    padding: 1rem;
+    background-color: #161616;
+  }
+
+  .hero-search {
+    height: 2.6rem;
+  }
+
+  .hero-search-btn {
+    height: 2.1rem;
+    background-color: var(--kicks-cream);
+    color: var(--kicks-ink);
+  }
+}
+
+/* ========== 列表標題列（維持原本樣式） ========== */
+.list-section {
+  scroll-margin-top: 60px;
+}
+
+.list-header {
+  position: sticky;
+  top: 56px;
+  z-index: 20;
+  background-color: #ffffff;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.sort-select {
+  border: none;
+  background-color: transparent;
+  box-shadow: none;
+  font-weight: 500;
+}
+
+.filter-toggle-btn {
+  font-weight: 500;
+}
+
+.sort-select:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* 標題「全部商品」可點擊，點了會清除所有篩選 */
+.title-reset-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.title-reset-btn:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+/* ========== 左側篩選欄（維持原本樣式） ========== */
+.filter-sidebar {
+  position: sticky;
+  top: 103px;
+  font-size: 0.82rem;
+}
+
+.filter-block {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.category-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.category-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.18rem 0;
+  cursor: pointer;
+  color: #212529;
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1.7;
+}
+
+.category-item.active {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.filter-group {
+  border-bottom: 1px solid #dee2e6;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.filter-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0.2rem 0;
+  font-weight: 600;
+  font-size: 0.98rem;
+  cursor: pointer;
+}
+
+.filter-icon {
+  color: #6c757d;
+  font-size: 1.1rem;
+}
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin-left: 0.35rem;
+  border-radius: 50%;
+  background-color: #111111;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+.filter-options {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+
+.filter-option input[type="checkbox"] {
+  accent-color: #111111;
+  width: 1rem;
+  height: 1rem;
+}
+
+/* 清除篩選：白底黑粗框膠囊，滑過去反轉成黑底白字（跟分頁的上一頁／下一頁同風格） */
+.clear-btn {
+  width: 100%;
+  height: 2.5rem;
+  margin-top: 0.5rem;
+  border: 1.5px solid #111111;
+  border-radius: 999px;
+  background-color: #ffffff;
+  color: #111111;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  transition: all 0.2s ease;
+}
+
+.clear-btn:hover {
+  background-color: #111111;
+  color: #ffffff;
+}
+
+/* ========== 商品卡片（維持原樣，未修改） ========== */
+.product-card {
+  transition: transform 0.2s ease;
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+}
+
+.product-card-img-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0;
+  background-color: #f1f1f1;
+}
+
+.product-card-img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  border-radius: 0;
+  transition: transform 0.3s ease;
+}
+
+.product-card:hover .product-card-img {
+  transform: scale(1.06);
+}
+
+.product-card-img-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 0.85rem;
+  aspect-ratio: 1 / 1;
+}
+
+.stock-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  background-color: #111111;
+  color: #fff;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.product-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ========== 分頁 ==========
+   不使用 Bootstrap 的 .pagination，顏色全部自己指定，避免被其他全域樣式影響
+   頁碼：圓形，目前頁為黑色實心；上一頁／下一頁：跟清除篩選同款的膠囊按鈕 */
+.kicks-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 3rem;
+}
+
+.page-btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background-color: transparent;
+  color: #111111;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.page-btn:hover:not(:disabled):not(.active) {
+  background-color: #f1f1f1;
+}
+
+.page-btn.active {
+  background-color: #111111;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.page-btn-text {
+  gap: 0.3rem;
+  width: auto;
+  padding: 0 1.2rem;
+  margin: 0 0.4rem;
+  border: 1.5px solid #111111;
+  border-radius: 999px;
+  background-color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.page-btn-text:hover:not(:disabled) {
+  background-color: #111111 !important;
+  color: #ffffff;
+}
+
+.page-btn:disabled {
+  border-color: #dddddd;
+  background-color: #ffffff;
+  color: #c4c4c4;
+  cursor: not-allowed;
+}

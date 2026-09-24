@@ -5,6 +5,7 @@ import { ref, onMounted, onUnmounted,computed } from 'vue'
 import { cartCount, refreshCartCount, cartIconPosition } from '@/service/cartState'
 import httpClient from '@/service/httpClient'
 import { useRouter } from 'vue-router'
+import { resolveProductImageUrl } from '@/utils/productImageUrl'
 
 
 const route = useRoute()
@@ -119,7 +120,7 @@ onUnmounted(() => {
       <div class="col-12 col-md-5">
         <img
           v-if="product.images && product.images.length > 0"
-          :src="product.images[0]"
+          :src="resolveProductImageUrl(product.images[0])"
           :alt="product.productName"
           class="detail-img"
         >
@@ -204,7 +205,7 @@ onUnmounted(() => {
     </div>
 
     <div class="cart-popup-body" v-if="addedItem">
-      <img v-if="addedItem.image" :src="addedItem.image" :alt="addedItem.productName" class="cart-popup-img">
+      <img v-if="addedItem.image" :src="resolveProductImageUrl(addedItem.image)" :alt="addedItem.productName" class="cart-popup-img">
       <div v-else class="cart-popup-img cart-popup-img-empty"></div>
 
       <div class="cart-popup-info">

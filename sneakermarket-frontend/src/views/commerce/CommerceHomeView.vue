@@ -3,8 +3,11 @@ import { ref, computed, onMounted } from "vue";
 import httpClient from "@/service/httpClient";
 import { getBrands } from "@/service/brandService";
 import { useRoute } from "vue-router"; // zwei導向分類
+import { resolveProductImageUrl } from "@/utils/productImageUrl";
 // 引入廣告顯示元件
 import AdvertisementDisplay from "@/components/advertisement/AdvertisementDisplay.vue";
+// Banner 圖片放在前端本地，打包時會一起帶走，不依賴網路或後端
+import heroBanner from "@/assets/images/hero-banner.jpg";
 
 const route = useRoute(); //zwei導向分類
 
@@ -27,6 +30,9 @@ const sortBy = ref("");
 const currentPage = ref(1);
 const pageSize = 9;
 
+// 商品列表區塊，Banner 搜尋或點品牌標籤後捲動到這裡
+const listSection = ref(null);
+
 const categories = [
   { id: 1, name: "籃球鞋" },
   { id: 2, name: "慢跑鞋" },
@@ -35,6 +41,8 @@ const categories = [
 ];
 
 const sizeOptions = [
+  "US 7",
+  "US 7.5",
   "US 8",
   "US 8.5",
   "US 9",
@@ -42,6 +50,8 @@ const sizeOptions = [
   "US 10",
   "US 10.5",
   "US 11",
+  "US 11.5",
+  "US 12",
 ];
 
 const currentCategoryLabel = computed(() => {
@@ -100,6 +110,10 @@ async function loadBrands() {
   }
 }
 
+function scrollToList() {
+  listSection.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function toggleCategory(id) {
   categoryId.value = categoryId.value === id ? null : id;
   fetchProducts();
@@ -122,10 +136,30 @@ function clearFilters() {
   fetchProducts();
 }
 
+// 點標題「全部商品」：清掉所有篩選和搜尋關鍵字，回到全部商品
+function resetAll() {
+  keyword.value = "";
+  clearFilters();
+}
+
+// Banner 搜尋框：搜尋後捲動到商品列表
+function searchFromHero() {
+  fetchProducts();
+  scrollToList();
+}
+
+// Banner 品牌標籤：套用品牌篩選、展開側欄的品牌區塊，並捲動到商品列表
+function pickBrandFromHero(id) {
+  toggleBrand(id);
+  openBrand.value = true;
+  showFilters.value = true;
+  scrollToList();
+}
+
 function goToPage(page) {
   if (page < 1 || page > totalPages.value) return;
   currentPage.value = page;
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  scrollToList();
 }
 
 function formatPrice(price) {
@@ -141,51 +175,69 @@ onMounted(() => {
 </script>
 
 <template>
-  <section>
+  <section class="kicks-shop">
     <!-- 一般商城顯示專用的靜態、 BANNER 與 SMALL_BLOCK -->
     <!-- 移除了:banner-order="1" :static-banner="true" -->
     <AdvertisementDisplay
       :placements="['SMALL_BLOCK']"
       :small-block-order="1"
     />
-    <div class="shop-hero">
-      <div class="container py-5">
-        <span class="hero-icon" aria-hidden="true">👟</span>
-        <div class="hero-content">
-          <p
-            class="text-uppercase small text-white-50 mb-2 fw-semibold"
-            style="letter-spacing: 0.15em"
-          >
-            酷客 Kicks
-          </p>
-          <h1 class="display-5 fw-bold mb-2">一般商城</h1>
-          <p class="text-white-50 mb-4">嚴選球鞋，找到你的下一雙戰靴</p>
 
-          <form
-            class="d-flex gap-2 hero-search"
-            @submit.prevent="fetchProducts"
-          >
-            <input
-              v-model="keyword"
-              type="text"
-              class="form-control"
-              placeholder="搜尋商品名稱"
-            />
-            <button type="submit" class="btn btn-light px-4 hero-search-btn">
-              搜尋
-            </button>
+    <!-- ========== Banner ========== -->
+    <div class="container pt-4">
+      <div class="hero">
+        <img
+          :src="heroBanner"
+          alt="KICKS - Find your next pair"
+          class="hero-img"
+        />
+
+        <div class="hero-actions">
+          <form class="hero-search" @submit.prevent="searchFromHero">
+            <div class="hero-search-field">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                v-model="keyword"
+                type="text"
+                placeholder="搜尋商品名稱，例如 Air Jordan 1"
+              />
+            </div>
+            <button type="submit" class="hero-search-btn">搜尋</button>
           </form>
+
+          <div v-if="!loadingBrands" class="hero-brands">
+            <button
+              v-for="brand in brands"
+              :key="brand.brandId"
+              type="button"
+              class="hero-brand-chip"
+              :class="{ active: brandId === brand.brandId }"
+              @click="pickBrandFromHero(brand.brandId)"
+            >
+              {{ brand.brandName }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="container py-4">
+    <!-- ========== 商品列表 ========== -->
+    <div ref="listSection" class="container py-4 list-section">
       <div
         class="d-flex justify-content-between align-items-center flex-wrap gap-2 list-header"
       >
         <h2 class="h4 fw-bold mb-0">
-          {{ currentCategoryLabel
-          }}<span v-if="categoryId && !loading"> ({{ products.length }})</span>
+          <button
+            type="button"
+            class="title-reset-btn"
+            title="查看全部商品"
+            @click="resetAll"
+          >
+            {{ currentCategoryLabel }}</button
+          ><span v-if="categoryId && !loading"> ({{ products.length }})</span>
         </h2>
         <div class="d-flex align-items-center gap-3">
           <button
@@ -209,6 +261,7 @@ onMounted(() => {
       </div>
 
       <div class="row g-4">
+        <!-- ========== 左側篩選欄 ========== -->
         <aside v-if="showFilters" class="col-12 col-md-2">
           <div class="filter-sidebar">
             <div class="filter-block">
@@ -284,7 +337,7 @@ onMounted(() => {
 
             <button
               type="button"
-              class="btn btn-outline-dark btn-sm w-100"
+              class="clear-btn"
               @click="clearFilters"
             >
               清除篩選
@@ -292,6 +345,7 @@ onMounted(() => {
           </div>
         </aside>
 
+        <!-- ========== 商品卡片（維持原樣） ========== -->
         <div :class="showFilters ? 'col-12 col-md-10' : 'col-12'">
           <div v-if="loading" class="text-secondary">載入中...</div>
 
@@ -314,7 +368,7 @@ onMounted(() => {
                     <div class="product-card-img-wrap">
                       <img
                         v-if="p.imageUrl"
-                        :src="p.imageUrl"
+                        :src="resolveProductImageUrl(p.imageUrl)"
                         :alt="p.productName"
                         class="product-card-img"
                       />
@@ -338,32 +392,40 @@ onMounted(() => {
               </div>
             </div>
 
-            <nav v-if="totalPages > 1" class="mt-5">
-              <ul class="pagination justify-content-center">
-                <li class="page-item" :class="{ disabled: currentPage === 1 }">
-                  <button class="page-link" @click="goToPage(currentPage - 1)">
-                    上一頁
-                  </button>
-                </li>
-                <li
-                  v-for="page in totalPages"
-                  :key="page"
-                  class="page-item"
-                  :class="{ active: page === currentPage }"
-                >
-                  <button class="page-link" @click="goToPage(page)">
-                    {{ page }}
-                  </button>
-                </li>
-                <li
-                  class="page-item"
-                  :class="{ disabled: currentPage === totalPages }"
-                >
-                  <button class="page-link" @click="goToPage(currentPage + 1)">
-                    下一頁
-                  </button>
-                </li>
-              </ul>
+            <!-- ========== 分頁 ========== -->
+            <nav v-if="totalPages > 1" class="kicks-pagination" aria-label="商品分頁">
+              <button
+                type="button"
+                class="page-btn page-btn-text"
+                :disabled="currentPage === 1"
+                @click="goToPage(currentPage - 1)"
+              >
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+                上一頁
+              </button>
+              <button
+                v-for="page in totalPages"
+                :key="page"
+                type="button"
+                class="page-btn"
+                :class="{ active: page === currentPage }"
+                @click="goToPage(page)"
+              >
+                {{ page }}
+              </button>
+              <button
+                type="button"
+                class="page-btn page-btn-text"
+                :disabled="currentPage === totalPages"
+                @click="goToPage(currentPage + 1)"
+              >
+                下一頁
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
             </nav>
           </template>
         </div>
@@ -374,228 +436,5 @@ onMounted(() => {
   </section>
 </template>
 
-<style scoped>
-.shop-hero {
-  background: linear-gradient(135deg, #0a0a0a 0%, #232323 100%);
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
-
-.hero-icon {
-  position: absolute;
-  right: -1rem;
-  top: 50%;
-  transform: translateY(-50%) rotate(-15deg);
-  font-size: 14rem;
-  line-height: 1;
-  opacity: 0.1;
-  pointer-events: none;
-  font-family:
-    "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-}
-
-.hero-search {
-  max-width: 380px;
-}
-
-.hero-search input {
-  font-size: 0.95rem;
-}
-
-.hero-search-btn {
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.list-header {
-  position: sticky;
-  top: 56px;
-  z-index: 20;
-  background-color: #ffffff;
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-}
-
-.sort-select {
-  border: none;
-  background-color: transparent;
-  box-shadow: none;
-  font-weight: 500;
-}
-
-.filter-toggle-btn {
-  font-weight: 500;
-}
-
-.sort-select:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-.filter-sidebar {
-  position: sticky;
-  top: 103px;
-  font-size: 0.82rem;
-}
-
-.filter-block {
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.category-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.category-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 0.18rem 0;
-  cursor: pointer;
-  color: #212529;
-  font-size: 1.05rem;
-  font-weight: 500;
-  line-height: 1.7;
-}
-
-.category-item.active {
-  font-weight: 700;
-  text-decoration: underline;
-}
-
-.filter-group {
-  border-bottom: 1px solid #dee2e6;
-  padding-bottom: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.filter-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  background: none;
-  border: none;
-  padding: 0;
-  font-weight: 600;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.filter-icon {
-  color: #6c757d;
-}
-
-.filter-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  margin-left: 0.35rem;
-  border-radius: 50%;
-  background-color: #111111;
-  color: #fff;
-  font-size: 0.6rem;
-  font-weight: 600;
-}
-
-.filter-options {
-  margin-top: 0.4rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.filter-option {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-
-.filter-option input[type="checkbox"] {
-  accent-color: #111111;
-  width: 0.85rem;
-  height: 0.85rem;
-}
-
-.product-card {
-  transition: transform 0.2s ease;
-}
-
-.product-card:hover {
-  transform: translateY(-4px);
-}
-
-.product-card-img-wrap {
-  position: relative;
-  overflow: hidden;
-  border-radius: 0;
-  background-color: #f1f1f1;
-}
-
-.product-card-img {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  display: block;
-  border-radius: 0;
-  transition: transform 0.3s ease;
-}
-
-.product-card:hover .product-card-img {
-  transform: scale(1.06);
-}
-
-.product-card-img-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #999;
-  font-size: 0.85rem;
-  aspect-ratio: 1 / 1;
-}
-
-.stock-badge {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  background-color: #111111;
-  color: #fff;
-  font-size: 0.7rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 0.25rem;
-}
-
-.product-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.pagination .page-link {
-  color: #212529;
-}
-
-.pagination .page-item.active .page-link {
-  background-color: #212529;
-  border-color: #212529;
-}
-</style>
+<!-- 樣式獨立放在 assets/css，只作用在這一頁（scoped），不會影響其他組員的頁面 -->
+<style scoped src="../../assets/css/commerceHome.css"></style>
