@@ -123,7 +123,7 @@ function formatPrice(price) {
             </div>
           </RouterLink>
 
-          <button
+          <!-- <button
             type="button"
             class="favorite-button"
             :class="{ active: isFavoriteProduct(product.productId) }"
@@ -138,7 +138,7 @@ function formatPrice(price) {
             <span aria-hidden="true">
               {{ isFavoriteProduct(product.productId) ? "♥" : "♡" }}
             </span>
-          </button>
+          </button> -->
         </article>
       </div>
     </Transition>

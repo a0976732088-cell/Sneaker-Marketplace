@@ -134,7 +134,7 @@
   font-style: normal;
   font-weight: 700;
 }
-.ad-panel {
+.campaign-management-panel {
   /* 廣告列表填滿工作區剩餘高度，資料較少時版面也不會縮在上方。 */
   display: flex;
   flex: 1;

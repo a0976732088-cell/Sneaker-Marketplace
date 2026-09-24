@@ -1,8 +1,6 @@
 package com.project.sneakermarket.advertisement.service;
 
 import com.project.sneakermarket.advertisement.dto.AdvertisementStatsResponse;
-import com.project.sneakermarket.advertisement.entity.Advertisement;
-import com.project.sneakermarket.advertisement.entity.AdvertisementStats;
 import com.project.sneakermarket.advertisement.repository.AdvertisementRepository;
 import com.project.sneakermarket.advertisement.repository.AdvertisementStatsRepository;
 import com.project.sneakermarket.advertisement.repository.AdvertisementStatsRepository.AdvertisementStatsTotalProjection;
@@ -46,7 +44,7 @@ public class AdvertisementStatsService {
 
     /**
      * 同一個 Session 當天已經曝光、點擊過哪些廣告。
-     *
+     * <p>
      * 日期改變時會建立新的狀態，讓隔天可以重新計算。
      */
     private static final class AdvertisementTrackingState
@@ -78,11 +76,7 @@ public class AdvertisementStatsService {
                 return;
             }
 
-            AdvertisementStats stats = getOrCreateTodayStats(adId);
-
-            stats.setViewCount(stats.getViewCount() + 1);
-
-            advertisementStatsRepository.save(stats);
+            incrementTodayStats(adId, 1L, 0L);
 
             // 資料庫操作成功後，再記錄到 Session
             trackingState.viewedAdIds.add(adId);
@@ -100,8 +94,6 @@ public class AdvertisementStatsService {
                 return;
             }
 
-            AdvertisementStats stats = getOrCreateTodayStats(adId);
-
             /*
              * 使用者可能在廣告顯示未滿一秒時就點擊。
              * 如果尚未計算曝光，點擊時補上一筆曝光，
@@ -110,13 +102,7 @@ public class AdvertisementStatsService {
             boolean needsView =
                     !trackingState.viewedAdIds.contains(adId);
 
-            if (needsView) {
-                stats.setViewCount(stats.getViewCount() + 1);
-            }
-
-            stats.setClickCount(stats.getClickCount() + 1);
-
-            advertisementStatsRepository.save(stats);
+            incrementTodayStats(adId, needsView ? 1L : 0L, 1L);
 
             if (needsView) {
                 trackingState.viewedAdIds.add(adId);
@@ -237,35 +223,26 @@ public class AdvertisementStatsService {
         return newState;
     }
 
-    // 共用邏輯，觀看點擊相同流程
-    private AdvertisementStats getOrCreateTodayStats(Long adId) {
-        // 執行悲觀鎖定
-        Advertisement advertisement =
-                advertisementRepository.findByIdForUpdate(adId)
-                        // 需要時才建立例外
-                        .orElseThrow(() ->
-                                new BusinessException("找不到指定的廣告"));
+    private void incrementTodayStats(
+            Long adId,
+            Long viewDelta,
+            Long clickDelta
+    ) {
+        if (!advertisementRepository.existsById(adId)) {
+            throw new BusinessException("找不到指定的廣告");
+        }
 
-        LocalDate today = LocalDate.now(TAIPEI_ZONE);
+        LocalDate statDate = LocalDate.now(TAIPEI_ZONE);
+        LocalDateTime updatedAt = LocalDateTime.now(TAIPEI_ZONE);
 
-        return advertisementStatsRepository
-                .findByAdvertisementAdIdAndStatDate(adId, today)
-                // 資料不存在時才執行，有資料回傳，沒資料建立新stats
-                .orElseGet(() -> {
-                    AdvertisementStats stats = new AdvertisementStats();
-
-                    stats.setAdvertisement(advertisement);
-                    stats.setStatDate(today);
-                    stats.setViewCount(0L);
-                    stats.setClickCount(0L);
-
-                    return stats;
-                });
+        advertisementStatsRepository.incrementOrCreate(
+                adId, statDate, viewDelta, clickDelta, updatedAt
+        );
     }
 
     // 計算CTR = (點擊/曝光) x 100%
     private BigDecimal calculateCtr(long views, long clicks) {
-        if (views <= 0){
+        if (views <= 0) {
             return BigDecimal.ZERO.setScale(2);
         }
         // 方法鏈式呼叫

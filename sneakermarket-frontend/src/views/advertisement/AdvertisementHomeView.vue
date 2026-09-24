@@ -127,7 +127,7 @@ onUnmounted(() => {
         </article>
       </div>
 
-      <div class="ad-panel">
+      <div class="campaign-management-panel">
         <AdvertisementFilterBar
           v-model:active-tab="activeTab"
           v-model:keyword="keyword"
