@@ -5,12 +5,15 @@ export function useAdvertisementForm(notify) {
   const IMAGE_UPLOAD_RULES = {
     BANNER: {
       label: "首頁橫幅",
-      width: 2000,
-      height: 600,
+      // 建議使用與一般商城相同的圖片尺寸
+      width: 2014,
+      height: 781,
+      // 最低寬度仍維持 1200，高度依新比例換算
       minimumWidth: 1200,
-      minimumHeight: 360,
-      ratio: 10 / 3,
-      ratioLabel: "10:3",
+      minimumHeight: 465,
+      // 與一般商城 Hero Banner 相同比例
+      ratio: 2014 / 781,
+      ratioLabel: "2014:781（約 2.58:1）",
     },
 
     POPUP: {

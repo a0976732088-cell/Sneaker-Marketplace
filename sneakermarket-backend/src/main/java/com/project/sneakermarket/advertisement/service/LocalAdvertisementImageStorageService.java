@@ -38,9 +38,9 @@ public class LocalAdvertisementImageStorageService implements AdvertisementImage
                     new ImageRule(
                             "首頁橫幅",
                             1200,
-                            360,
-                            10.0 / 3.0,
-                            "10:3"
+                            465,
+                            2014.0 / 781.0,
+                            "2014:781(約2.58:1)"
                     ),
 
                     AdvertisementPlacement.POPUP,
