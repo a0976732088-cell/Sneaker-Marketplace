@@ -37,6 +37,26 @@
         </ul>
 
         <ul class="navbar-nav ms-auto align-items-lg-center right-links">
+          <li v-if="currentMember" class="nav-item">
+            <RouterLink
+              class="nav-link auction-create-link"
+              to="/auctions/create"
+            >
+              <svg
+                class="auction-create-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0s-.83-2.17 0-3L11 10" />
+                <path d="m16 16 6-6" />
+                <path d="m8 8 6-6" />
+                <path d="m9 7 8 8" />
+                <path d="m21 11-8-8" />
+              </svg>
+              <span>建立競標</span>
+            </RouterLink>
+          </li>
+
           <li class="nav-item" ref="cartLinkWrapper">
             <RouterLink class="nav-link cart-link" to="/cart" aria-label="購物車">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -129,12 +149,6 @@
                 </button>
               </li>
             </ul>
-          </li>
-
-          <li v-if="isAuctionPage" class="nav-item">
-            <RouterLink class="nav-link" to="/auctions/create">
-              建立競標
-            </RouterLink>
           </li>
         </ul>
       </div>
@@ -232,10 +246,6 @@ watch(
     immediate: true,
   },
 );
-
-const isAuctionPage = computed(() => {
-  return route.path.startsWith("/auctions");
-});
 
 const isNoticeOpen = ref(false);
 
@@ -445,6 +455,23 @@ onUnmounted(() => {
 .main-links .nav-link.router-link-active {
   border-bottom-color: #e7664e;
   color: #202326;
+}
+
+.auction-create-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auction-create-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .notification-button {

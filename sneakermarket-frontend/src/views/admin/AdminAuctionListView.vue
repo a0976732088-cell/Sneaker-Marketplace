@@ -2,7 +2,7 @@
   <main class="container py-4 admin-auctions">
     <header class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 admin-page-heading">
       <div>
-        <p class="text-uppercase text-secondary small mb-1 admin-page-eyebrow">SNEAKERMARKET ADMIN</p>
+        <p class="text-uppercase text-secondary small mb-1 admin-page-eyebrow">酷客 Kicks ADMIN</p>
         <h1 class="h3 mb-1">競標管理</h1>
         <p class="text-secondary mb-0 admin-page-description">
           下架可恢復公開顯示；刪除僅能在競標下架後執行。

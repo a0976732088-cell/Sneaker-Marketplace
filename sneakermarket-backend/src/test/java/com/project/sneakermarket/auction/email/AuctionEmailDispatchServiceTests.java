@@ -97,11 +97,15 @@ class AuctionEmailDispatchServiceTests {
         assertTrue(plainText.contains(productName));
         assertTrue(plainText.contains("https://example.invalid" + route));
         assertTrue(plainText.contains("※ 防詐騙提醒 ※"));
+        String fraudReminder = "酷客 Kicks 不會透過 Email 要求您提供密碼、驗證碼或匯款。";
+        assertTrue(plainText.contains(fraudReminder));
         assertTrue(html.contains("background:#f5f7fa"));
         assertTrue(html.contains("background:#ffffff"));
         assertTrue(html.contains("background:#26313d"));
         assertTrue(html.contains("cid:brandLogo"));
         assertTrue(html.contains("※ 防詐騙提醒 ※"));
+        assertTrue(html.contains(fraudReminder));
+        assertTrue(html.contains("alt=\"酷客 Kicks\""));
         assertTrue(html.contains(cta));
         assertTrue(html.contains("https://example.invalid" + route));
         assertTrue(html.contains("SneakerMarket &lt;測試&gt; &amp; " + type));

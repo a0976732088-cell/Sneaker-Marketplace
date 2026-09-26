@@ -14,3 +14,13 @@ export function formatAuctionTime(value) {
     day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
   }).format(date);
 }
+
+export function formatAuctionTimeWithSeconds(value) {
+  const date = parseAuctionTime(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei", year: "numeric", month: "2-digit",
+    day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+}

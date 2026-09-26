@@ -54,7 +54,7 @@ public class AuctionEmailDispatchService {
             helper.setTo(log.getRecipientEmail());
             helper.setSubject(log.getSubject());
             helper.setText(content.plainText(), content.html());
-            helper.addInline("brandLogo", new ClassPathResource("logoPhoto/05_banner_white.png"), "image/png");
+            helper.addInline("brandLogo", new ClassPathResource("logoPhoto/newLogo_rectangle.png"), "image/png");
             sender.send(message);
             log.setSendStatus(AuctionEmailSendStatus.SENT);
             log.setSentAt(time.now());
@@ -114,7 +114,7 @@ public class AuctionEmailDispatchService {
         String cta = ctaLabel(log.getEmailType());
         String plainText = details + "\n查看詳情：" + destinationUrl
                 + "\n\n※ 防詐騙提醒 ※"
-                + "\nSneakerMarket 不會透過 Email 要求您提供密碼、驗證碼或匯款。"
+                + "\n酷客 Kicks 不會透過 Email 要求您提供密碼、驗證碼或匯款。"
                 + "\n如收到可疑訊息，請勿點擊不明連結。";
         return new EmailContent(plainText, htmlMessage(log.getSubject(), htmlDetails, destinationUrl, cta));
     }
@@ -173,7 +173,7 @@ public class AuctionEmailDispatchService {
                             <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%%;">
                               <tr>
                                 <td style="width:48%%;padding-right:22px;vertical-align:middle;">
-                                  <img src="cid:brandLogo" alt="SneakerMarket" width="300"
+                                  <img src="cid:brandLogo" alt="酷客 Kicks" width="300"
                                        style="display:block;width:100%%;max-width:220px;height:auto;border:0;">
                                 </td>
                                 <td style="vertical-align:middle;text-align:center;color:#111827;">
@@ -181,7 +181,7 @@ public class AuctionEmailDispatchService {
                                     ※ 防詐騙提醒 ※
                                   </p>
                                   <p style="margin:0;font-size:14px;line-height:1.8;color:#374151;">
-                                    SneakerMarket 不會透過 Email 要求您提供密碼、驗證碼或匯款。<br>
+                                    酷客 Kicks 不會透過 Email 要求您提供密碼、驗證碼或匯款。<br>
                                     如收到可疑訊息，請勿點擊不明連結。
                                   </p>
                                 </td>

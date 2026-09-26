@@ -174,10 +174,10 @@ public class AuctionQueryService {
             );
         }
 
-        // 查詢此競標所有成功出價，Repository 已依時間由新到舊排序
+        // 查詢此競標所有成功出價；DATETIME2(0) 同秒時以 bidId 維持確定的最新到最舊順序
         List<AuctionBid> bids =
                 auctionBidRepository
-                        .findByAuctionIdOrderByCreatedAtDesc(
+                        .findByAuctionIdOrderByCreatedAtDescBidIdDesc(
                                 auctionId
                         );
 

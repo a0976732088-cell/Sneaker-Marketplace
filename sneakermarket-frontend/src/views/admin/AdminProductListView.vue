@@ -97,7 +97,7 @@ onMounted(() => {
   <div class="container py-5">
     <header class="d-flex justify-content-between align-items-center mb-4 admin-page-heading">
       <div>
-        <p class="admin-page-eyebrow">SNEAKERMARKET ADMIN</p>
+        <p class="admin-page-eyebrow">酷客 Kicks ADMIN</p>
         <h1 class="h2 mb-1">商品管理</h1>
         <p class="text-secondary mb-0 admin-page-description">一般商城商品列表</p>
       </div>

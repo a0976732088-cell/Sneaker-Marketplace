@@ -27,9 +27,6 @@ const paginationSource = await readSource(
 const auctionServiceSource = await readSource(
   new URL("../src/service/auctionService.js", import.meta.url),
 );
-const commerceSource = await readSource(
-  new URL("../src/views/commerce/CommerceHomeView.vue", import.meta.url),
-);
 const detailSource = await readSource(
   new URL("../src/views/auction/AuctionDetailView.vue", import.meta.url),
 );
@@ -340,8 +337,11 @@ test("storefront Hero keeps the search form and delegates state and submit to th
   assert.match(heroTag, /v-model=["']keyword["']/);
   assert.match(heroTag, /:loading=["']loading["']/);
   assert.match(heroTag, /@search=["']searchAuctions["']/);
-  assert.match(heroSource, /<h1\s+class=["'][^"']*\bdisplay-5\b[^"']*\bfw-bold\b/);
-  assert.match(heroSource, /class=["'][^"']*\bd-flex\b[^"']*\bgap-2\b[^"']*\bhero-search\b/);
+  assert.match(
+    heroSource,
+    /<h1\s+id=["']auction-hero-title["']\s+class=["']hero-title["']>競標商城<\/h1>/,
+  );
+  assert.match(heroSource, /<form[\s\S]*?class=["']hero-search["'][\s\S]*?role=["']search["']/);
   assert.match(heroSource, /@submit\.prevent=["']emit\('search'\)["']/);
   assert.match(heroSource, /v-model=["']keywordModel["']/);
   assert.match(heroSource, /const\s+keywordModel\s*=\s*computed\s*\(/);
@@ -409,7 +409,7 @@ test("auction list size checkboxes expose the supported US sizes in order", () =
   assert.doesNotMatch(sizeFilter, /<select\b/);
 });
 
-test("auction storefront keeps the commerce layout with readable search and filter text", () => {
+test("auction storefront keeps the editorial Hero and readable search and filter text", () => {
   const heroStyle = section(
     heroSource,
     /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
@@ -425,26 +425,35 @@ test("auction storefront keeps the commerce layout with readable search and filt
     /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
     "</style>",
   );
-  const commerceStyle = section(
-    commerceSource,
-    /<style\b(?=[^>]*\bscoped\b)[^>]*>/,
-    "</style>",
-  );
+  for (const className of [
+    "hero-search",
+    "hero-search-field",
+    "hero-search-icon",
+    "hero-search-btn",
+    "hero-search-arrow",
+    "hero-visual",
+    "hero-features",
+  ]) {
+    assert.match(heroSource, new RegExp('class=["\'][^"\']*\\b' + className + '\\b'));
+  }
+  assert.match(heroSource, /placeholder=["']搜尋球鞋名稱、型號或品牌["']/);
+  assert.match(heroSource, /aria-label=["']酷客 Kicks["']/);
+  assert.doesNotMatch(heroSource, />\s*SneakerMarket\s*</);
+  assert.doesNotMatch(heroSource, /👟|\bdisplay-5\b|\bbtn-light\b|\bform-control\b/);
+  assert.match(heroSource, /auction-hero-editorial\.png/);
 
-  assert.match(heroSource, /class=["'][^"']*\bd-flex\b[^"']*\bgap-2\b[^"']*\bhero-search\b/);
-  assert.match(heroSource, /class=["'][^"']*\bbtn-light\b[^"']*\bpx-4\b[^"']*\bhero-search-btn\b/);
-  for (const style of [commerceStyle, heroStyle]) {
-    assert.match(style, /\.hero-search\s*\{[^}]*max-width\s*:\s*380px/);
-  }
-  for (const style of [commerceStyle, filterStyle]) {
-    assert.match(
-      style,
-      /\.sort-select\s*\{[^}]*border\s*:\s*(?:none|0)[^}]*background-color\s*:\s*transparent[^}]*font-weight\s*:\s*500/,
-    );
-  }
-  assert.match(commerceStyle, /\.hero-search input\s*\{[^}]*font-size\s*:\s*0\.95rem/);
-  assert.match(commerceStyle, /\.filter-sidebar\s*\{[^}]*font-size\s*:\s*0\.82rem/);
-  assert.match(heroStyle, /\.hero-search input\s*\{[^}]*font-size\s*:\s*1rem/);
+  assert.match(heroStyle, /\.auction-hero\s*\{[^}]*aspect-ratio\s*:\s*2014\s*\/\s*781/);
+  assert.match(heroStyle, /\.auction-hero\s*\{[^}]*border-radius\s*:\s*1\.25rem/);
+  assert.match(heroStyle, /#f5eee6|#f6f0e9/);
+  assert.match(heroStyle, /\.hero-visual\s*\{[^}]*width\s*:\s*60%/);
+  assert.match(heroStyle, /\.hero-search\s*\{[^}]*max-width\s*:\s*600px/);
+  assert.match(heroStyle, /\.hero-search:focus-within\s*\{/);
+  assert.match(heroStyle, /@media\s*\(max-width:\s*767\.98px\)/);
+  assert.match(
+    filterStyle,
+    /\.sort-select\s*\{[^}]*border\s*:\s*(?:none|0)[^}]*background-color\s*:\s*transparent[^}]*font-weight\s*:\s*500/,
+  );
+  assert.match(heroStyle, /\.hero-search-field input\s*\{[^}]*font-size\s*:\s*1rem/);
   assert.match(filterStyle, /\.filter-sidebar\s*\{[^}]*font-size\s*:\s*0\.95rem/);
 
   assert.match(filterSource, /<h2\s+class=["'][^"']*\bh4\b[^"']*\bfw-bold\b/);
@@ -767,7 +776,7 @@ test("auction detail panels retain the complete public commerce presentation", (
   assert.match(historySource, /v-if="bids\.length === 0"/);
   assert.match(historySource, /bid\.bidderName \|\| "會員資料未提供"/);
   assert.match(historySource, /formatTwd\(bid\.bidAmount\)/);
-  assert.match(historySource, /formatAuctionTime\(bid\.createdAt\)/);
+  assert.match(historySource, /formatAuctionTimeWithSeconds\(bid\.createdAt\)/);
 });
 
 test("auction detail combines shipping and meetup into one delivery presentation", () => {

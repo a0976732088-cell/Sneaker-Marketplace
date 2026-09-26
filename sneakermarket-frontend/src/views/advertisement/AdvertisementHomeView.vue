@@ -64,7 +64,7 @@ onUnmounted(() => {
     <main class="ad-workspace">
       <header class="workspace-header admin-page-heading">
         <div>
-          <div class="eyebrow admin-page-eyebrow">SNEAKERMARKET ADMIN</div>
+          <div class="eyebrow admin-page-eyebrow">酷客 Kicks ADMIN</div>
           <h1>廣告管理</h1>
           <p class="admin-page-description">建立、排程並追蹤平台上的每一則廣告活動。</p>
         </div>

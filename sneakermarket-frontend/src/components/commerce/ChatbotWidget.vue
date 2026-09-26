@@ -34,7 +34,7 @@
             <circle cx="38" cy="40" r="2.6" fill="#37373c" />
             <path d="M 24 46 Q 32 51 40 46" fill="none" stroke="#37373c" stroke-width="2.2" stroke-linecap="round" />
           </svg>
-          <span>SneakerMarket 客服機器人</span>
+          <span>酷客 Kicks 客服機器人</span>
         </div>
         <button class="chatbot-close-btn" @click="isOpen = false">✕</button>
       </div>

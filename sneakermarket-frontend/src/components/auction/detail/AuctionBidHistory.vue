@@ -1,6 +1,6 @@
 <script setup>
 import { formatTwd } from "@/utils/auctionMoney";
-import { formatAuctionTime } from "@/utils/auctionTime";
+import { formatAuctionTimeWithSeconds } from "@/utils/auctionTime";
 
 defineProps({
   bids: {
@@ -36,7 +36,7 @@ defineProps({
               {{ bid.bidderName || "會員資料未提供" }}
             </td>
             <td>{{ formatTwd(bid.bidAmount) }}</td>
-            <td>{{ formatAuctionTime(bid.createdAt) }}</td>
+            <td>{{ formatAuctionTimeWithSeconds(bid.createdAt) }}</td>
           </tr>
         </tbody>
       </table>

@@ -257,7 +257,7 @@ class AuctionQueryContractTests {
 
     @Test
     void bidHistoryReturnsNamesWithOneBatchMemberQuery() {
-        when(bids.findByAuctionIdOrderByCreatedAtDesc(12L)).thenReturn(List.of(
+        when(bids.findByAuctionIdOrderByCreatedAtDescBidIdDesc(12L)).thenReturn(List.of(
                 bid(42L, "6000", 3), bid(43L, "5500", 2), bid(42L, "5000", 1)));
         when(members.findAllById(any())).thenReturn(List.of(
                 member(42L, "王小明"), member(43L, "陳小華")));
@@ -266,6 +266,8 @@ class AuctionQueryContractTests {
 
         assertEquals(List.of("王小明", "陳小華", "王小明"),
                 result.stream().map(BidHistoryResponse::bidderName).toList());
+        verify(bids).findByAuctionIdOrderByCreatedAtDescBidIdDesc(12L);
+        verify(bids, never()).findByAuctionIdOrderByCreatedAtDesc(12L);
         verify(members, times(1)).findAllById(any());
         verify(members, never()).findById(anyLong());
     }
@@ -277,7 +279,7 @@ class AuctionQueryContractTests {
         when(products.findAllById(any())).thenReturn(List.of(product));
         when(members.findAllById(any())).thenReturn(List.of());
         when(members.findById(42L)).thenReturn(Optional.empty());
-        when(bids.findByAuctionIdOrderByCreatedAtDesc(12L))
+        when(bids.findByAuctionIdOrderByCreatedAtDescBidIdDesc(12L))
                 .thenReturn(List.of(bid(99L, "5000", 1)));
 
         assertNull(query.searchAuctions(new AuctionSearchCriteria(), PageRequest.of(0, 20))

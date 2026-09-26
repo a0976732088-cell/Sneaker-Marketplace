@@ -2,7 +2,7 @@
   <main class="container py-4 admin-auction-detail">
     <header class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 admin-page-heading">
       <div>
-        <p class="text-uppercase text-secondary small mb-1 admin-page-eyebrow">SNEAKERMARKET ADMIN</p>
+        <p class="text-uppercase text-secondary small mb-1 admin-page-eyebrow">酷客 Kicks ADMIN</p>
         <h1 class="h3 mb-1">競標管理詳情</h1>
         <p class="text-secondary mb-0 admin-page-description">
           此頁可唯讀查看公開中、已下架及已刪除競標的完整生命週期。
