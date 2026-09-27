@@ -1,23 +1,26 @@
 <template>
   <div v-if="isVisibleRoute" class="chatbot-widget">
-    <!-- 浮動按鈕 -->
-    <button
-      v-if="!isOpen"
-      class="chatbot-toggle-btn"
-      @click="isOpen = true"
-    >
-      <svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true">
-        <circle cx="32" cy="32" r="30" fill="#37373c" />
-        <line x1="32" y1="24" x2="32" y2="18" stroke="#fafafa" stroke-width="2.2" stroke-linecap="round" />
-        <circle cx="32" cy="16" r="2.4" fill="#fafafa" />
-        <circle cx="13" cy="42" r="3" fill="#fafafa" />
-        <circle cx="51" cy="42" r="3" fill="#fafafa" />
-        <rect x="18" y="27" width="28" height="24" rx="8" fill="#fafafa" />
-        <circle cx="26" cy="40" r="2.6" fill="#37373c" />
-        <circle cx="38" cy="40" r="2.6" fill="#37373c" />
-        <path d="M 24 46 Q 32 51 40 46" fill="none" stroke="#37373c" stroke-width="2.2" stroke-linecap="round" />
-      </svg>
-    </button>
+    <!-- 浮動按鈕：滑鼠移上去時，左邊跳出對話框 -->
+    <div v-if="!isOpen" class="chatbot-toggle-wrap">
+      <span class="chatbot-hover-bubble" aria-hidden="true">你好！有需要幫忙嗎？</span>
+      <button
+        class="chatbot-toggle-btn"
+        aria-label="開啟客服機器人"
+        @click="isOpen = true"
+      >
+        <svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true">
+          <circle cx="32" cy="32" r="30" fill="#37373c" />
+          <line x1="32" y1="24" x2="32" y2="18" stroke="#fafafa" stroke-width="2.2" stroke-linecap="round" />
+          <circle cx="32" cy="16" r="2.4" fill="#fafafa" />
+          <circle cx="13" cy="42" r="3" fill="#fafafa" />
+          <circle cx="51" cy="42" r="3" fill="#fafafa" />
+          <rect x="18" y="27" width="28" height="24" rx="8" fill="#fafafa" />
+          <circle cx="26" cy="40" r="2.6" fill="#37373c" />
+          <circle cx="38" cy="40" r="2.6" fill="#37373c" />
+          <path d="M 24 46 Q 32 51 40 46" fill="none" stroke="#37373c" stroke-width="2.2" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
 
     <!-- 聊天視窗 -->
     <div v-else class="chatbot-panel">
@@ -36,7 +39,7 @@
           </svg>
           <span>酷客 Kicks 客服機器人</span>
         </div>
-        <button class="chatbot-close-btn" @click="isOpen = false">✕</button>
+        <button class="chatbot-close-btn" aria-label="關閉並清除對話" @click="closeChat">✕</button>
       </div>
 
       <div class="chatbot-messages" ref="messagesContainer">
@@ -99,6 +102,18 @@ const messages = ref([])
 const messagesContainer = ref(null)
 const quickQuestions = ['運費怎麼算？', '付款方式有哪些？', '大概多久會到貨？']
 
+// 每次對話的編號：關閉視窗時換新編號，舊的回覆就算晚到也不會塞進新對話
+let conversationId = 0
+
+// 按叉叉：關閉視窗並清空對話，下次打開是全新的對話
+function closeChat() {
+  isOpen.value = false
+  messages.value = []
+  inputText.value = ''
+  isLoading.value = false
+  conversationId++
+}
+
 function askQuickQuestion(question) {
   inputText.value = question
   sendMessage()
@@ -108,6 +123,7 @@ async function sendMessage() {
   const question = inputText.value.trim()
   if (!question) return
 
+  const currentId = conversationId
   messages.value.push({ role: 'user', text: question })
   inputText.value = ''
   isLoading.value = true
@@ -115,8 +131,10 @@ async function sendMessage() {
 
   try {
     const response = await httpClient.post('/chatbot/ask', { question }, { timeout: 30000 })
+    if (currentId !== conversationId) return
     messages.value.push({ role: 'bot', text: response.data.answer })
   } catch (error) {
+    if (currentId !== conversationId) return
     console.error('聊天機器人呼叫失敗', error)
     messages.value.push({
       role: 'bot',
@@ -156,6 +174,49 @@ async function scrollToBottom() {
   padding: 0;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* ===== 滑鼠移到機器人上時跳出的對話框 ===== */
+.chatbot-toggle-wrap {
+  position: relative;
+}
+
+.chatbot-hover-bubble {
+  position: absolute;
+  right: calc(100% + 14px);
+  top: 50%;
+  transform: translate(6px, -50%);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background-color: #ffffff;
+  color: #111111;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* 對話框右邊的小尖角，指向機器人 */
+.chatbot-hover-bubble::after {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  background-color: #ffffff;
+  transform: translateY(-50%) rotate(45deg);
+  border-radius: 2px;
+}
+
+/* 滑鼠移到按鈕上（或用鍵盤 Tab 選到按鈕）時顯示 */
+.chatbot-toggle-wrap:hover .chatbot-hover-bubble,
+.chatbot-toggle-wrap:focus-within .chatbot-hover-bubble {
+  opacity: 1;
+  transform: translate(0, -50%);
 }
 
 .chatbot-panel {

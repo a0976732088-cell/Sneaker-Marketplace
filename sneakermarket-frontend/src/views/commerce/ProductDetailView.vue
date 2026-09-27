@@ -2,7 +2,7 @@
 import { getCurrentMember } from '@/service/authService'
 import { useRoute } from 'vue-router'
 import { ref, onMounted, onUnmounted,computed } from 'vue'
-import { cartCount, refreshCartCount, cartIconPosition } from '@/service/cartState'
+import { cartCount, refreshCartCount } from '@/service/cartState'
 import httpClient from '@/service/httpClient'
 import { useRouter } from 'vue-router'
 import { resolveProductImageUrl } from '@/utils/productImageUrl'
@@ -19,6 +19,41 @@ const showCartPopup = ref(false)
 const addedItem = ref(null)
 let popupTimer = null                    
 const POPUP_AUTO_CLOSE_MS = 5000  
+
+// 跳窗位置：每次顯示時量導覽列購物車圖示的位置，讓跳窗右邊緣對齊圖示右邊緣
+const popupStyle = ref({})
+const POPUP_EDGE_GAP = 16
+
+function positionCartPopup() {
+  const cartIcon = document.querySelector('a[href="/cart"]')
+  // 導覽列的內容容器（左右邊界）和整條導覽列（上下位置）
+  const navContainer = cartIcon?.closest('.container, .container-xl, .container-xxl, .container-fluid')
+  const navBar = cartIcon?.closest('header, nav')
+
+  if (navContainer && navBar) {
+    const containerRect = navContainer.getBoundingClientRect()
+    const paddingRight = parseFloat(getComputedStyle(navContainer).paddingRight) || 0
+    const right = Math.max(POPUP_EDGE_GAP, window.innerWidth - containerRect.right + paddingRight)
+    const top = navBar.getBoundingClientRect().bottom + 8
+    popupStyle.value = { right: right + 'px', top: top + 'px' }
+  } else if (cartIcon) {
+    // 找不到導覽列容器時：退回對齊購物車圖示
+    const rect = cartIcon.getBoundingClientRect()
+    const right = Math.max(POPUP_EDGE_GAP, window.innerWidth - rect.right)
+    popupStyle.value = { right: right + 'px', top: rect.bottom + 8 + 'px' }
+  } else {
+    popupStyle.value = { right: POPUP_EDGE_GAP + 'px', top: '80px' }
+  }
+}
+
+// 跳窗開著時拖動視窗大小，重新計算位置
+function handleResize() {
+  if (showCartPopup.value) positionCartPopup()
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize)
+})
 
 onMounted(async () => {
   try {
@@ -47,7 +82,29 @@ const displayPrice = computed(() => {
 })
 
 const lowStockWarning = computed(() => {
-  return !!(selectedVariant.value && selectedVariant.value.stock > 0 && selectedVariant.value.stock < 10)
+    return !!(canPurchase.value && selectedVariant.value && selectedVariant.value.stock > 0 && selectedVariant.value.stock < 10)
+})
+
+// 整雙鞋是否還有貨：只要任一尺寸庫存 > 0 就算有貨
+const hasStock = computed(() => {
+  return !!product.value?.variants?.some(v => v.stock > 0)
+})
+
+// 是否能購買：要「販售中」而且「有貨」，兩個條件缺一不可
+const canPurchase = computed(() => {
+  return product.value?.status === 'ON_SALE' && hasStock.value
+})
+
+// 前台狀態標籤：「上架」和「有貨」是兩件事，要分開判斷
+const statusBadge = computed(() => {
+  const status = product.value?.status
+  if (status === 'ON_SALE') {
+    return hasStock.value
+      ? { text: '現貨', cls: 'status-on' }
+      : { text: '缺貨', cls: 'status-off' }
+  }
+  if (status === 'OFF_SHELF') return { text: '已下架', cls: 'status-off' }
+  return { text: '暫不販售', cls: 'status-off' }   // DRAFT 或其他狀態，不讓前台看到英文代碼
 })
 
 function formatPrice(price) {
@@ -77,6 +134,7 @@ async function addToCart() {
       size: selectedVariant.value.size,
       price: selectedVariant.value.price,
     }
+    positionCartPopup()
     showCartPopup.value = true
 
     clearTimeout(popupTimer)                              
@@ -84,7 +142,18 @@ async function addToCart() {
       showCartPopup.value = false                         
     }, POPUP_AUTO_CLOSE_MS)             
   } catch (error) {
-    alert('加入購物車失敗')
+    // 顯示後端回傳的實際原因（例如「此商品目前未販售」「庫存不足」），沒有才用通用訊息
+    alert(error.response?.data?.message || '加入購物車失敗')
+  }
+}
+
+// 返回上一頁：從網站內點進來就回上一頁（例如商品列表）；
+// 如果是直接打開網址進來、沒有上一頁，就回到商品列表
+function goBack() {
+  if (window.history.state && window.history.state.back) {
+    router.back()
+  } else {
+    router.push('/products')
   }
 }
 
@@ -106,10 +175,21 @@ function goToCheckout() {
 //元件卸載時也要清理
 onUnmounted(() => {
   clearTimeout(popupTimer)
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 <template>
-  <section class="detail-container py-5">
+  <!-- 返回上一頁：放在頁面左上角，跟導覽列的 Logo 左邊對齊 -->
+  <div class="container pt-4">
+    <button type="button" class="back-link" @click="goBack">
+      <svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m15 18-6-6 6-6" />
+      </svg>
+      返回
+    </button>
+  </div>
+
+  <section class="detail-container pt-3 pb-5">
     <div v-if="loading" class="text-secondary mt-3">載入中...</div>
 
     <div v-else-if="errorMessage" class="alert alert-danger mt-3">
@@ -128,8 +208,8 @@ onUnmounted(() => {
       </div>
 
       <div class="col-12 col-md-7">
-        <span class="status-badge mb-2" :class="product.status === 'ON_SALE' ? 'status-on' : 'status-off'">
-          {{ product.status === 'ON_SALE' ? '現貨' : product.status }}
+        <span class="status-badge mb-2" :class="statusBadge.cls">
+          {{ statusBadge.text }}
         </span>
 
         <h1 class="product-title">{{ product.productName }}</h1>
@@ -137,7 +217,7 @@ onUnmounted(() => {
         <p class="text-secondary mb-3">{{ product.categoryName }}</p>
 
         <p class="fs-4 fw-semibold mb-3">{{ formatPrice(displayPrice) }}</p>
-        <p v-if="lowStockWarning" class="low-stock-text mb-3">⏱ 所剩庫存不多，欲購從速。</p>
+        <p v-if="lowStockWarning" class="low-stock-text mb-3">所剩庫存不多，欲購從速。</p>
 
         <hr class="my-4">
 
@@ -156,11 +236,13 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <p v-if="!selectedVariant" class="text-secondary small mb-3">請先選擇尺寸</p>
+        <!-- 買不了的時候直接說原因，不要叫顧客「先選尺寸」 -->
+        <p v-if="!canPurchase" class="text-secondary small mb-3">此商品目前無法購買</p>
+        <p v-else-if="!selectedVariant" class="text-secondary small mb-3">請先選擇尺寸</p>
 
         <button
           class="btn-add-to-cart"
-          :disabled="!selectedVariant || selectedVariant.stock === 0"
+          :disabled="!canPurchase || !selectedVariant || selectedVariant.stock === 0"
           @click="addToCart"
         >
           加入購物車
@@ -196,7 +278,7 @@ onUnmounted(() => {
   <div 
     v-if="showCartPopup" 
     class="cart-popup"
-    :style="{ left: cartIconPosition.left + 'px', top: cartIconPosition.top + 8 + 'px' }"
+    :style="popupStyle"
     >
     <div class="cart-popup-header">
       <span class="cart-popup-check">✓</span>
@@ -233,6 +315,40 @@ onUnmounted(() => {
   margin: 0 auto;
   padding-left: 1rem;
   padding-right: 1rem;
+}
+
+/* 返回上一頁 */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+  border: none;
+  background: none;
+  color: #6c757d;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.back-link:hover {
+  color: #111111;
+}
+
+.back-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s ease;
+}
+
+.back-link:hover .back-icon {
+  transform: translateX(-3px);
 }
 
 .detail-img {

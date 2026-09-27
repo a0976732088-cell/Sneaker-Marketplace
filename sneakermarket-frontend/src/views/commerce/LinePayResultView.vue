@@ -29,7 +29,7 @@ async function finishPayment() {
     await httpClient.post(`/orders/${orderId}/linepay/confirm`, { transactionId })
     state.value = 'paid'
     // 用 replace 取代目前這頁，使用者按上一頁就不會回到這裡重複確認
-    setTimeout(() => router.replace(`/orders/${orderId}`), 1500)
+    setTimeout(() => router.replace(`/orders/${orderId}?fromPayment=true`), 1500)
   } catch (error) {
     state.value = 'failed'
     errorMessage.value = error.response?.data?.message || '付款確認失敗，請稍後再試'

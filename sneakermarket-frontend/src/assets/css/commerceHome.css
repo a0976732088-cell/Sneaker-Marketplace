@@ -1,4 +1,5 @@
 /* =========================================================
+   版本：2026-09-24 v9（標題列與側欄依導覽列實際高度固定）
    一般商城首頁（CommerceHomeView.vue）專用樣式
    以 <style scoped src> 引入，只作用在這一頁
    ========================================================= */
@@ -41,36 +42,43 @@
   object-fit: cover;
 }
 
-/* 搜尋框與品牌標籤：大螢幕疊在圖片左下角、「嚴選球鞋」標語下方 */
+/* 搜尋框與品牌標籤：大螢幕疊在圖片左側、「嚴選球鞋」標語下方 */
 .hero-actions {
   position: absolute;
-  left: 3.2%;
-  top: 83%;
-  width: 33%;
+  left: 7.6%;
+  top: 64%;
+  /* 寬度跟著下面那排品牌標籤走，搜尋列會自動拉成一樣長 */
+  width: fit-content;
+  max-width: 34%;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.75rem;
 }
 
-/* 整個搜尋列是一個膠囊，搜尋按鈕放在膠囊內右側 */
+/* 搜尋列：白色輸入框 + 右邊獨立的黑色搜尋按鈕 */
 .hero-search {
   display: flex;
   align-items: center;
-  height: 2.25rem;
-  padding: 0 0.2rem 0 0.9rem;
-  border: 1px solid rgba(239, 230, 214, 0.6);
-  border-radius: 999px;
-  background-color: rgba(20, 20, 20, 0.55);
-  backdrop-filter: blur(4px);
+  gap: 0.6rem;
 }
 
 .hero-search-field {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   min-width: 0;
-  color: var(--kicks-cream);
+  height: 2.8rem;
+  padding: 0 1rem;
+  border-radius: 0.75rem;
+  background-color: #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  color: #555555;
+}
+
+.hero-search-field .icon {
+  width: 1.3rem;
+  height: 1.3rem;
 }
 
 .hero-search-field input {
@@ -79,85 +87,110 @@
   border: none;
   outline: none;
   background: transparent;
-  font-size: 0.85rem;
-  color: #ffffff;
+  font-size: 0.92rem;
+  color: var(--kicks-ink);
 }
 
 .hero-search-field input::placeholder {
-  color: rgba(239, 230, 214, 0.7);
+  color: #9a9a9a;
 }
 
 .hero-search-btn {
-  height: 1.8rem;
-  padding: 0 1.2rem;
-  border: none;
-  border-radius: 999px;
+  flex-shrink: 0;
+  height: 2.8rem;
+  padding: 0 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 0.75rem;
   background-color: var(--kicks-ink);
-  color: var(--kicks-cream);
-  font-size: 0.85rem;
+  color: #ffffff;
+  font-size: 0.95rem;
   font-weight: 700;
+  letter-spacing: 0.1em;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
   white-space: nowrap;
   transition: all 0.2s ease;
 }
 
 .hero-search-btn:hover {
-  background-color: var(--kicks-cream);
-  color: var(--kicks-ink);
+  background-color: #333333;
 }
 
+/* 品牌標籤：白底膠囊，選中時變黑底白字 */
 .hero-brands {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
 }
 
 .hero-brand-chip {
-  padding: 0.2rem 0.8rem;
-  border: 1px solid rgba(239, 230, 214, 0.55);
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid #dddddd;
   border-radius: 999px;
-  background-color: rgba(17, 17, 17, 0.45);
-  color: var(--kicks-cream);
-  font-size: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.94);
+  color: #222222;
+  font-size: 0.82rem;
+  font-weight: 500;
   line-height: 1.4;
   transition: all 0.2s ease;
 }
 
-.hero-brand-chip:hover,
-.hero-brand-chip.active {
-  background-color: var(--kicks-cream);
-  border-color: var(--kicks-cream);
-  color: var(--kicks-ink);
+.hero-brand-chip:hover {
+  border-color: var(--kicks-ink);
 }
 
-/* 小於 1200px：圖片下方空間不夠，搜尋區改放到圖片下方的深色區塊 */
+.hero-brand-chip.active {
+  background-color: var(--kicks-ink);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+/* 1200～1399px：Banner 比較窄，稍微縮小，讓 5 個品牌維持一排 */
+@media (min-width: 1200px) and (max-width: 1399.98px) {
+  .hero-search-field,
+  .hero-search-btn {
+    height: 2.5rem;
+  }
+
+  .hero-search-field input {
+    font-size: 0.82rem;
+  }
+
+  .hero-search-btn {
+    padding: 0 1.1rem;
+    font-size: 0.88rem;
+  }
+
+  .hero-brand-chip {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.74rem;
+  }
+}
+
+/* 小於 1200px：圖片上空間不夠，搜尋區改放到圖片下方的深色區塊 */
 @media (max-width: 1199.98px) {
   .hero-actions {
     position: static;
     width: 100%;
-    gap: 0.6rem;
+    max-width: none;
     padding: 1rem;
     background-color: #161616;
   }
 
-  .hero-search {
-    height: 2.6rem;
-  }
-
-  .hero-search-btn {
-    height: 2.1rem;
-    background-color: var(--kicks-cream);
-    color: var(--kicks-ink);
+  .hero-brands {
+    flex-wrap: wrap;
   }
 }
 
 /* ========== 列表標題列（維持原本樣式） ========== */
 .list-section {
-  scroll-margin-top: 60px;
+  scroll-margin-top: var(--nav-h, 64px);
 }
 
 .list-header {
   position: sticky;
-  top: 56px;
+  top: var(--nav-h, 64px);
   z-index: 20;
   background-color: #ffffff;
   padding-top: 0.5rem;
@@ -198,7 +231,8 @@
 /* ========== 左側篩選欄（維持原本樣式） ========== */
 .filter-sidebar {
   position: sticky;
-  top: 103px;
+  /* 導覽列高度 + 標題列高度，側欄停在標題列下方 */
+  top: calc(var(--nav-h, 64px) + 56px);
   font-size: 0.82rem;
 }
 

@@ -113,6 +113,23 @@ async function loadMember() {
   }
 }
 
+const cancelling = ref(false)
+
+// 未完成付款的 LINE Pay 訂單，讓使用者自己取消並還原庫存
+async function cancelLinePayOrder() {
+  if (!confirm('確定要取消這筆訂單嗎？')) return
+
+  cancelling.value = true
+  try {
+    const response = await httpClient.post(`/orders/${route.params.id}/linepay/cancel`)
+    order.value = response.data
+  } catch (error) {
+    alert(error?.response?.data?.message || '取消訂單失敗，請稍後再試')
+  } finally {
+    cancelling.value = false
+  }
+}
+
 // 付款方式標籤
 function paymentMethodLabel(method) {
   if (!method) return '—'
@@ -415,6 +432,15 @@ onUnmounted(() => {
 
                   {{ statusLabel(order.status) }}
                 </span>
+                <button
+                  v-if="order.status === 'PENDING' && order.paymentMethod === 'LINE_PAY'"
+                  type="button"
+                  class="btn btn-outline-dark btn-sm d-block mt-2"
+                  :disabled="cancelling"
+                  @click="cancelLinePayOrder"
+                >
+                  {{ cancelling ? '取消中...' : '取消訂單' }}
+                </button>
               </div>
 
               <!-- 付款方式 -->
@@ -465,8 +491,8 @@ onUnmounted(() => {
                 <h3>運送狀態</h3>
 
                 <span class="status-badge">
-                  <span class="status-dot"></span>
-                  待出貨
+                  <span class="status-dot" :class="{ paid: order.status === 'PAID' }"></span>
+                  {{ shippingStatusLabel(order.status) }}
                 </span>
               </div>
 

@@ -15,6 +15,9 @@ const memberId = ref(null)
 const router = useRouter()
 let redirectTimer = null
 
+// 庫存提醒門檻：跟商品明細頁一致，庫存大於 0 且小於這個數字就提醒
+const LOW_STOCK_THRESHOLD = 10
+
 const totalPrice = computed(() => {
   let total = 0
   for (const item of cartItems.value) {
@@ -31,6 +34,15 @@ const shippingFee = computed(() => {
 const grandTotal = computed(() => {
   return totalPrice.value + shippingFee.value
 })
+
+// 金額格式：跟商品明細頁一致，加上千分位逗號（例如 NT$ 6,500）
+function formatPrice(price) {
+  return price != null ? 'NT$ ' + Number(price).toLocaleString('zh-TW') : '-'
+}
+
+function isLowStock(item) {
+  return item.stock > 0 && item.stock < LOW_STOCK_THRESHOLD
+}
 
 function checkEmptyCartAndRedirect() {
   if (cartItems.value.length === 0) {
@@ -146,23 +158,31 @@ onUnmounted(() => {
 
         <div>
           <img :src="resolveProductImageUrl(item.imageUrl)" alt="" style="width: 120px; height: 120px; object-fit: cover;">
-          <p v-if="item.stock === 1" class="text-warning small mt-1 mb-0">所剩庫存不多，欲購從速。</p>
         </div>
 
         <div class="flex-grow-1 d-flex justify-content-between align-self-stretch">
           <div>
             <p class="mb-1">{{ item.productName }}</p>
             <p class="mb-0 text-secondary">{{ item.size }} / {{ item.color }}</p>
+            <p v-if="isLowStock(item)" class="low-stock-text mt-4 mb-0">所剩庫存不多，欲購從速。</p>
           </div>
 
           <div class="d-flex flex-column justify-content-between align-items-end">
-            <p class="mb-0">NT$ {{ item.price * item.quantity }}</p>
+            <p class="mb-0">{{ formatPrice(item.price * item.quantity) }}</p>
             <div class="d-flex align-items-center gap-2 border rounded-pill px-3 py-1" style="width: fit-content;">
-              <button class="btn btn-sm border-0 p-0" @click="decreaseQuantity(item)">
-                {{ item.quantity === 1 ? '🗑️' : '−' }}
+              <button
+                class="btn btn-sm border-0 p-0 qty-btn"
+                :aria-label="item.quantity === 1 ? '移除商品' : '減少數量'"
+                @click="decreaseQuantity(item)"
+              >
+                <!-- 數量為 1 時顯示垃圾桶（SVG，不用 emoji），否則顯示減號 -->
+                <svg v-if="item.quantity === 1" class="trash-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+                </svg>
+                <template v-else>−</template>
               </button>
               <span>{{ item.quantity }}</span>
-              <button class="btn btn-sm border-0 p-0" @click="increaseQuantity(item)" :disabled="item.quantity >= item.stock">+</button>
+              <button class="btn btn-sm border-0 p-0 qty-btn" aria-label="增加數量" @click="increaseQuantity(item)" :disabled="item.quantity >= item.stock">+</button>
             </div>
           </div>
         </div>
@@ -174,16 +194,16 @@ onUnmounted(() => {
         <h5>摘要</h5>
         <div class="d-flex justify-content-between mb-2">
           <span>小計</span>
-          <span>NT$ {{ totalPrice }}</span>
+          <span>{{ formatPrice(totalPrice) }}</span>
         </div>
         <div class="d-flex justify-content-between mb-3">
           <span>運費</span>
-          <span>NT$ {{ shippingFee }}</span>
+          <span>{{ formatPrice(shippingFee) }}</span>
         </div>
         <hr>
         <div class="d-flex justify-content-between mb-3">
           <span>總計</span>
-          <span class="fw-bold">NT$ {{ grandTotal }}</span>
+          <span class="fw-bold">{{ formatPrice(grandTotal) }}</span>
         </div>
         <button class="btn btn-dark w-100" :disabled="totalPrice===0" @click="router.push('/checkout')">結帳</button>
       </div>
@@ -191,3 +211,29 @@ onUnmounted(() => {
   </div>
 </template>
 </template>
+
+<style scoped>
+/* 庫存提醒：跟商品明細頁同樣的紅色與粗細 */
+.low-stock-text {
+  color: #d9534f;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.qty-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.2rem;
+}
+
+.trash-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+</style>
