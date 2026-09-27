@@ -6,7 +6,7 @@ import com.project.sneakermarket.commerce.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.util.Map;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,28 +24,48 @@ public class ProductService {
 
     // 取得商品列表，每筆商品只顯示代表價格與一張主圖（給列表頁用）
     // categoryId、keyword、size 都可以不帶（null），代表使用者沒有指定該項篩選條件
+    @Transactional(readOnly = true)
     public List<ProductListItemResponse> getAllProducts(Long categoryId, String keyword, String size, Long brandId) {
-        List<Product> products = productRepository.findAll();
 
-        return products.stream()
+        // 1. 先用商品本身的欄位篩選，這一步不需要查其他表
+        List<Product> products = productRepository.findAll().stream()
                 // 固定規則：不管有沒有篩選條件，永遠只顯示上架中的商品
                 .filter(p -> p.getStatus().equals("ON_SALE"))
                 .filter(p -> categoryId == null || p.getCategory().getCategoryId().equals(categoryId))
                 .filter(p -> keyword == null || p.getProductName().toLowerCase().contains(keyword.toLowerCase()))
-                // 尺寸篩選（可選）：跨表查這個商品的規格裡，有沒有符合指定尺寸的
-                .filter(p -> size == null || productVariantRepository.findByProductProductId(p.getProductId())
+                .filter(p -> brandId == null || p.getBrand().getBrandId().equals(brandId))
+                .collect(Collectors.toList());
+
+        if (products.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Long> productIds = products.stream()
+                .map(Product::getProductId)
+                .collect(Collectors.toList());
+
+        // 2. 一次查出這些商品的全部規格和主圖，再依 productId 分組
+        //    （原本是每筆商品各查一次，商品越多查詢次數越多 → N+1 問題）
+        Map<Long, List<ProductVariant>> variantMap = productVariantRepository.findByProductProductIdIn(productIds)
+                .stream()
+                .collect(Collectors.groupingBy(v -> v.getProduct().getProductId()));
+
+        Map<Long, List<ProductImage>> imageMap = productImageRepository.findByProductProductIdInAndIsPrimaryTrue(productIds)
+                .stream()
+                .collect(Collectors.groupingBy(img -> img.getProduct().getProductId()));
+
+        // 3. 尺寸篩選和組回應都改從 Map 取資料，不再查資料庫
+        return products.stream()
+                // 尺寸篩選（可選）：這個商品的規格裡，有沒有符合指定尺寸的
+                .filter(p -> size == null || variantMap.getOrDefault(p.getProductId(), List.of())
                         .stream()
                         .anyMatch(v -> v.getSize().equals(size)))
-                .filter(p -> brandId == null || p.getBrand().getBrandId().equals(brandId))
                 .map(p -> {
-                    List<ProductVariant> variants =
-                            productVariantRepository.findByProductProductId(p.getProductId());
+                    List<ProductVariant> variants = variantMap.getOrDefault(p.getProductId(), List.of());
+                    List<ProductImage> images = imageMap.getOrDefault(p.getProductId(), List.of());
 
                     // 同商品所有規格價格相同，直接抓第一筆；沒有規格資料就顯示 null
                     BigDecimal price = variants.isEmpty() ? null : variants.get(0).getPrice();
-
-                    List<ProductImage> images =
-                            productImageRepository.findByProductProductIdAndIsPrimaryTrue(p.getProductId());
 
                     String imageUrl = images.isEmpty() ? null : images.get(0).getImageUrl();
 
@@ -71,7 +91,7 @@ public class ProductService {
                 .orElseThrow(() -> new RuntimeException("找不到這個商品"));
 
         List<ProductVariant> variants = productVariantRepository.findByProductProductId(productId);
-        List<ProductImage> images = productImageRepository.findByProductProductId(productId);
+        List<ProductImage> images = productImageRepository.findByProductProductIdOrderByIsPrimaryDescSortOrderAsc(productId);
 
         List<String> imageUrls = images.stream()
                 .map(ProductImage::getImageUrl)
@@ -99,29 +119,47 @@ public class ProductService {
 
 
     // [後台]取得商品列表
+    @Transactional(readOnly = true)
     public List<ProductListItemResponse> getAllProductsForAdmin(
             Long categoryId, String keyword, String size, Long brandId, String status, Integer maxStock) {
 
-        List<Product> products = productRepository.findAll();
-
-        List<ProductListItemResponse> result = products.stream()
+        // 1. 先用商品本身的欄位篩選，這一步不需要查其他表
+        List<Product> products = productRepository.findAll().stream()
                 // 不寫死「只顯示 ON_SALE」，狀態要不要篩由參數決定
                 .filter(p -> categoryId == null || p.getCategory().getCategoryId().equals(categoryId))
                 .filter(p -> keyword == null || p.getProductName().toLowerCase().contains(keyword.toLowerCase()))
-                .filter(p -> size == null || productVariantRepository.findByProductProductId(p.getProductId())
-                        .stream()
-                        .anyMatch(v -> v.getSize().equals(size)))
                 .filter(p -> brandId == null || p.getBrand().getBrandId().equals(brandId))
                 // 有指定狀態就照指定的篩；沒指定就預設排除已刪除（DELETED）的商品
                 .filter(p -> status != null ? p.getStatus().equals(status) : !p.getStatus().equals("DELETED"))
+                .collect(Collectors.toList());
+
+        if (products.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Long> productIds = products.stream()
+                .map(Product::getProductId)
+                .collect(Collectors.toList());
+
+        // 2. 一次查出這些商品的全部規格和主圖，再依 productId 分組（避免 N+1）
+        Map<Long, List<ProductVariant>> variantMap = productVariantRepository.findByProductProductIdIn(productIds)
+                .stream()
+                .collect(Collectors.groupingBy(v -> v.getProduct().getProductId()));
+
+        Map<Long, List<ProductImage>> imageMap = productImageRepository.findByProductProductIdInAndIsPrimaryTrue(productIds)
+                .stream()
+                .collect(Collectors.groupingBy(img -> img.getProduct().getProductId()));
+
+        // 3. 尺寸篩選和組回應都改從 Map 取資料，不再查資料庫
+        List<ProductListItemResponse> result = products.stream()
+                .filter(p -> size == null || variantMap.getOrDefault(p.getProductId(), List.of())
+                        .stream()
+                        .anyMatch(v -> v.getSize().equals(size)))
                 .map(p -> {
-                    List<ProductVariant> variants =
-                            productVariantRepository.findByProductProductId(p.getProductId());
+                    List<ProductVariant> variants = variantMap.getOrDefault(p.getProductId(), List.of());
+                    List<ProductImage> images = imageMap.getOrDefault(p.getProductId(), List.of());
 
                     BigDecimal price = variants.isEmpty() ? null : variants.get(0).getPrice();
-
-                    List<ProductImage> images =
-                            productImageRepository.findByProductProductIdAndIsPrimaryTrue(p.getProductId());
 
                     String imageUrl = images.isEmpty() ? null : images.get(0).getImageUrl();
 

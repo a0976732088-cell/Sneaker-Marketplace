@@ -161,6 +161,11 @@ public class OrderService {
         }
 
         for (CartItem item : selectedItems) {
+            // 商品可能在「加入購物車之後、結帳之前」被下架，結帳當下要再檢查一次
+            if (!"ON_SALE".equals(item.getVariant().getProduct().getStatus())) {
+                throw new RuntimeException("商品「" + item.getVariant().getProduct().getProductName() + "」已下架，請從購物車移除");
+            }
+
             if (item.getQuantity() > item.getVariant().getStock()) {
                 throw new RuntimeException("庫存不足");
             }

@@ -14,4 +14,6 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
     //刪除某商品所有的規格
     void deleteByProductProductId(Long productId);
+
+    List<ProductVariant> findByProductProductIdIn(List<Long> productIds);
 }

@@ -71,6 +71,11 @@ public class CartService {
         ProductVariant variant = productVariantRepository.findById(variantId)
                 .orElseThrow(() -> new RuntimeException("找不到這個規格"));
 
+        // 只有販售中的商品能加入購物車（防止有人直接用網址或 API 把下架/草稿商品加進來）
+        if (!"ON_SALE".equals(variant.getProduct().getStatus())) {
+            throw new RuntimeException("此商品目前未販售");
+        }
+
         // 檢查是否已有這個規格，決定合併還是新增
         Optional<CartItem> existingItem =
                 cartItemRepository.findByCartCartIdAndVariantVariantId(cart.getCartId(), variantId);
