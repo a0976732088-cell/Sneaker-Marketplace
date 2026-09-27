@@ -15,4 +15,8 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Long
 
     //刪除某商品所有圖片
     void deleteByProductProductId(Long productId);
+
+    List<ProductImage> findByProductProductIdOrderByIsPrimaryDescSortOrderAsc(Long productId);
+
+    List<ProductImage> findByProductProductIdInAndIsPrimaryTrue(List<Long> productIds);
 }
