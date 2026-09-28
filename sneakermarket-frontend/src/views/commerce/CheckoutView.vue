@@ -82,6 +82,20 @@ const discountAmount = computed(() => {
   return Number(selectedCoupon.value.discountAmount)
 })
 
+// 真正能用的券：後端回傳的券中，商品小計有達到滿額門檻的
+const usableCoupons = computed(() => {
+  return coupons.value.filter(c => subtotal.value >= Number(c.minSpend))
+})
+
+// 預設幫會員選折抵金額最多的那張
+function autoSelectCoupon() {
+  if (usableCoupons.value.length === 0) return
+  const best = usableCoupons.value.reduce((a, b) =>
+    Number(b.discountAmount) > Number(a.discountAmount) ? b : a
+  )
+  couponId.value = best.couponId
+}
+
 // 對應規格書 6.4 節：商品小計 + 運費 − 折抵金額 = 最終應付金額
 const grandTotal = computed(() => {
   return subtotal.value + shippingFee.value - discountAmount.value
@@ -142,8 +156,9 @@ async function loadCoupons() {
 
 onMounted(async () => {
   await loadMember()
-  loadCart()
-  loadCoupons()
+  // 購物車和優惠券都載完，小計才是正確的，這時再自動選券
+  await Promise.all([loadCart(), loadCoupons()])
+  autoSelectCoupon()
 })
 
 async function checkout() {
@@ -268,18 +283,15 @@ async function checkout() {
         <h2 class="section-title">優惠券</h2>
 
         <div class="field">
-          <select v-if="coupons.length > 0" v-model="couponId" class="form-select">
+          <select v-if="usableCoupons.length > 0" v-model="couponId" class="form-select">
             <option value="">不使用優惠券</option>
-            <option v-for="c in coupons" :key="c.couponId" :value="c.couponId">
+            <option v-for="c in usableCoupons" :key="c.couponId" :value="c.couponId">
               滿 {{ formatPrice(c.minSpend) }} 折抵 {{ formatPrice(c.discountAmount) }}
             </option>
           </select>
           <select v-else class="form-select" disabled>
             <option>目前沒有可使用的優惠券</option>
           </select>
-          <p v-if="couponNotReached" class="field-hint text-danger">
-            尚未達到此優惠券的滿額門檻，本次不會折抵
-          </p>
         </div>
 
         <hr class="section-divider">
