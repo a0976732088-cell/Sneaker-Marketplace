@@ -55,7 +55,7 @@
             class="chatbot-quick-reply-btn"
             @click="askQuickQuestion(q)"
           >
-            {{ q }}
+            {{ q.question }}
           </button>
         </div>
         <div
@@ -100,7 +100,15 @@ const inputText = ref('')
 const isLoading = ref(false)
 const messages = ref([])
 const messagesContainer = ref(null)
-const quickQuestions = ['運費怎麼算？', '付款方式有哪些？', '大概多久會到貨？']
+
+// 快捷問題：答案直接寫在前端，不呼叫 Gemini，就算 API 掛掉也能秒回
+// 內容需與後端 ChatbotService 的 SYSTEM_PROMPT 保持一致
+const quickQuestions = [
+  { question: '運費怎麼算？', answer: '全站運費固定 NT$100，不分金額，目前沒有滿額免運喔。' },
+  { question: '付款方式有哪些？', answer: '目前支援綠界信用卡付款與 LINE Pay，不提供轉帳付款與貨到付款。' },
+  { question: '可以超商取貨嗎？', answer: '可以！結帳時可選擇宅配到府，或 7-11 超商店到店取貨，還能用地圖挑選門市。' },
+  { question: '大概多久會到貨？', answer: '台北市約 2-5 個工作天，其他地區約 3-6 個工作天；出貨時間為週一至週五（不含國定假日）。' }
+]
 
 // 每次對話的編號：關閉視窗時換新編號，舊的回覆就算晚到也不會塞進新對話
 let conversationId = 0
@@ -114,9 +122,20 @@ function closeChat() {
   conversationId++
 }
 
-function askQuickQuestion(question) {
-  inputText.value = question
-  sendMessage()
+// 點快捷問題：直接顯示寫好的答案，不打 API
+async function askQuickQuestion(item) {
+  const currentId = conversationId
+  messages.value.push({ role: 'user', text: item.question })
+  isLoading.value = true
+  await scrollToBottom()
+
+  // 停頓 0.5 秒，讓回覆看起來像機器人在回答
+  setTimeout(async () => {
+    if (currentId !== conversationId) return
+    messages.value.push({ role: 'bot', text: item.answer })
+    isLoading.value = false
+    await scrollToBottom()
+  }, 500)
 }
 
 async function sendMessage() {
