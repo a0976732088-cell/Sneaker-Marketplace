@@ -29,8 +29,11 @@ public class CartService {
     // 查看購物車
     public List<CartItemResponse> getCart(Long memberId) {
 
-        Cart cart = cartRepository.findByMemberId(memberId)
-                .orElseThrow(() -> new RuntimeException("找不到這個購物車"));
+        // 新會員還沒加過商品時不會有購物車，這不是錯誤，視為空購物車
+        Cart cart = cartRepository.findByMemberId(memberId).orElse(null);
+        if (cart == null) {
+            return List.of();
+        }
 
         List<CartItem> cartItems = cartItemRepository.findByCartCartId(cart.getCartId());
 
@@ -60,7 +63,7 @@ public class CartService {
     // 加入購物車：已有該規格就合併數量，沒有就新增一筆
     public void addToCart(Long memberId, Long variantId, Integer quantity) {
 
-        // 這裡跟 getCart 不同：查不到購物車不算錯誤，而是第一次使用購物車，直接建一台新的
+        // 查不到購物車代表第一次使用，直接建一台新的（getCart 只回空清單、不建立，因為查看不該寫入資料）
         Cart cart = cartRepository.findByMemberId(memberId)
                 .orElseGet(() -> {
                     Cart newCart = new Cart();
