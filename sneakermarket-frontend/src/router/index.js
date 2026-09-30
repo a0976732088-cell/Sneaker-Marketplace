@@ -5,6 +5,16 @@ import HomeView from "@/views/advertisement/StorefrontHomeView.vue";
 import { getCurrentMember } from "@/service/authService";
 
 const routes = [
+  {
+    path: "/about",
+    name: "about",
+    component: () => import("@/views/AboutView.vue"),
+  },
+  {
+    path: "/faq",
+    name: "faq",
+    component: () => import("@/views/FaqView.vue"),
+  },
   // =====================================================
   // Home
   // =====================================================
@@ -422,6 +432,9 @@ const routes = [
 
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(to) {
+    if (to.name === "faq" || to.name === "about") return { top: 0 };
+  },
 
   routes,
 });
