@@ -3,7 +3,7 @@
     <div class="dashboard-heading">
       <div>
         <h2 id="auction-dashboard-title">競標營運總覽</h2>
-        <p>全部競標的狀態分布，包含下架與刪除資料，不受下方篩選影響。</p>
+        <p>全部競標與商城可見筆數分開統計，不受下方篩選影響。</p>
       </div>
       <div class="dashboard-refresh">
         <span class="update-time" role="status">
@@ -21,7 +21,7 @@
     <div class="metric-grid">
       <article v-for="metric in metrics" :key="metric.key" class="metric-tile" :class="`metric-${metric.tone}`">
         <div class="metric-heading">
-          <h3>{{ metric.label }}</h3>
+          <h3>{{ metric.label }}<span v-if="metric.qualifier" class="metric-qualifier">{{ metric.qualifier }}</span></h3>
           <span class="metric-icon"><FontAwesomeIcon :icon="metric.icon" aria-hidden="true" /></span>
         </div>
         <div class="metric-value">{{ formatCount(counts?.[metric.key]) }}<span>筆</span></div>
@@ -33,7 +33,7 @@
       <article class="analysis-panel">
         <div class="panel-heading">
           <h3>競標狀態分布</h3>
-          <span>各狀態筆數與占比</span>
+          <span>以全部競標計算筆數與占比</span>
         </div>
         <div class="distribution-track" aria-hidden="true">
           <span v-for="status in statusRows" :key="status.key" :style="{ width: `${status.percent}%`, background: status.color }"></span>
@@ -59,7 +59,7 @@
             <dd>{{ formatCount(counts?.[state.key]) }}<span>筆</span></dd>
           </div>
         </dl>
-        <p class="management-note">「廢標」是競標結果；「已下架」是管理狀態，兩者分開統計。</p>
+        <p class="management-note">「未下架／刪除」仍可能包含已取消或草稿，與商城可見筆數不同。「廢標」是競標結果，「已下架」是管理狀態。</p>
       </article>
     </div>
   </section>
@@ -68,7 +68,7 @@
 <script setup>
 import { computed, onMounted, watch } from "vue";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
-import { faGavel, faLayerGroup, faTrophy, faWallet, faRotateRight } from "@fortawesome/free-solid-svg-icons";
+import { faGavel, faLayerGroup, faStore, faTrophy, faWallet, faRotateRight } from "@fortawesome/free-solid-svg-icons";
 import { useAdminAuctionOverview } from "@/composables/useAdminAuctionOverview";
 import { formatMemberAuctionStatus } from "@/utils/auctionMemberStatus";
 
@@ -83,9 +83,10 @@ const timeFormatter = new Intl.DateTimeFormat("zh-TW", {
 });
 const formattedUpdatedAt = computed(() => updatedAt.value ? timeFormatter.format(updatedAt.value) : "");
 const metrics = [
-  { key: "total", label: "競標總數", description: "所有競標資料", icon: faLayerGroup, tone: "total" },
-  { key: "ACTIVE", label: "競標中", description: "目前狀態為進行中的競標", icon: faGavel, tone: "active" },
-  { key: "SOLD", label: "已結標", description: "已有得標者，尚不代表完成付款", icon: faTrophy, tone: "sold" },
+  { key: "total", label: "全部競標", qualifier: "（含非公開）", description: "含取消、草稿、下架及刪除", icon: faLayerGroup, tone: "total" },
+  { key: "storefrontVisible", label: "商城可見", description: "商城未套用篩選時的商品總數", icon: faStore, tone: "storefront" },
+  { key: "ACTIVE", label: "競標中", description: "依全部競標資料統計", icon: faGavel, tone: "active" },
+  { key: "SOLD", label: "已結標", description: "有得標者，尚不代表完成付款", icon: faTrophy, tone: "sold" },
   { key: "pendingPayment", label: "待付款", description: "得標後等待買家付款的訂單", icon: faWallet, tone: "pending" },
 ];
 const statusDefinitions = [
@@ -98,7 +99,7 @@ const statusDefinitions = [
   { key: "DRAFT", color: "#98a2b3" },
 ];
 const managementStates = [
-  { key: "managementVISIBLE", label: "公開中", color: "#56836a" },
+  { key: "managementVISIBLE", label: "未下架／刪除", color: "#56836a" },
   { key: "managementREMOVED", label: "已下架", color: "#b28c52" },
   { key: "managementDELETED", label: "已刪除", color: "#c46555" },
 ];
@@ -137,10 +138,12 @@ watch(() => props.refreshKey, refresh);
 .dashboard-refresh { flex-wrap: wrap; justify-content: flex-end; }
 .update-time { color: #667085; font-size: 12px; }
 .dashboard-refresh button { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
-.metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+.metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
 .metric-tile { padding: 18px 20px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; }
+.metric-heading { min-height: 40px; }
 .metric-heading h3 { margin: 0; font-size: 13px; font-weight: 650; color: #596273; }
-.metric-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; background: #f0f3f6; color: #53657d; }
+.metric-qualifier { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; white-space: nowrap; }
+.metric-icon { display: grid; width: 32px; height: 32px; flex-shrink: 0; place-items: center; border-radius: 9px; background: #f0f3f6; color: #53657d; }
 .metric-value { display: flex; align-items: baseline; gap: 8px; margin: 9px 0 5px; font-size: 30px; line-height: 1.15; font-weight: 750; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .metric-value > span { font-size: 12px; font-weight: 400; color: #667085; flex-shrink: 0; }
 .metric-total { background: #202733; border-color: #202733; color: #fff; }
@@ -168,6 +171,7 @@ watch(() => props.refreshKey, refresh);
 .management-note { font-size: 11px; }
 @media (max-width: 1199px) {
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metric-tile:last-child { grid-column: 1 / -1; }
   .status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {

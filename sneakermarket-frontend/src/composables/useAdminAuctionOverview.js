@@ -1,8 +1,10 @@
 import { onBeforeUnmount, ref } from "vue";
 import { getAdminAuctions } from "@/service/auctionAdminService";
+import { getAuctions } from "@/service/auctionService";
 
 const countQueries = [
   ["total", {}],
+  ["storefrontVisible", {}],
   ...["DRAFT", "SCHEDULED", "ACTIVE", "SOLD", "UNSOLD", "CANCELLED", "REMOVED"].map(
     (status) => [status, { status }],
   ),
@@ -32,7 +34,9 @@ export function useAdminAuctionOverview() {
         if (sequence !== requestSequence) return;
         const results = await Promise.allSettled(
           countQueries.slice(offset, offset + 3).map(async ([key, filters]) => {
-            const response = await getAdminAuctions({ ...filters, page: 0, size: 1 });
+            // The storefront applies its own visibility rules, beyond managementState=VISIBLE.
+            const query = key === "storefrontVisible" ? getAuctions : getAdminAuctions;
+            const response = await query({ ...filters, page: 0, size: 1 });
             const total = response.data?.data?.totalElements;
             if (!Number.isSafeInteger(total) || total < 0) {
               throw new Error("Invalid auction total");
