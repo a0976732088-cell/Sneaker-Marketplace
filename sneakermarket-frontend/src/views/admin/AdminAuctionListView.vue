@@ -10,6 +10,8 @@
       </div>
     </header>
 
+    <AdminAuctionDashboard :refresh-key="overviewRefreshKey" :disabled="submitting" />
+
     <AdminAuctionFilterPanel
       :filters="filters"
       :statuses="statuses"
@@ -129,6 +131,7 @@
 </template>
 
 <script setup>
+import AdminAuctionDashboard from "@/components/auction/admin/AdminAuctionDashboard.vue";
 import AdminAuctionFilterPanel from "@/components/auction/admin/AdminAuctionFilterPanel.vue";
 import AdminAuctionBatchToolbar from "@/components/auction/admin/AdminAuctionBatchToolbar.vue";
 import AdminAuctionCard from "@/components/auction/admin/AdminAuctionCard.vue";
@@ -175,6 +178,7 @@ const filters = reactive({
   managementState: "",
 });
 const items = ref([]);
+const overviewRefreshKey = ref(0);
 const MAX_BATCH_SELECTION = 100;
 const selectedAuctionMap = ref(new Map());
 const selectedIds = computed(() => [...selectedAuctionMap.value.keys()]);
@@ -532,6 +536,7 @@ async function confirmAction() {
       successMessage.value = `競標 #${ids[0]}${dialogActionLabel.value}成功`;
     }
     resetDialog();
+    overviewRefreshKey.value += 1;
     await loadAuctions(pagination.page);
   } catch (error) {
     if (await handleAccessError(error)) {
