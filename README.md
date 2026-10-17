@@ -31,6 +31,14 @@
 - 使用 DTO 區分 API 傳輸資料與 Entity。
 - 透過前端追蹤事件與後端 API 統計廣告成效。
 
+ ### 個人實作與設計重點
+
+- **分層架構**：採用 Controller、Service、Repository 分層設計，將 HTTP 請求處理、業務邏輯與資料存取分離，並透過 DTO 傳輸 API 資料。
+- **廣告曝光判定**：使用 IntersectionObserver API，當廣告可見比例達 50% 且持續 1 秒時才觸發曝光紀錄，減少短暫滑過造成的統計誤差。
+- **重複統計控制**：透過 HttpSession 記錄同一 Session 當日已曝光及點擊的廣告，避免重複計數。
+- **廣告成效分析**：由後端統計曝光數、點擊數，並計算 CTR，供廣告管理後台查看。
+- **廣告排程管理**：利用 Spring Scheduler 每分鐘檢查已到期的廣告，並透過時間及狀態條件篩選前台可顯示的廣告。
+
 ### 原始碼
 
 - [後端廣告模組](sneakermarket-backend/src/main/java/com/project/sneakermarket/advertisement)
