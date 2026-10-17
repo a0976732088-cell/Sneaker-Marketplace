@@ -6,6 +6,36 @@
 
 > 本 README 以目前各模組的最新整合內容為準；`main` 為穩定基線，開發與整合內容分布於 `dev` 與各模組分支。
 
+## 個人負責模組｜Advertisement System（廣告管理系統）
+
+**Backend：** Java 17、Spring Boot、Spring Data JPA、SQL Server
+
+**Frontend：** Vue 3、JavaScript、Axios
+
+### 模組介紹
+
+負責球鞋電商平台的廣告管理系統，包含廣告 CRUD、Banner 輪播、彈窗、上下架排程及廣告成效統計，並完成前後端 API 串接。
+
+### 主要功能
+
+- **廣告管理**：新增、查詢、修改、刪除及廣告狀態控制。
+- **排程管理**：設定廣告開始與結束時間，透過 Spring Scheduler 處理上下架。
+- **成效統計**：紀錄廣告曝光次數、點擊次數並計算 CTR。
+- **曝光追蹤**：使用瀏覽器 IntersectionObserver API 判斷廣告是否達到曝光條件。
+- **前後端整合**：Vue 3 透過 Axios 呼叫 Spring Boot REST API。
+
+### 技術實作
+
+- 採用 Controller、Service、Repository 分層架構處理 API 請求、業務邏輯與資料存取。
+- 使用 Spring Data JPA / Hibernate 進行資料庫存取。
+- 使用 DTO 區分 API 傳輸資料與 Entity。
+- 透過前端追蹤事件與後端 API 統計廣告成效。
+
+### 原始碼
+
+- [後端廣告模組](sneakermarket-backend/src/main/java/com/project/sneakermarket/advertisement)
+- [前端廣告元件](sneakermarket-frontend/src/components/advertisement)
+  
 ## 系統模組
 
 | 模組 | 主要功能 |
