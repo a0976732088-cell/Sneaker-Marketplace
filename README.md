@@ -306,5 +306,11 @@ main
 - 正式部署前需重新檢視 Session Cookie、CSRF、CORS、第三方 Callback URL 與 Secret 管理。
 
 ---
+## Copyright & Usage（著作權與使用聲明）
 
+本專案為五人團隊共同開發之學習專題，公開原始碼僅供求職作品集展示及技術審查使用。
+
+專案各部分之著作權由相應權利人保留（All Rights Reserved）。
+
+本 Repository 未提供開源授權。除適用法律或 GitHub 服務條款允許的情況外，未經相關著作權人事先同意，不得重製、修改、重新散布或進行商業利用。
 **酷客 Kicks** — 將一般購物、競標交易、活動追蹤與通知整合於同一個球鞋平台。
