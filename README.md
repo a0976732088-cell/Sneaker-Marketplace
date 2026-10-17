@@ -24,13 +24,6 @@
 - **曝光追蹤**：使用瀏覽器 IntersectionObserver API 判斷廣告是否達到曝光條件。
 - **前後端整合**：Vue 3 透過 Axios 呼叫 Spring Boot REST API。
 
-### 技術實作
-
-- 採用 Controller、Service、Repository 分層架構處理 API 請求、業務邏輯與資料存取。
-- 使用 Spring Data JPA / Hibernate 進行資料庫存取。
-- 使用 DTO 區分 API 傳輸資料與 Entity。
-- 透過前端追蹤事件與後端 API 統計廣告成效。
-
  ### 個人實作與設計重點
 
 - **分層架構**：採用 Controller、Service、Repository 分層設計，將 HTTP 請求處理、業務邏輯與資料存取分離，並透過 DTO 傳輸 API 資料。
